@@ -214,3 +214,11 @@ uv run pytest
 ---
 
 See also: [design principles](docs/design-principles.md)
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+## Acknowledgments
+
+Mosaic is part of the DataHelix platform, developed by Adam Labadorf with the National Center for PTSD Brain Bank, U.S. Department of Veterans Affairs.
