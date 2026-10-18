@@ -52,7 +52,7 @@ built — changing either takes effect on restart. Two deployment notes:
   before being handed back, and it is never executed automatically.
 - The egress call carries **no credential and no caller identity** (authn/authz
   is not yet implemented anywhere in Mosaic — see
-  [issue #54](https://github.com/BU-Neuromics/mosaic/issues/54)). Run the
+  [issue #54](https://github.com/datahelix-platform/mosaic/issues/54)). Run the
   planning service on a trusted network segment, and do not expose an MCP or
   GraphQL surface publicly while the delegate is configured: a reachable
   Mosaic can be made to spend model invocations at that service.

@@ -14,7 +14,7 @@
   shape: traversal and grain stay in the artifact for this validator to check and a future
   compiler to execute, while visibility and ordering become view-side state that never reaches a
   boundary; see the note under Consequences).
-- **Tracking issue:** [#177](https://github.com/BU-Neuromics/mosaic/issues/177) (original,
+- **Tracking issue:** [#177](https://github.com/datahelix-platform/mosaic/issues/177) (original,
   bundled scope; superseded by the split issues this ADR proposes filing — see Consequences).
 
 ## Context

@@ -52,7 +52,7 @@ reads to move the `composition.lock.json` pin to
 ```json
 {
   "component": "mosaic",
-  "repo": "BU-Neuromics/mosaic",
+  "repo": "datahelix-platform/mosaic",
   "version": "X.Y.Z",
   "image": "ghcr.io/bu-neuromics/mosaic",
   "digest": "sha256:…",

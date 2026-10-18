@@ -8,7 +8,7 @@
   reference slots persist as relationships; no-silent-loss invariant), ADR-0004 (Hippo→Mosaic
   rename, in flight); consumer: Aperture (reference-rendering bugs to be filed against this
   outcome). Code: `src/mosaic/graphql/schema_builder.py` (`_slot_spec`, `SlotKind.REFERENCE`).
-- **Tracking issue:** [#131](https://github.com/BU-Neuromics/mosaic/issues/131)
+- **Tracking issue:** [#131](https://github.com/datahelix-platform/mosaic/issues/131)
 
 ## Context
 
@@ -140,7 +140,7 @@ JSON emission (a separate concern), or the `findByXref` reverse-lookup surface.
 
 ## Notes / open sub-questions
 
-- **Multivalued cheap-count (deferred, [#132](https://github.com/BU-Neuromics/mosaic/issues/132)).**
+- **Multivalued cheap-count (deferred, [#132](https://github.com/datahelix-platform/mosaic/issues/132)).**
   resolve-to-count is the interim; the optimization — a `count` field or relationship total
   that avoids resolving the whole list — is tracked separately and is not a blocker for
   ratifying this ADR. **Settled at implementation (issue #132):** `MosaicClient.count_relationship`

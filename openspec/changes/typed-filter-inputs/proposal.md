@@ -1,6 +1,6 @@
 # Typed Filter Inputs (generated `<Type>Filter` + `where:` with phased relationship predicates)
 
-Tracking issue: BU-Neuromics/mosaic#155
+Tracking issue: datahelix-platform/mosaic#155
 
 ## Why
 

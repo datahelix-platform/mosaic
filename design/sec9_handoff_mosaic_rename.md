@@ -5,7 +5,7 @@
 **Implements:** [ADR-0004](./decisions/ADR-0004-rename-hippo-to-mosaic.md) (Accepted) — tracked in
 [hippo#113](https://github.com/BU-Neuromics/hippo/issues/113)
 **Coordinates with:** platform ADR-0002 (`datahelix` metapackage) and the cross-repo master plan
-[`proposals/mosaic-rename-and-metapackage.md`](https://github.com/BU-Neuromics/datahelix/blob/claude/hippo-package-rename-gq1cne/proposals/mosaic-rename-and-metapackage.md)
+[`proposals/mosaic-rename-and-metapackage.md`](https://github.com/datahelix-platform/datahelix/blob/claude/hippo-package-rename-gq1cne/proposals/mosaic-rename-and-metapackage.md)
 in the datahelix repo. **This document is self-contained for the hippo-repo work**; the master
 plan governs what happens in datahelix/aperture afterwards.
 **Branch:** `claude/hippo-package-rename-gq1cne` — one PR, commits structured WP-H1 → WP-H6.

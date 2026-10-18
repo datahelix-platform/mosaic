@@ -1,6 +1,6 @@
 # Heterogeneous Roots (`searchAll` + `neighbors` JSON-envelope queries)
 
-Tracking issue: BU-Neuromics/mosaic#158
+Tracking issue: datahelix-platform/mosaic#158
 
 ## Why
 
