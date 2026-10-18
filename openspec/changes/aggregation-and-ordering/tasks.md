@@ -1,6 +1,6 @@
 # Tasks — `aggregation-and-ordering`
 
-Tracking issue: BU-Neuromics/mosaic#156
+Tracking issue: datahelix-platform/mosaic#156
 
 > ADR-0007 ratified 2026-08-19 (gate decisions recorded in the ADR). Implemented
 > 2026-08-19 (all increments).

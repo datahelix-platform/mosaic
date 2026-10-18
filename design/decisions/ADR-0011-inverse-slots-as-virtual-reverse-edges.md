@@ -10,12 +10,12 @@
   that surfaced the gap); **Aperture ADR-0035** (`QuerySpec`); `mosaic-demo-small`'s
   `APERTURE_EXON_CONTRACT.md` Decision 8 (the planner re-validates through Mosaic's validator,
   so a reverse edge the validator rejects can never reach a `proposal` turn).
-- **Tracking issue:** [#204](https://github.com/BU-Neuromics/mosaic/issues/204) (implemented,
-  `7fc300c`); ratification [#217](https://github.com/BU-Neuromics/mosaic/issues/217). Also
+- **Tracking issue:** [#204](https://github.com/datahelix-platform/mosaic/issues/204) (implemented,
+  `7fc300c`); ratification [#217](https://github.com/datahelix-platform/mosaic/issues/217). Also
   **Aperture ADR-0041** (referenced-class slot values in the result table — reverse-traversal
   display columns gate on a deployment declaring an `inverse:` slot, which is this ADR's
   mechanism), and its cross-component umbrella
-  [datahelix#93](https://github.com/BU-Neuromics/datahelix/issues/93).
+  [datahelix#93](https://github.com/datahelix-platform/datahelix/issues/93).
 
 ## Context
 
@@ -193,9 +193,9 @@ Both open sub-questions are dispositioned rather than left ambiguous by the stat
 
 **Two things ratification does not do, worth naming so nobody plans around them.** No tag contains
 `7fc300c` — the latest is `v0.13.0`, which `datahelix`'s `composition.lock.json` pins — so this is
-unreachable from a certifiable server until a release is cut ([#218](https://github.com/BU-Neuromics/mosaic/issues/218)).
+unreachable from a certifiable server until a release is cut ([#218](https://github.com/datahelix-platform/mosaic/issues/218)).
 
-> **Update (2026-09-25): both are closed.** `v0.14.0` tags this work ([#218](https://github.com/BU-Neuromics/mosaic/issues/218)),
+> **Update (2026-09-25): both are closed.** `v0.14.0` tags this work ([#218](https://github.com/datahelix-platform/mosaic/issues/218)),
 > `datahelix` pins it, and the pair `aperture0.5.0+mosaic0.14.0` is certified against fixture
 > **1.1.0** — which the fixture was grown to carry precisely so an `inverse:`-declared reverse edge
 > is exercised by the golden path rather than only by this repo's tests.

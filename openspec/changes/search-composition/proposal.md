@@ -1,6 +1,6 @@
 # Search Composition (page envelope + filters via id-set composition)
 
-Tracking issue: BU-Neuromics/mosaic#157
+Tracking issue: datahelix-platform/mosaic#157
 
 ## Why
 

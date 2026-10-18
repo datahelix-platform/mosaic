@@ -8,7 +8,7 @@ name: Release
 #     when the `PYPI_PUBLISH` repository variable is "true" — see RELEASING.md
 #     for the distribution-name decision that gates this),
 #   - a digest-addressed, multi-arch (amd64+arm64) image at
-#     ghcr.io/bu-neuromics/mosaic (renamed from hippo — ADR-0004 Phase R),
+#     ghcr.io/datahelix-platform/mosaic (renamed from hippo — ADR-0004 Phase R),
 #   - an `image-digest.json` release asset carrying the image digest for the
 #     DataHelix certification workflow / composition.lock.json bump bot.
 
@@ -88,7 +88,7 @@ jobs:
       - uses: docker/metadata-action@v5
         id: meta
         with:
-          images: ghcr.io/bu-neuromics/mosaic
+          images: ghcr.io/datahelix-platform/mosaic
           # Explicit version (not type=semver) so workflow_dispatch runs, which
           # aren't on a tag ref, tag the image identically.
           tags: |
@@ -131,11 +131,11 @@ jobs:
           import json
           version = "${{ needs.validate.outputs.version }}"
           digest = "${{ needs.image.outputs.digest }}"
-          image = "ghcr.io/bu-neuromics/mosaic"
+          image = "ghcr.io/datahelix-platform/mosaic"
           json.dump(
               {
                   "component": "mosaic",
-                  "repo": "BU-Neuromics/mosaic",
+                  "repo": "datahelix-platform/mosaic",
                   "version": version,
                   "image": image,
                   "digest": digest,
