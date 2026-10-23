@@ -7,7 +7,7 @@
   deferral of the multivalued case); ADR-0002 (multivalued reference slots persist as
   relationships — the storage this reverse reads); ADR-0012 (forward-side declaration);
   datahelix#113 item M4.
-- **Tracking issue:** _(added once filed)_
+- **Tracking issue:** [#231](https://github.com/datahelix-platform/mosaic/issues/231)
 
 ## Context
 

@@ -6,7 +6,7 @@
 - **Related:** ADR-0011 (inverse-declared slots as virtual reverse edges; this ADR amends
   where the declaration may live, answering its first open sub-question); ADR-0013 (reverse of
   multivalued forward slots); datahelix#113 item M3.
-- **Tracking issue:** _(added once filed)_
+- **Tracking issue:** [#230](https://github.com/datahelix-platform/mosaic/issues/230)
 
 ## Context
 
