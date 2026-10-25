@@ -237,3 +237,38 @@ classes:
     manifest = build_capability_manifest(registry)
     assert manifest["Widget"].search_available is False
     assert manifest["Widget"].fields_by_name["name"].searchable is False
+
+
+_OWN_PROCESS_SCHEMA = """
+id: https://example.org/own_process
+name: own_process
+prefixes:
+  linkml: https://w3id.org/linkml/
+  own: https://example.org/own_process/
+default_prefix: own
+default_range: string
+imports:
+  - linkml:types
+classes:
+  Process:
+    attributes:
+      id:
+        identifier: true
+  Sample:
+    attributes:
+      id:
+        identifier: true
+      produced_by:
+        range: Process
+"""
+
+
+def test_domain_class_named_like_infrastructure_is_exposed():
+    # A schema that defines its own ``Process`` without importing hippo_core:
+    # the name collides with a framework class but the identity does not.
+    registry = SchemaRegistry.from_yaml(_OWN_PROCESS_SCHEMA)
+    assert exposed_class_names(registry) == ["Process", "Sample"]
+    sample = build_type_model(registry)["Sample"]
+    produced_by = {f.name: f for f in sample.fields}["produced_by"]
+    assert produced_by.kind is SlotKind.REFERENCE
+    assert produced_by.target_class == "Process"
