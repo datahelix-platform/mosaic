@@ -44,6 +44,23 @@ INFRASTRUCTURE_CLASSES: frozenset[str] = frozenset(
     }
 )
 
+#: ``from_schema`` of the framework classes named in INFRASTRUCTURE_CLASSES.
+HIPPO_CORE_SCHEMA_URI = "https://w3id.org/hippo/hippo_core"
+
+
+def is_infrastructure_class(registry: SchemaRegistry, name: str) -> bool:
+    """True if ``name`` is one of ``hippo_core``'s framework classes.
+
+    Matches by identity (the class's defining schema), not bare name, so a
+    domain schema that defines its own ``Process`` keeps it as an ordinary
+    entity class.
+    """
+    if name not in INFRASTRUCTURE_CLASSES:
+        return False
+    cls = registry.get_class(name)
+    return cls is not None and str(cls.from_schema) == HIPPO_CORE_SCHEMA_URI
+
+
 # VALUE_TYPE_CLASSES (imported above) is the framework-baseline value-type
 # set, re-exported here for backward compatibility. As of issue #90 the
 # authoritative, per-schema set is computed from the schema via
@@ -145,7 +162,7 @@ def exposed_class_names(registry: SchemaRegistry) -> list[str]:
     value_types = registry.value_type_classes()
     names: list[str] = []
     for name in registry.class_names():
-        if name in INFRASTRUCTURE_CLASSES or name in value_types:
+        if is_infrastructure_class(registry, name) or name in value_types:
             continue
         cls = sv.get_class(name)
         if cls is None or cls.abstract:
@@ -173,7 +190,7 @@ def _classify_slot(slot: Any, registry: SchemaRegistry, enums: dict[str, Any]) -
         # object itself (JSON), not a UUID reference to another entity.
         kind = SlotKind.STRUCTURED
         target_class = rng
-    elif registry.has_class(rng) and rng not in INFRASTRUCTURE_CLASSES:
+    elif registry.has_class(rng) and not is_infrastructure_class(registry, rng):
         kind = SlotKind.REFERENCE
         target_class = rng
 
