@@ -115,12 +115,52 @@ def test_rejects_bad_mode():
         parse_query_spec({"v": 1, "anchor": "Sample", "mode": "XOR", "criteria": []})
 
 
-def test_rejects_columns():
+_BASE = {"v": 1, "anchor": "Sample", "mode": "AND", "criteria": []}
+
+
+def test_parses_anchor_columns():
+    spec = parse_query_spec({**_BASE, "columns": [{"path": ["name"]}, {"path": ["volume_ml"]}]})
+    assert [c.slot for c in spec.columns] == ["name", "volume_ml"]
+
+
+def test_absent_or_null_columns_means_no_selection():
+    assert parse_query_spec(_BASE).columns == ()
+    assert parse_query_spec({**_BASE, "columns": None}).columns == ()
+    assert parse_query_spec({**_BASE, "columns": []}).columns == ()
+
+
+def test_multi_hop_column_is_still_rejected_naming_the_hop():
     with pytest.raises(QuerySpecShapeError) as exc:
-        parse_query_spec(
-            {"v": 1, "anchor": "Sample", "mode": "AND", "criteria": [], "columns": [{"slot": "name"}]}
-        )
+        parse_query_spec({**_BASE, "columns": [{"path": ["donor", "name"]}]})
     assert exc.value.code == "COLUMNS_NOT_SUPPORTED"
+    assert "donor" in str(exc.value) and "name" in str(exc.value)
+    assert exc.value.path == "$.columns[0].path"
+
+
+@pytest.mark.parametrize("key", ["aggregate", "explode", "mode", "many"])
+def test_grain_choice_is_still_rejected(key):
+    with pytest.raises(QuerySpecShapeError) as exc:
+        parse_query_spec({**_BASE, "columns": [{"path": ["name"], key: True}]})
+    assert exc.value.code == "COLUMNS_NOT_SUPPORTED"
+
+
+@pytest.mark.parametrize(
+    "columns",
+    ["name", [{"slot": "name"}], [{"path": []}], [{"path": "name"}], [{"path": ["name"], "label": "x"}], ["name"]],
+)
+def test_malformed_columns_are_shape_errors(columns):
+    with pytest.raises(QuerySpecShapeError) as exc:
+        parse_query_spec({**_BASE, "columns": columns})
+    assert exc.value.code == "INVALID_QUERYSPEC_SHAPE"
+
+
+def test_validates_columns_against_the_manifest():
+    ok = parse_query_spec({**_BASE, "columns": [{"path": ["name"]}]})
+    assert validate_query_spec(ok, _manifest()).valid
+    bad = parse_query_spec({**_BASE, "columns": [{"path": ["name"]}, {"path": ["nope"]}]})
+    errors = validate_query_spec(bad, _manifest()).errors
+    assert [(e.code, e.path) for e in errors] == [("UNKNOWN_SLOT", "$.columns[1].path")]
+    assert "nope" in errors[0].message
 
 
 def test_rejects_depth_beyond_cap():

@@ -940,11 +940,45 @@ class InverseSlot:
     derived side has no column, link table, or relationship rows of its
     own — every read, filter, and count through it delegates to
     ``forward_slot``.
+
+    ``target_classes`` are the concrete classes whose rows the reverse edge
+    can reach: ``target_class`` itself when it is concrete, plus every
+    concrete descendant (issue #224). When ``target_class`` is abstract
+    (``Sample`` with ``Brain``/``CSF``/... subclasses) it has no table of its
+    own and every hit lives in a descendant's table, so adapters must
+    resolve the edge across all of them.
     """
 
     name: str
     target_class: str
     forward_slot: str
+    target_classes: tuple[str, ...] = ()
+
+    @property
+    def tables(self) -> tuple[str, ...]:
+        """Concrete classes to resolve against (falls back to the range)."""
+        return self.target_classes or (self.target_class,)
+
+
+def concrete_class_closure(sv: SchemaView, class_name: str) -> tuple[str, ...]:
+    """``class_name`` and its descendants that are concrete (issue #224).
+
+    Mixins and ``abstract`` classes own no storage, so they are skipped. The
+    range itself comes first when concrete; descendants follow sorted, for a
+    deterministic SQL shape.
+    """
+    try:
+        descendants = sv.class_descendants(class_name, reflexive=True, mixins=False)
+    except Exception:
+        descendants = [class_name]
+    out: list[str] = []
+    for name in descendants:
+        cls = sv.get_class(name)
+        if cls is None or cls.abstract or cls.mixin:
+            continue
+        out.append(str(name))
+    head = [n for n in out if n == class_name]
+    return tuple(head + sorted(n for n in out if n != class_name))
 
 
 def _validate_inverse_slots(sv: SchemaView) -> None:
@@ -991,6 +1025,13 @@ def _validate_inverse_slots(sv: SchemaView) -> None:
                     f"{where} declares `inverse: {inverse}` but its range "
                     f"{rng!r} is not an entity class; `inverse` is only "
                     f"meaningful on a slot ranged against another class."
+                )
+                continue
+            if not concrete_class_closure(sv, str(rng)):
+                failures.append(
+                    f"{where} declares `inverse: {inverse}` but its range "
+                    f"{rng!r} is abstract with no concrete descendant, so no "
+                    f"stored row can ever reference this entity (issue #224)."
                 )
                 continue
             if slot.required or slot.identifier:
@@ -1336,6 +1377,9 @@ class SchemaRegistry:
                             name=slot.name,
                             target_class=str(slot.range),
                             forward_slot=str(inverse),
+                            target_classes=concrete_class_closure(
+                                self._sv, str(slot.range)
+                            ),
                         )
                     )
         self._inverse_slots_cache[class_name] = out

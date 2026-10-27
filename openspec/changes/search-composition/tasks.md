@@ -1,6 +1,6 @@
 # Tasks — `search-composition`
 
-Tracking issue: BU-Neuromics/mosaic#157
+Tracking issue: datahelix-platform/mosaic#157
 
 > Implemented 2026-08-19 (after ADR-0006 increments 1–2 and ADR-0007 landed, so `where:`
 > composition and `order_by` precedence shipped in the same change).

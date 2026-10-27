@@ -33,7 +33,7 @@ ARG REVISION=unknown
 
 LABEL org.opencontainers.image.title="mosaic" \
       org.opencontainers.image.description="Mosaic (formerly Hippo) — LinkML runtime for the DataHelix platform" \
-      org.opencontainers.image.source="https://github.com/BU-Neuromics/mosaic" \
+      org.opencontainers.image.source="https://github.com/datahelix-platform/mosaic" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${REVISION}"

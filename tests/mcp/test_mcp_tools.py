@@ -126,6 +126,64 @@ class TestExecuteQuerySpec:
         # GraphQL flattens, because it renders typed fields.
         assert payload["items"][0]["data"]["name"] == "S2"
 
+    async def test_columns_project_each_envelope_to_the_selected_slots(self, hippo_client):
+        """Issue #215: the planner can say which FIELD, and the envelope
+        carries only that. One anchor stays one row; total is unaffected."""
+        _seed(hippo_client)
+        server = create_mcp_server(hippo_client)
+        spec = {"v": 1, "anchor": "Sample", "mode": "AND", "criteria": []}
+        full = await _call_tool(server, "execute_query_spec", {"query_spec": spec})
+        picked = await _call_tool(
+            server,
+            "execute_query_spec",
+            {"query_spec": {**spec, "columns": [{"path": ["volume_ml"]}]}},
+        )
+        assert picked["valid"] is True
+        assert picked["total"] == full["total"]
+        assert len(picked["items"]) == len(full["items"])
+        for item, whole in zip(picked["items"], full["items"]):
+            assert set(item["data"]) == {"volume_ml"}
+            assert set(whole["data"]) > {"volume_ml"}
+            # Envelope metadata survives; only the slots are trimmed.
+            assert item["id"] == whole["id"]
+            assert item["entity_type"] == "Sample"
+
+    async def test_unknown_or_multi_hop_columns_come_back_coded(self, hippo_client):
+        _seed(hippo_client)
+        server = create_mcp_server(hippo_client)
+        base = {"v": 1, "anchor": "Sample", "mode": "AND", "criteria": []}
+        unknown = await _call_tool(
+            server, "execute_query_spec", {"query_spec": {**base, "columns": [{"path": ["nope"]}]}}
+        )
+        assert unknown["valid"] is False
+        assert unknown["errors"][0]["code"] == "UNKNOWN_SLOT"
+        hop = await _call_tool(
+            server,
+            "execute_query_spec",
+            {"query_spec": {**base, "columns": [{"path": ["donor_id", "name"]}]}},
+        )
+        assert hop["valid"] is False
+        assert hop["errors"][0]["code"] == "COLUMNS_NOT_SUPPORTED"
+
+    async def test_columns_are_rejected_loudly_by_aggregate_tools(self, hippo_client):
+        _seed(hippo_client)
+        server = create_mcp_server(hippo_client)
+        payload = await _call_tool(
+            server,
+            "count_query_spec",
+            {
+                "query_spec": {
+                    "v": 1,
+                    "anchor": "Sample",
+                    "mode": "AND",
+                    "criteria": [],
+                    "columns": [{"path": ["name"]}],
+                }
+            },
+        )
+        assert payload["valid"] is False
+        assert payload["errors"][0]["code"] == "COLUMNS_NOT_APPLICABLE"
+
     async def test_related_condition_filters_through_the_donor(self, hippo_client):
         donor = _seed(hippo_client)
         other_donor = hippo_client.create("Donor", {"name": "D2"})

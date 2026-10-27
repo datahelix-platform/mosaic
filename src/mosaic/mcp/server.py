@@ -261,6 +261,9 @@ def create_mcp_server(hippo_client: MosaicClient) -> MCPServer:
           expose no orderBy argument either. Meaningful for search (an
           explicit `sort` overrides FTS rank, matching `search()`'s own
           `order_by`), so `allow_sort=True` there.
+        - `columns`: field selection trims an entity envelope, which only
+          execute_query_spec returns (issue #215) -- rejected everywhere this
+          helper runs.
         - `asOf`: supported only where the underlying method takes it --
           `count()` does; `facet_counts()`/`field_range()`/`search()` do
           not ("Not defined under as-of in this increment", their
@@ -270,6 +273,15 @@ def create_mcp_server(hippo_client: MosaicClient) -> MCPServer:
         issue #129's rule; validate_query_spec's own
         ASOF_RELATIONSHIP_FILTER_UNSUPPORTED check still runs underneath
         this for count_query_spec's asOf+RelatedCondition case."""
+        if spec.columns:
+            # Field selection is an execute_query_spec capability (issue
+            # #215); a count/facet/range/search result has no entity
+            # envelope to trim, so silently ignoring it would be a lie.
+            return {
+                "code": "COLUMNS_NOT_APPLICABLE",
+                "message": "'columns' only applies to execute_query_spec -- omit it here",
+                "path": "$.columns",
+            }
         if not allow_sort and spec.sort:
             return {
                 "code": "SORT_NOT_APPLICABLE",
@@ -411,6 +423,7 @@ def create_mcp_server(hippo_client: MosaicClient) -> MCPServer:
                 as_of=compiled.as_of,
                 order_by=compiled.order_by,
                 order_dir=compiled.order_dir,
+                fields=list(compiled.fields) if compiled.fields else None,
                 limit=limit,
                 offset=offset,
             )
@@ -733,9 +746,14 @@ name>, "quantifier": "some" | "none", "criteria": [FieldCondition, ...]}. \
 whether the relationship is one-to-one or one-to-many, so never simulate \
 it with a client-side per-id fan-out (fetch-then-filter in a loop).
 
-4. `columns` is NOT supported yet -- omit it entirely. execute_query_spec \
-always returns full entity envelopes; there is no column-projection or \
-aggregate-vs-explode compiler on this deployment.
+4. `columns` takes ANCHOR slots only: a list of {"path": ["<slot name>"]}, \
+one single-element path per field of the anchor (check the field names on \
+mosaic://capabilities). Use it when the user asks which FIELD(S) to look at \
+-- do not filter or sort on a field just to surface it. It trims each \
+returned entity's `data` to those slots; there is still one row per anchor \
+entity. A path that follows a reference (two or more elements), and any \
+aggregate/explode choice, is NOT supported -- omit a traversal entirely \
+(COLUMNS_NOT_SUPPORTED). Omit `columns` to get every field.
 
 5. `asOf` cannot combine with a RelatedCondition anywhere in `criteria` \
 (including nested inside a group) -- pick a point in time OR a \

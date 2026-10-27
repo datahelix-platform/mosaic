@@ -55,7 +55,12 @@ class TestRecognition:
     def test_inverse_reference_slots_resolves_forward_slot(self):
         reg = _registry(VALID)
         assert reg.inverse_reference_slots("Donor") == [
-            InverseSlot(name="samples", target_class="Sample", forward_slot="donor")
+            InverseSlot(
+                name="samples",
+                target_class="Sample",
+                forward_slot="donor",
+                target_classes=("Sample",),
+            )
         ]
         assert reg.inverse_reference_slots("Sample") == []
 

@@ -35,13 +35,14 @@ it is *what Mosaic's ``where:`` surface can actually compile today*:
   ``order_by``/``order_dir`` pair, mirrored by GraphQL's single-valued
   ``orderBy`` argument) has no multi-column sort to compile a second
   entry against.
-- ``columns`` is REJECTED with a coded, not-a-crash error: its
-  aggregate-vs-explode choice on a to-many path has no Mosaic-side
-  equivalent to validate against — ADR-0009's own Consequences section
-  names this as unresolved even in ADR-0035 itself. Today's real Aperture
-  emitter never sends this field, so the rejection never fires against an
-  actual consumer; it exists so a future caller gets a clear error instead
-  of a silently-ignored field.
+- ``columns`` IS accepted for **anchor-owned slots only** (issue #215,
+  approved 2026-10-02, ADR-0009's 2026-10-02 note): a list of
+  ``{"path": [<slot>]}`` ColumnSpecs, each a single-hop path naming a field
+  of the anchor. Grain is untouched — one anchor entity stays one row. Any
+  path with a hop, and anything carrying the ``aggregate``/``explode`` choice,
+  is still rejected with ``COLUMNS_NOT_SUPPORTED`` (coded, not-a-crash) naming
+  what it objected to: that half needs a traversal compiler and is not
+  approved. ``COLUMNS_NOT_SUPPORTED`` therefore *narrows*, it does not lift.
 
 **Op spelling:** ADR-0035's prose writes ``isNull``; both real
 implementations (Aperture's shipped ``QueryOp`` type and this module's
@@ -109,6 +110,18 @@ class SortField:
 
 
 @dataclass(frozen=True)
+class ColumnSpec:
+    """One ``columns`` entry (ADR-0035): an anchor-owned slot to return.
+
+    ``path`` is always a single segment here — multi-hop paths are rejected at
+    parse time (issue #215 scope), so a ``ColumnSpec`` that exists is
+    anchor-owned by construction.
+    """
+
+    slot: str
+
+
+@dataclass(frozen=True)
 class QuerySpec:
     """The parsed, not-yet-validated artifact (ADR-0009/ADR-0035)."""
 
@@ -118,6 +131,8 @@ class QuerySpec:
     criteria: tuple[Criterion, ...] = ()
     as_of: Optional[str] = None
     sort: tuple[SortField, ...] = ()
+    #: Empty = no selection (full envelopes, the historical behaviour).
+    columns: tuple[ColumnSpec, ...] = ()
 
 
 class QuerySpecShapeError(ValueError):
@@ -203,6 +218,41 @@ def _parse_sort_field(raw: Any, path: str) -> SortField:
     return SortField(slot=raw["slot"], direction=direction)
 
 
+#: ColumnSpec keys that only make sense on a to-many traversal (ADR-0035/0041).
+_TRAVERSAL_COLUMN_KEYS = frozenset({"aggregate", "explode", "mode", "many"})
+
+
+def _parse_column_spec(raw: Any, path: str) -> ColumnSpec:
+    _require(isinstance(raw, dict), "INVALID_QUERYSPEC_SHAPE", "must be an object like {\"path\": [\"slot\"]}", path)
+    seg = raw.get("path")
+    _require(
+        isinstance(seg, list) and len(seg) > 0 and all(isinstance(x, str) for x in seg),
+        "INVALID_QUERYSPEC_SHAPE",
+        "'path' must be a non-empty list of slot names",
+        f"{path}.path",
+    )
+    if len(seg) > 1:
+        raise QuerySpecShapeError(
+            "COLUMNS_NOT_SUPPORTED",
+            f"column path {seg!r} follows a reference ({seg[0]!r} -> {seg[1]!r}); "
+            "only anchor-owned slots are supported (a single-element path) — "
+            "omit the traversal, or request the reference slot itself",
+            f"{path}.path",
+        )
+    traversal = sorted(_TRAVERSAL_COLUMN_KEYS & raw.keys())
+    if traversal:
+        raise QuerySpecShapeError(
+            "COLUMNS_NOT_SUPPORTED",
+            f"{traversal} choose an aggregate-vs-explode grain for a to-many "
+            "traversal, which is not supported — anchor-owned columns keep one "
+            "row per anchor entity",
+            f"{path}.{traversal[0]}",
+        )
+    extra = sorted(set(raw) - {"path"})
+    _require(not extra, "INVALID_QUERYSPEC_SHAPE", f"unknown ColumnSpec key(s) {extra}", path)
+    return ColumnSpec(slot=seg[0])
+
+
 def parse_query_spec(raw: Any) -> QuerySpec:
     """Parse a raw (JSON-decoded) object into a :class:`QuerySpec`.
 
@@ -218,14 +268,11 @@ def parse_query_spec(raw: Any) -> QuerySpec:
     _require(isinstance(raw.get("anchor"), str), "INVALID_QUERYSPEC_SHAPE", "'anchor' must be a string", "$.anchor")
     mode = raw.get("mode")
     _require(mode in _VALID_MODES, "INVALID_QUERYSPEC_SHAPE", "'mode' must be 'AND' or 'OR'", "$.mode")
-    if "columns" in raw and raw["columns"] is not None:
-        raise QuerySpecShapeError(
-            "COLUMNS_NOT_SUPPORTED",
-            "'columns' (aggregate-vs-explode selection, ADR-0035) has no "
-            "Mosaic-side compiler yet — omit it, or request full envelopes "
-            "and project client-side",
-            "$.columns",
-        )
+    raw_columns = raw.get("columns")
+    if raw_columns is None:
+        raw_columns = []
+    _require(isinstance(raw_columns, list), "INVALID_QUERYSPEC_SHAPE", "'columns' must be a list", "$.columns")
+    columns = tuple(_parse_column_spec(c, f"$.columns[{i}]") for i, c in enumerate(raw_columns))
     raw_criteria = raw.get("criteria", [])
     _require(isinstance(raw_criteria, list), "INVALID_QUERYSPEC_SHAPE", "'criteria' must be a list", "$.criteria")
     criteria = tuple(
@@ -237,7 +284,7 @@ def parse_query_spec(raw: Any) -> QuerySpec:
     raw_sort = raw.get("sort") or []
     _require(isinstance(raw_sort, list), "INVALID_QUERYSPEC_SHAPE", "'sort' must be a list", "$.sort")
     sort = tuple(_parse_sort_field(s, f"$.sort[{i}]") for i, s in enumerate(raw_sort))
-    return QuerySpec(v=1, anchor=raw["anchor"], mode=mode, criteria=criteria, as_of=as_of, sort=sort)
+    return QuerySpec(v=1, anchor=raw["anchor"], mode=mode, criteria=criteria, as_of=as_of, sort=sort, columns=columns)
 
 
 # ---------------------------------------------------------------------------
@@ -446,6 +493,16 @@ def validate_query_spec(
                 "$.sort",
             )
         )
+    for i, col in enumerate(spec.columns):
+        if col.slot not in anchor.fields_by_name:
+            errors.append(
+                QuerySpecError(
+                    "UNKNOWN_SLOT",
+                    f"{anchor.class_name!r} has no field {col.slot!r}. "
+                    f"Known fields: {sorted(anchor.fields_by_name)}",
+                    f"$.columns[{i}].path",
+                )
+            )
     for i, s in enumerate(spec.sort):
         field = anchor.fields_by_name.get(s.slot)
         if field is None:

@@ -1,6 +1,6 @@
 # Aggregation and Ordering (count mode, facet counts, min/max, order_by + pushdown)
 
-Tracking issue: BU-Neuromics/mosaic#156
+Tracking issue: datahelix-platform/mosaic#156
 
 ## Why
 

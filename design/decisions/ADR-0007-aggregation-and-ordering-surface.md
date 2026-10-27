@@ -13,9 +13,9 @@
   (the co-design exploration), **Aperture ADR-0035** (Accepted 2026-08-19 — the QuerySpec
   artifact whose counts/sort compile to this surface). Code landing sites cited inline
   (mosaic @ 502991c, v0.12.1).
-- **Tracking issue:** [#154](https://github.com/BU-Neuromics/mosaic/issues/154)
+- **Tracking issue:** [#154](https://github.com/datahelix-platform/mosaic/issues/154)
   (implementation: OpenSpec `aggregation-and-ordering`,
-  [#156](https://github.com/BU-Neuromics/mosaic/issues/156))
+  [#156](https://github.com/datahelix-platform/mosaic/issues/156))
 
 ## Context
 
@@ -143,5 +143,5 @@ never "unlimited" (#130; `query_service.py:276-279` and the adapters' guards), a
   results come back in FTS rank order when no explicit ordering is given; an explicit
   `order_by` overrides rank and reuses this ADR's pushdown.
 - Implementation increments, tasks, and acceptance live in the OpenSpec change
-  `aggregation-and-ordering` ([#156](https://github.com/BU-Neuromics/mosaic/issues/156));
+  `aggregation-and-ordering` ([#156](https://github.com/datahelix-platform/mosaic/issues/156));
   do not implement ahead of it.

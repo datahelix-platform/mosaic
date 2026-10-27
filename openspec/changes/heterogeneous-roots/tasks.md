@@ -1,6 +1,6 @@
 # Tasks — `heterogeneous-roots`
 
-Tracking issue: BU-Neuromics/mosaic#158
+Tracking issue: datahelix-platform/mosaic#158
 
 > Implemented 2026-08-19/20 (after `search-composition`, whose ranked path and batched
 > materialization discipline `searchAll` reuses).

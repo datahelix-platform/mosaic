@@ -12,7 +12,7 @@
   *feature*-parity campaigns that shipped against the JSONB model), `core/storage/
   pg_ddl_generator.py` (`PostgresDDLGenerator` — "the not-yet-wired-into-CRUD per-class-table
   migration path", maintained in lockstep with the SQLite DDL generator).
-- **Tracking issue:** [#162](https://github.com/BU-Neuromics/mosaic/issues/162)
+- **Tracking issue:** [#162](https://github.com/datahelix-platform/mosaic/issues/162)
 
 ## Context
 

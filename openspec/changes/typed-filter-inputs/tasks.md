@@ -1,6 +1,6 @@
 # Tasks — `typed-filter-inputs`
 
-Tracking issue: BU-Neuromics/mosaic#155
+Tracking issue: datahelix-platform/mosaic#155
 
 > ADR-0006 ratified 2026-08-19; ALL four increments implemented (1–2 on 2026-08-19,
 > 3–4 on 2026-08-19/20). The typed filter contract is complete.

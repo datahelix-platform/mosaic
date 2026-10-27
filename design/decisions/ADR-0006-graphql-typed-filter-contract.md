@@ -17,9 +17,9 @@
   already taken by X3a/X3b — the X4/L9/L10 citation form modeled by
   `design/sec5_ingestion.md` §5.4 and `openspec/changes/batch-unit-of-work/proposal.md`).
   Code landing sites cited inline (mosaic @ 502991c, v0.12.1).
-- **Tracking issue:** [#153](https://github.com/BU-Neuromics/mosaic/issues/153)
+- **Tracking issue:** [#153](https://github.com/datahelix-platform/mosaic/issues/153)
   (implementation: OpenSpec `typed-filter-inputs`,
-  [#155](https://github.com/BU-Neuromics/mosaic/issues/155))
+  [#155](https://github.com/datahelix-platform/mosaic/issues/155))
 
 ## Context
 
@@ -211,5 +211,5 @@ answer).
 - **Filter-nesting depth cap default** (M5b): pick a value (Airtable/Notion cap criteria
   nesting at 3; Aperture's QuerySpec caps at 3) and a coded error for exceeding it.
 - Implementation increments, tasks, and acceptance live in the OpenSpec change
-  `typed-filter-inputs` ([#155](https://github.com/BU-Neuromics/mosaic/issues/155));
+  `typed-filter-inputs` ([#155](https://github.com/datahelix-platform/mosaic/issues/155));
   do not implement ahead of it.

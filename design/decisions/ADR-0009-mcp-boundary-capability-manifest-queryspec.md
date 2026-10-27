@@ -14,7 +14,7 @@
   shape: traversal and grain stay in the artifact for this validator to check and a future
   compiler to execute, while visibility and ordering become view-side state that never reaches a
   boundary; see the notes under Consequences).
-- **Tracking issue:** [#177](https://github.com/BU-Neuromics/mosaic/issues/177) (original,
+- **Tracking issue:** [#177](https://github.com/datahelix-platform/mosaic/issues/177) (original,
   bundled scope; superseded by the split issues this ADR proposes filing — see Consequences).
 
 ## Context
@@ -137,8 +137,37 @@ on an increment before building it. Approved (labadorf, 2026-10-02), in this sha
   It touches the same live wire contract as #182/#183/#195/#196/#199/#205, and lands with the same
   kind of explicit scope note each of those carried.
 
-Only when that compiler lands does the second follow-up — accepting traversal paths and their
-explicit `aggregate`-vs-`explode` choice — come due. This note does not approve it.
+> **Shipped:** `be20d96` (#223) — `columns` of anchor-owned slots, compiled to
+> `MosaicClient.query(fields=...)`, advertised per entity as `column_projection: "anchor"`.
+
+**Note (2026-10-27) — the second follow-up is approved: traversal paths in `columns`.** Decided by
+labadorf in the [datahelix#113](https://github.com/datahelix-platform/datahelix/issues/113) decision
+pass (item D0), after the anchor-only increment shipped and the consumer that needs the next step
+(the conversational composer: "solid samples *with their donor's age at death*") was found closed at
+every layer. Scope:
+
+- **Paths.** `columns[].path` accepts **one or two hops**, each a reference slot the previous class
+  holds — forward, or a declared or synthesized inverse (ADR-0011/0012/0013) — ending in a slot of
+  the final class. Validated hop by hop against the capability manifest, with the same actionable
+  per-hop errors. Depth two matches Aperture ADR-0041's client cap.
+- **Spelling is settled: LinkML slot names**, exactly as `criteria` and the anchor-only increment
+  already spell fields, never GraphQL field names. Aperture translates on its side
+  (`canonicalizeQuerySpec`); Reel emits slot names everywhere else.
+- **A to-many hop needs an explicit `mode`: `count | joinIds | explode`** (ADR-0041's vocabulary).
+  `explode` changes the grain and is **capped to one path per spec**, matching ADR-0041's ratified
+  cap; an exploded path shows all members (ADR-0041's resolution — criteria select anchors, not
+  members). A to-many hop without `mode` is a coded error naming the hop.
+- **Advertised** on the manifest as `column_projection: "traversal"`, so a client tells the three
+  generations apart (none / anchor / traversal) without probing.
+- **`COLUMNS_NOT_SUPPORTED` narrows once more.** It stops refusing hops and starts refusing depth
+  greater than two, a to-many hop without `mode`, and a second `explode`. `construct-query-spec`
+  moves from "anchor slots only" to describing paths and the to-many choice.
+- **Grain is stated in the envelope** when `explode` is in play (rows from anchors), so a transport
+  can say what ADR-0041 requires on screen.
+
+Implementation is datahelix#113 item M6 (issue to file in this repo). Until it lands the relay's
+re-validation turns any planner output carrying such `columns` into an error turn, which is the
+honest behaviour and stays.
 
 
 - A fourth transport exists with the same trust boundary (or lack thereof) as REST/GraphQL today

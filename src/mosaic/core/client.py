@@ -854,6 +854,7 @@ class MosaicClient:
         where: Optional[dict[str, Any]] = None,
         order_by: Optional[str] = None,
         order_dir: str = "asc",
+        fields: Optional[list[str]] = None,
     ) -> "PaginatedResult":
         """Query entities with filter criteria.
 
@@ -878,11 +879,29 @@ class MosaicClient:
                 ``date_from``/``date_to``. Omitted = the historical
                 ``created_at``-ascending default.
             order_dir: "asc" (default) or "desc"; only used with order_by.
+            fields: Optional anchor slot names to keep (issue #215). Each
+                item's ``data`` is trimmed to these slots; envelope metadata
+                (``id``, ``entity_type``, version/provenance fields) is always
+                kept, and ``total``/ordering/pagination are unaffected — one
+                entity is still one row. Omitted/``None`` = full envelopes.
+                Names are not checked here (the QuerySpec validator does that
+                against the capability manifest); an unknown name is simply
+                absent from the result.
         """
-        return self._query_service.query(
+        page = self._query_service.query(
             entity_type, filters, date_from, date_to, limit, offset, filter_mode,
             as_of=as_of, where=where, order_by=order_by, order_dir=order_dir,
         )
+        if fields is None:
+            return page
+        keep = set(fields)
+        page.items = [
+            {**item, "data": {k: v for k, v in item.get("data", {}).items() if k in keep}}
+            if isinstance(item, dict)
+            else item
+            for item in page.items
+        ]
+        return page
 
     def count(
         self,

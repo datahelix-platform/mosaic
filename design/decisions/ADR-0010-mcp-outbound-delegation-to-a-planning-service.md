@@ -2,17 +2,17 @@
 
 - **Status:** Proposed
 - **Date:** 2026-09-08
-- **Deciders:** labadorf (review of [#199](https://github.com/BU-Neuromics/mosaic/pull/199)); clandaverde (implementation)
+- **Deciders:** labadorf (review of [#199](https://github.com/datahelix-platform/mosaic/pull/199)); clandaverde (implementation)
 - **Related:** ADR-0009 (MCP boundary, capability manifest, QuerySpec — this ADR extends its
   surface with the one tool that is not a `MosaicClient` wrapper); **Aperture ADR-0032**
   (rejects a dedicated control-plane service — the constraint that forces the relay here) and
   **ADR-0035** (`QuerySpec`); [sec8](../sec8_auth_integration.md) (auth integration — inbound
-  only, see Consequences); issue [#54](https://github.com/BU-Neuromics/mosaic/issues/54)
+  only, see Consequences); issue [#54](https://github.com/datahelix-platform/mosaic/issues/54)
   Part A (authn/authz, referenced not resolved); `mosaic-demo-small`'s
   `openspec/changes/add-exon-conversational-contract/design.md` Decision 8 (the wire
   contract, owned by that repo).
-- **Tracking issue:** [#186](https://github.com/BU-Neuromics/mosaic/issues/186)
-  (`converse_query_spec`), implemented in [#199](https://github.com/BU-Neuromics/mosaic/pull/199).
+- **Tracking issue:** [#186](https://github.com/datahelix-platform/mosaic/issues/186)
+  (`converse_query_spec`), implemented in [#199](https://github.com/datahelix-platform/mosaic/pull/199).
 
 ## Context
 
@@ -72,7 +72,7 @@ currently only instance.
    is stale, buggy, or bypassed, and it keeps ADR-0009's guarantee a property of Mosaic rather
    than of another repo's release cycle.
 
-   "Every" is load-bearing, and was widened by [#200](https://github.com/BU-Neuromics/mosaic/pull/200)
+   "Every" is load-bearing, and was widened by [#200](https://github.com/datahelix-platform/mosaic/pull/200)
    rather than assumed here: editing an earlier turn makes the planner *recompute* the turns that
    follow it, so a response can carry freshly generated specs this deployment has never seen.
    Validating only the turn just taken would let those reach the caller unchecked — precisely the

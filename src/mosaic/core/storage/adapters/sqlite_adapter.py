@@ -1579,6 +1579,15 @@ class SQLiteAdapter(EntityStore):
             return data
         return {k: v for k, v in data.items() if k not in inverse}
 
+    def _inverse_tables(self, inv: "InverseSlot") -> list[str]:
+        """Per-class tables a virtual inverse slot resolves against.
+
+        The range's concrete closure (issue #224): an abstract range such as
+        ``Sample`` owns no table, so its rows live in ``Brain``, ``CSF``, ...
+        Only tables that exist are returned.
+        """
+        return [t for t in inv.tables if self._per_class_table_exists(t)]
+
     def _hydrate_inverse_refs_batch(
         self,
         conn: sqlite3.Connection,
@@ -1600,13 +1609,21 @@ class SQLiteAdapter(EntityStore):
         cursor = conn.cursor()
         id_ph = ",".join("?" for _ in entity_ids)
         for slot_name, inv in inverse.items():
-            if not self._per_class_table_exists(inv.target_class):
+            tables = self._inverse_tables(inv)
+            if not tables:
                 continue
+            # One statement per slot even when the range is abstract
+            # (issue #224): UNION ALL across the concrete closure, ordered
+            # by table position then rowid so ids stay deterministic.
+            selects = [
+                f'SELECT "id", "{inv.forward_slot}" AS fk, {i} AS t_ord, rowid AS r_ord '
+                f'FROM "{table}" WHERE "{inv.forward_slot}" IN ({id_ph}) '
+                "AND is_available = 1"
+                for i, table in enumerate(tables)
+            ]
             cursor.execute(
-                f'SELECT "id", "{inv.forward_slot}" AS fk FROM "{inv.target_class}" '
-                f'WHERE "{inv.forward_slot}" IN ({id_ph}) AND is_available = 1 '
-                "ORDER BY rowid",
-                tuple(entity_ids),
+                " UNION ALL ".join(selects) + " ORDER BY t_ord, r_ord",
+                tuple(entity_ids) * len(tables),
             )
             for row in cursor.fetchall():
                 out.setdefault(row["fk"], {}).setdefault(slot_name, []).append(
@@ -3038,6 +3055,13 @@ class SQLiteAdapter(EntityStore):
             outer = scope or f'"{entity_type}".'
             target_columns = self._valid_query_columns(target)
             if inverse_of is not None:
+                inv = self._inverse_slots(entity_type)[edge]
+                tables = self._inverse_tables(inv)
+                if tables != [target]:
+                    return self._inverse_closure_predicate(
+                        node, tables, inverse_of, quantifier, outer, params,
+                        alias_seq=alias_seq,
+                    )
                 # Reverse FK edge (ADR-0011): the relationship is stored on
                 # the *target* row as a single-valued FK column pointing at
                 # this entity, so `some` is EXISTS over the target table
@@ -3100,6 +3124,48 @@ class SQLiteAdapter(EntityStore):
             field, node["op"], node["value"], params, qual=scope
         )
         return f"COALESCE(({leaf}), 0)"
+
+    def _inverse_closure_predicate(
+        self,
+        node: dict[str, Any],
+        tables: list[str],
+        inverse_of: str,
+        quantifier: Optional[str],
+        outer: str,
+        params: list[Any],
+        *,
+        alias_seq: list[int],
+    ) -> str:
+        """Reverse FK edge over an abstract or subclassed range (issue #224).
+
+        The hit may live in any concrete table of the range's closure, so
+        ``some`` is an OR of one correlated EXISTS per table and ``none``
+        its negation. The nested tree may only name fields every table in
+        the closure owns (the range's own slots); a subclass-only field is
+        rejected rather than silently matching a subset of tables. With no
+        table at all, ``some`` is false and ``none`` true.
+        """
+        if not tables:
+            return "0" if quantifier == "some" else "1"
+        shared: Optional[set[str]] = None
+        for table in tables:
+            cols = self._valid_query_columns(table)
+            shared = set(cols) if shared is None else shared & set(cols)
+        clauses = []
+        for table in tables:
+            alias_seq[0] += 1
+            alias = f"rel{alias_seq[0]}"
+            sub = self._tree_predicate(
+                node["where"], shared or set(), params,
+                entity_type=table, scope=f"{alias}.", alias_seq=alias_seq,
+            )
+            clauses.append(
+                f'EXISTS (SELECT 1 FROM "{table}" {alias} '
+                f'WHERE {alias}."{inverse_of}" = {outer}"id" '
+                f"AND {alias}.is_available = 1 AND {sub})"
+            )
+        some = "(" + " OR ".join(clauses) + ")"
+        return some if quantifier == "some" else f"NOT {some}"
 
     def _query_predicate(
         self,
@@ -3391,19 +3457,28 @@ class SQLiteAdapter(EntityStore):
         to-one edge with the identical errors that path already raises).
         """
         target, _, inverse_of = self._reference_edge(entity_type, edge, "some")
+        if inverse_of is not None:
+            # Virtual inverse slot (ADR-0011): count the available target
+            # rows whose forward FK points at this entity, summed across
+            # the range's concrete closure (issue #224).
+            tables = self._inverse_tables(self._inverse_slots(entity_type)[edge])
+            if not tables:
+                return 0
+            with self._transaction() as conn:
+                cursor = conn.cursor()
+                total = 0
+                for table in tables:
+                    cursor.execute(
+                        f'SELECT COUNT(*) AS c FROM "{table}" tgt '
+                        f'WHERE tgt."{inverse_of}" = ? AND tgt.is_available = 1',
+                        (entity_id,),
+                    )
+                    total += int(cursor.fetchone()["c"])
+                return total
         if not self._per_class_table_exists(target):
             return 0
         with self._transaction() as conn:
             cursor = conn.cursor()
-            if inverse_of is not None:
-                # Virtual inverse slot (ADR-0011): count the available
-                # target rows whose forward FK points at this entity.
-                cursor.execute(
-                    f'SELECT COUNT(*) AS c FROM "{target}" tgt '
-                    f'WHERE tgt."{inverse_of}" = ? AND tgt.is_available = 1',
-                    (entity_id,),
-                )
-                return int(cursor.fetchone()["c"])
             cursor.execute(
                 f'SELECT COUNT(*) AS c FROM relationships rel '
                 f'JOIN "{target}" tgt ON tgt."id" = rel.target_id '

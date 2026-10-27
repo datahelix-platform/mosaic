@@ -11,10 +11,10 @@ unconditionally before ever calling :func:`compile_query_spec` — see its
 docstring for why that ordering is load-bearing, not just tidy.
 
 Compiles ONLY to ``client.query()``'s ``where``/``order_by``/``as_of``
-shape. No ``facet_counts``/``field_range``/``search`` compilation here —
-``QuerySpec`` (ADR-0035) has no representation for those yet, and
-``columns`` (the one QuerySpec field that would need them) is already
-rejected at parse time.
+shape, plus ``fields`` — the anchor-owned ``columns`` selection (issue #215)
+that ``MosaicClient.query(fields=...)`` projects. No ``facet_counts``/
+``field_range``/``search`` compilation here — ``QuerySpec`` (ADR-0035) has no
+representation for those yet.
 """
 
 from __future__ import annotations
@@ -41,6 +41,8 @@ class CompiledQuery:
     as_of: Optional[str]
     order_by: Optional[str]
     order_dir: str
+    #: Anchor slots to keep in each envelope's ``data``; ``None`` = full envelopes.
+    fields: Optional[tuple[str, ...]] = None
 
 
 def _compile_field_condition(cond: FieldCondition) -> dict[str, Any]:
@@ -124,4 +126,6 @@ def compile_query_spec(
         as_of=spec.as_of,
         order_by=sort.slot if sort else None,
         order_dir=sort.direction if sort else "asc",
+        # Order-preserving dedupe: a repeated column is one column.
+        fields=tuple(dict.fromkeys(c.slot for c in spec.columns)) or None,
     )

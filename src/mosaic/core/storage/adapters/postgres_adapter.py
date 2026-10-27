@@ -1768,11 +1768,13 @@ class PostgresAdapter(EntityStore):
         out: dict[str, dict[str, list[str]]] = {}
         cur = conn.cursor()
         for slot_name, inv in inverse.items():
+            # entity_type over the range's concrete closure: an abstract
+            # range (``Sample``) stores no rows under its own name (#224).
             cur.execute(
                 "SELECT id, data->>%s AS fk FROM entities "
-                "WHERE entity_type = %s AND data->>%s = ANY(%s) "
+                "WHERE entity_type = ANY(%s) AND data->>%s = ANY(%s) "
                 "AND is_available = TRUE ORDER BY id",
-                (inv.forward_slot, inv.target_class, inv.forward_slot, list(entity_ids)),
+                (inv.forward_slot, list(inv.tables), inv.forward_slot, list(entity_ids)),
             )
             for row in cur.fetchall():
                 out.setdefault(row["fk"], {}).setdefault(slot_name, []).append(
@@ -2098,7 +2100,7 @@ class PostgresAdapter(EntityStore):
                 # link table. Placeholder render order: forward key →
                 # target type → subtree.
                 params.append(inverse_of)
-                params.append(target)
+                params.append(list(self._inverse_slots(entity_type)[edge].tables))
                 sub = self._tree_predicate(
                     node["where"], target, params,
                     scope=f"{alias}.", alias_seq=alias_seq,
@@ -2106,7 +2108,7 @@ class PostgresAdapter(EntityStore):
                 exists = (
                     f"EXISTS (SELECT 1 FROM entities {alias} "
                     f"WHERE {alias}.data->>%s = {outer}id "
-                    f"AND {alias}.entity_type = %s "
+                    f"AND {alias}.entity_type = ANY(%s) "
                     f"AND {alias}.is_available = TRUE AND {sub})"
                 )
                 return exists if quantifier == "some" else f"NOT {exists}"
@@ -2666,9 +2668,13 @@ class PostgresAdapter(EntityStore):
                 cur = conn.cursor()
                 cur.execute(
                     "SELECT COUNT(*) AS c FROM entities tgt "
-                    "WHERE tgt.entity_type = %s AND tgt.data->>%s = %s "
+                    "WHERE tgt.entity_type = ANY(%s) AND tgt.data->>%s = %s "
                     "AND tgt.is_available = TRUE",
-                    (target, inverse_of, entity_id),
+                    (
+                        list(self._inverse_slots(entity_type)[edge].tables),
+                        inverse_of,
+                        entity_id,
+                    ),
                 )
                 return int(cur.fetchone()["c"])
         sql = (

@@ -29,7 +29,7 @@ Scope of the rename:
 - **Distribution:** publish as `datahelix-mosaic` (per ADR-0002).
 - **Import package & API:** `hippo` → `mosaic`; `HippoClient` → `MosaicClient`; CLI `hippo` → `mosaic`.
 - **Entry-point namespace (the load-bearing part):** the `hippo.storage_adapters`, `hippo.write_validators`, `hippo.reference_loaders`, and `hippo.schema_packages` group names → `mosaic.*`. These are **cross-package string contracts** — e.g. Canon registers `[project.entry-points."hippo.reference_loaders"]` — and the `hippo-reference-<name>` / `hippo-adapter-<name>` plugin-naming conventions become `mosaic-reference-<name>` / `mosaic-adapter-<name>`.
-- **Repository:** `BU-Neuromics/hippo` → `BU-Neuromics/mosaic`, with the datahelix submodule pointer updated.
+- **Repository:** `BU-Neuromics/hippo` → `datahelix-platform/mosaic`, with the datahelix submodule pointer updated.
 - **Docs/specs:** the component name in prose across platform and component docs.
 
 A **compatibility strategy** (import shim, CLI alias, and dual-registered entry-point groups with a deprecation window) will be defined so consumers migrate without a flag-day break.

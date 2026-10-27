@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Inverse slots over an abstract or subclassed range** (issue #224,
+  ADR-0011 follow-up). A reverse edge such as `Donor.samples {range: Sample,
+  inverse: donor}` with `Sample` abstract used to resolve against a
+  `Sample` table that does not exist: hydration was empty,
+  `count_relationship` returned 0 and `some`/`none` predicates raised. The
+  edge now resolves across the range's concrete closure
+  (`concrete_class_closure`: the range if concrete, plus every concrete
+  descendant) in both adapters — SQLite hydrates with one `UNION ALL`,
+  filters with an OR of per-table `EXISTS`, and sums per-table counts;
+  Postgres matches `entity_type = ANY(...)`. This also fixes a *concrete*
+  range with subclasses (`Donor.brains` → `Brain` now includes `Cerebrum`
+  rows). Nested `where` fields must be owned by every table in the closure
+  (a subclass-only field is rejected). An abstract range with no concrete
+  descendant is now a load-time `SchemaError` instead of a silently empty
+  edge. `InverseSlot` gains `target_classes` / `tables`.
+
 ## v0.14.0 — 2026-09-22 (the MCP boundary — QuerySpec tools over a capability manifest, conversational planning delegation, reverse edges via LinkML `inverse`)
 
 ### Added

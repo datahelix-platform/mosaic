@@ -133,15 +133,23 @@ class TestConstructQuerySpecPrompt:
             assert "samples over 5ml" in text
 
     async def test_columns_guidance_matches_what_is_actually_implemented(self, hippo_client):
-        # Regression against issue #184's own (stale) text, which described
-        # columns needing an aggregate-vs-explode choice -- #183 decided to
-        # reject columns entirely instead, since no Mosaic-side compiler
-        # exists for it. The prompt must teach the real, current behavior.
+        # The prompt must teach the real, current behaviour (issue #215):
+        # anchor-owned slots are accepted; a traversal is not. Both statements
+        # must stay true at every commit, because the chat panel round-trips
+        # every spec through this parser.
         async with Client(create_mcp_server(hippo_client)) as client:
             result = await client.get_prompt("construct_query_spec", {})
             text = result.messages[0].content.text
-            assert "not supported" in text.lower()
-            assert "omit it" in text.lower()
+            assert "ANCHOR slots only" in text
+            assert "COLUMNS_NOT_SUPPORTED" in text
+            assert "omit a traversal" in text.lower()
+
+    async def test_capabilities_advertise_column_projection(self, hippo_client):
+        # ADR-0029: a client tells a projecting deployment from a
+        # non-projecting one by reading the manifest, not by probing.
+        server = create_mcp_server(hippo_client)
+        payload = await _read_json(server, "mosaic://capabilities")
+        assert payload and all(e["column_projection"] == "anchor" for e in payload.values())
 
 
 class TestRealMount:
