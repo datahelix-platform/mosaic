@@ -10,10 +10,10 @@
   `openspec/changes/add-mosaic-mcp-boundary/` (`proposal.md`, `design.md`, `tasks.md`, spec
   deltas — the full, detailed spec this ADR summarizes for ratification purposes); mosaic
   issue #54 Part A (authn/authz, referenced not resolved by this ADR); **Aperture ADR-0041**
-  (Proposed 2026-09-22 — splits the `columns` field this ADR lists in the accepted `QuerySpec`
+  (Accepted 2026-10-02 — splits the `columns` field this ADR lists in the accepted `QuerySpec`
   shape: traversal and grain stay in the artifact for this validator to check and a future
   compiler to execute, while visibility and ordering become view-side state that never reaches a
-  boundary; see the note under Consequences).
+  boundary; see the notes under Consequences).
 - **Tracking issue:** [#177](https://github.com/datahelix-platform/mosaic/issues/177) (original,
   bundled scope; superseded by the split issues this ADR proposes filing — see Consequences).
 
@@ -105,6 +105,69 @@ shipped.
 Two follow-ups fall to this ADR when the compiler lands: accept `columns` under that narrowed
 reading, and lift `COLUMNS_NOT_SUPPORTED`. Until then `mcp/server.py:736` stays as it is — the
 prompt should keep saying "omit it", because it is true.
+
+**Note (2026-10-02) — the first of those two follow-ups is now scoped and approved: anchor-owned
+`columns` only.** Issue #215 reported the consequence of the gap from the planner's side — *"how
+long did each processing run take?"* is a question about **which field**, and an artifact with only
+`criteria` and `sort` makes the planner reach for the nearest date slot. It asked for scope sign-off
+on an increment before building it. Approved (labadorf, 2026-10-02), in this shape:
+
+- **In scope.** `columns` parses and validates as a list of **anchor-owned slot paths** — single
+  hop, no traversal — checked against the same `EntityCapability.fields_by_name` manifest every
+  other part of this validator already uses, with the same per-field, actionable error text. A
+  validated selection compiles to server-side projection and the REST/MCP envelope carries only
+  the selected slots. GraphQL callers already get this from their own selection sets and are
+  unaffected.
+- **Out of scope, and still rejected.** Any path with a hop — therefore the whole
+  `aggregate`/`explode` choice ADR-0041 keeps in the artifact. Grain is unchanged by this
+  increment: one anchor entity remains one row. That is what makes it a safe increment rather
+  than a partial one.
+- **`COLUMNS_NOT_SUPPORTED` narrows rather than lifts.** It stops refusing the key wholesale and
+  starts refusing *multi-hop paths*, naming the hop it objected to. `mcp/server.py`'s
+  `construct-query-spec` prompt stops saying "omit it" and starts saying "anchor slots only; omit
+  a traversal". Both statements stay true at every point.
+- **The capability manifest must advertise it**, so a client distinguishes a deployment that
+  projects from one that does not without probing — ADR-0029's honest degradation, which is also
+  what lets Aperture keep its client-side projection working unchanged against older servers.
+- **Note the real cost, which is not in this validator.** `MosaicClient.query()`
+  (`core/client.py:844`) takes no projection parameter at all today and always returns full
+  entity envelopes; `compile_query_spec` translates `where`/`order_by`/`as_of` only. The increment
+  is a projection capability on the core SDK query path threaded through
+  `compile_query_spec`/`execute_query_spec` to REST and MCP response shaping — not a parser patch.
+  It touches the same live wire contract as #182/#183/#195/#196/#199/#205, and lands with the same
+  kind of explicit scope note each of those carried.
+
+> **Shipped:** `be20d96` (#223) — `columns` of anchor-owned slots, compiled to
+> `MosaicClient.query(fields=...)`, advertised per entity as `column_projection: "anchor"`.
+
+**Note (2026-10-27) — the second follow-up is approved: traversal paths in `columns`.** Decided by
+labadorf in the [datahelix#113](https://github.com/datahelix-platform/datahelix/issues/113) decision
+pass (item D0), after the anchor-only increment shipped and the consumer that needs the next step
+(the conversational composer: "solid samples *with their donor's age at death*") was found closed at
+every layer. Scope:
+
+- **Paths.** `columns[].path` accepts **one or two hops**, each a reference slot the previous class
+  holds — forward, or a declared or synthesized inverse (ADR-0011/0012/0013) — ending in a slot of
+  the final class. Validated hop by hop against the capability manifest, with the same actionable
+  per-hop errors. Depth two matches Aperture ADR-0041's client cap.
+- **Spelling is settled: LinkML slot names**, exactly as `criteria` and the anchor-only increment
+  already spell fields, never GraphQL field names. Aperture translates on its side
+  (`canonicalizeQuerySpec`); Reel emits slot names everywhere else.
+- **A to-many hop needs an explicit `mode`: `count | joinIds | explode`** (ADR-0041's vocabulary).
+  `explode` changes the grain and is **capped to one path per spec**, matching ADR-0041's ratified
+  cap; an exploded path shows all members (ADR-0041's resolution — criteria select anchors, not
+  members). A to-many hop without `mode` is a coded error naming the hop.
+- **Advertised** on the manifest as `column_projection: "traversal"`, so a client tells the three
+  generations apart (none / anchor / traversal) without probing.
+- **`COLUMNS_NOT_SUPPORTED` narrows once more.** It stops refusing hops and starts refusing depth
+  greater than two, a to-many hop without `mode`, and a second `explode`. `construct-query-spec`
+  moves from "anchor slots only" to describing paths and the to-many choice.
+- **Grain is stated in the envelope** when `explode` is in play (rows from anchors), so a transport
+  can say what ADR-0041 requires on screen.
+
+Implementation is datahelix#113 item M6 (issue to file in this repo). Until it lands the relay's
+re-validation turns any planner output carrying such `columns` into an error turn, which is the
+honest behaviour and stays.
 
 
 - A fourth transport exists with the same trust boundary (or lack thereof) as REST/GraphQL today
