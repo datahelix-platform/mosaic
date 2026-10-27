@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+## v0.15.0 — 2026-10-27 (anchor-owned `columns` projection, inverse edges over abstract ranges, domain classes named like infrastructure, images under datahelix-platform)
+
+### Added
+
+- **Anchor-owned `QuerySpec.columns`, projected server-side** (issue #215,
+  ADR-0009 note of 2026-10-02, PR #223). `columns` is a list of
+  `{"path": ["<slot>"]}` entries naming the anchor's own slots, validated
+  against the same capability manifest as every other part of the spec
+  (`UNKNOWN_SLOT` names the field). A validated selection compiles to
+  `MosaicClient.query(fields=...)` and `execute_query_spec` returns envelopes
+  trimmed to those slots — still one row per anchor entity. The manifest
+  advertises it per entity as `column_projection: "anchor"` so a client can
+  tell a projecting deployment from one that is not without probing.
+  `COLUMNS_NOT_SUPPORTED` **narrows rather than lifts**: it now refuses only
+  a path with a hop and any `aggregate`/`explode`/`mode` key, naming the hop.
+  The aggregate tools (`count_query_spec`, `facet_query_spec`,
+  `field_range_query_spec`) reject `columns`; the `construct-query-spec`
+  prompt moves from "omit it" to "anchor slots only". GraphQL is unaffected
+  (selection sets already project).
+
 ### Fixed
 
 - **Inverse slots over an abstract or subclassed range** (issue #224,
@@ -19,6 +39,52 @@
   (a subclass-only field is rejected). An abstract range with no concrete
   descendant is now a load-time `SchemaError` instead of a silently empty
   edge. `InverseSlot` gains `target_classes` / `tables`.
+
+- **A domain class named `Process` is no longer hidden as Mosaic
+  infrastructure** (issue #229, PR #233). `INFRASTRUCTURE_CLASSES` (`Entity`,
+  `ProvenanceRecord`, `Process`, `Validator`, `ReferenceLoader`) was matched
+  by bare name, so a schema defining its own `Process` without importing
+  `hippo_core` lost the class silently: no collection, no GraphQL type, no
+  manifest entry, and every slot ranged on it (brain bank: 35, including
+  `Sample.produced_by`) flattened to a scalar. New
+  `is_infrastructure_class(registry, name)` matches only when the class's
+  `from_schema` is `hippo_core`; schemas that import `hippo_core` behave as
+  before. The exported name set is unchanged. Not addressed: a schema that
+  defines a same-named class *and* imports `hippo_core` still resolves to
+  one class by LinkML merge rules.
+
+### Changed
+
+- **Images publish to `ghcr.io/datahelix-platform/mosaic`** (PR #227) and
+  every repository URL points at the `datahelix-platform` org. The previously
+  published `ghcr.io/bu-neuromics/mosaic` digests stay valid but receive no
+  new tags (datahelix#117). README acknowledges the National Center for PTSD
+  Brain Bank (PR #226).
+
+### Decisions (docs only — nothing below is implemented in this release)
+
+- **ADR-0012** (honour `inverse` declared on the single-valued *forward*
+  slot, for import-layered schemas) and **ADR-0013** (reverse edges over
+  multivalued, relationship-row forward slots) are **Accepted**, ratified
+  2026-10-27 (PR #232; issues #230, #231).
+- **ADR-0009** records both `columns` follow-ups: the anchor-only increment
+  above (approved 2026-10-02) and **traversal paths** (approved 2026-10-27,
+  datahelix#113 D0 — 1–2 hops as LinkML slot names, explicit
+  `count|joinIds|explode` on a to-many hop; PR #222). The traversal compiler
+  is a separate issue.
+
+### Upgrading
+
+- **The image moved.** Deployments that pin `ghcr.io/bu-neuromics/mosaic`
+  must repoint at `ghcr.io/datahelix-platform/mosaic` to receive this and
+  later releases. The DataHelix certification lock does this in its bump PR.
+- **`columns` is opt-in.** A client that never sends it sees no change; one
+  that does gets trimmed envelopes and must read `column_projection` on
+  `mosaic://capabilities` to know the deployment supports it.
+- **A schema that defines its own `Process`** (or another infrastructure
+  name) without importing `hippo_core` now exposes that class. Its
+  collection and GraphQL type appear; slots ranged on it become references.
+  Re-run `mosaic schema diff` against an existing database before serving.
 
 ## v0.14.0 — 2026-09-22 (the MCP boundary — QuerySpec tools over a capability manifest, conversational planning delegation, reverse edges via LinkML `inverse`)
 
