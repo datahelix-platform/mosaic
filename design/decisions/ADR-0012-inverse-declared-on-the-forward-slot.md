@@ -1,8 +1,8 @@
 # ADR-0012: Honour `inverse` declared on the forward slot, so import-layered schemas can declare reverse edges
 
-- **Status:** Proposed
-- **Date:** 2026-10-23 (proposed)
-- **Deciders:** — (proposed by clandaverde; awaiting maintainer ratification)
+- **Status:** Accepted
+- **Date:** 2026-10-27 (ratified; proposed 2026-10-23)
+- **Deciders:** labadorf; clandaverde (proposal, reproduction)
 - **Related:** ADR-0011 (inverse-declared slots as virtual reverse edges; this ADR amends
   where the declaration may live, answering its first open sub-question); ADR-0013 (reverse of
   multivalued forward slots); datahelix#113 item M3.
@@ -30,7 +30,7 @@ So the only declaration that keeps module boundaries clean is the one Mosaic dro
 saying so. ADR-0011's Notes already list this ("Whether `inverse` should also be honoured on
 the *forward* side").
 
-## Decision (recommended)
+## Decision
 
 Mosaic will honour `inverse: <name>` on a **single-valued forward reference slot** by
 synthesizing a virtual, multivalued reverse slot `<name>` on the forward slot's range class,
@@ -76,3 +76,30 @@ derived-side declaration.
 - Confirm no deployed schema carries a forward-side `inverse` today (behaviour change).
 - Should a synthesized reverse be reported by `inverse_reference_slots()` indistinguishably
   from a declared one, or flagged as synthesized (for docs/diagnostics)?
+
+## Ratification note (2026-10-27)
+
+Ratified by labadorf in the [datahelix#113](https://github.com/datahelix-platform/datahelix/issues/113)
+decision pass (item M3), together with ADR-0013. **Accepted as written**: LinkML's own `inverse`
+on the single-valued forward slot synthesizes the virtual reverse, with ADR-0011's storage, query,
+manifest and transport semantics unchanged; both sides declared must agree, and a name collision
+with a real slot on the range class is a `SchemaError`. The Mosaic-specific annotation stays the
+rejected alternative.
+
+The two open sub-questions, dispositioned rather than left to the status flip:
+
+- **Synthesized vs. declared — flag it.** `InverseSlot` (and so `inverse_reference_slots()`)
+  carries a `declared_on: "forward" | "reverse"` marker. The capability manifest and GraphQL treat
+  both identically; the marker is for diagnostics and the schema guide, which must say that generic
+  LinkML tooling will not show a synthesized slot.
+- **Behaviour change for a schema already carrying a forward-side `inverse`** was not verified at
+  ratification. The implementing PR ([#230](https://github.com/datahelix-platform/mosaic/issues/230))
+  checks the deployment schemas Mosaic is known to serve (brainbank-hippo-schema, mosaic-demo-small,
+  the certification fixture) and records the result in its release note. A hit is a CHANGELOG entry,
+  not a blocker.
+
+**Sequencing.** Implement before ADR-0013 (#231). A synthesized reverse ranged on an abstract class
+(`Donor.samples → Sample`) resolves in storage today (#224) but is usable from a transport only once
+[#228](https://github.com/datahelix-platform/mosaic/issues/228) lands — decided the same day as
+GraphQL **interface** types per abstract range, with abstract classes queryable as anchors and the
+class hierarchy on the manifest; its ADR follows.

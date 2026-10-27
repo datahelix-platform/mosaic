@@ -1,8 +1,8 @@
 # ADR-0013: Reverse edges over multivalued (relationship-row) forward slots
 
-- **Status:** Proposed
-- **Date:** 2026-10-23 (proposed)
-- **Deciders:** — (proposed by clandaverde; awaiting maintainer ratification)
+- **Status:** Accepted
+- **Date:** 2026-10-27 (ratified; proposed 2026-10-23)
+- **Deciders:** labadorf; clandaverde (proposal, reproduction)
 - **Related:** ADR-0011 (inverse-declared slots as virtual reverse edges; this ADR lifts its
   deferral of the multivalued case); ADR-0002 (multivalued reference slots persist as
   relationships — the storage this reverse reads); ADR-0012 (forward-side declaration);
@@ -28,7 +28,7 @@ Today (mosaic `main`, `e4d93e6`) declaring one fails with ADR-0011's error, e.g.
 `Cohort.members declares inverse: cohort but Person.cohort is multivalued (stored as
 relationship rows, ADR-0002) …`.
 
-## Decision (recommended)
+## Decision
 
 Mosaic will accept `inverse` over a multivalued forward slot, as a virtual reverse resolved
 through the ADR-0002 `relationships` table — joining on `target_id` and scoped by
@@ -63,3 +63,24 @@ edge predicate compiled to a correlated `EXISTS`, available targets only.
   forward edge exactly.
 - Should ADR-0012's forward-side declaration apply here too (declare on `Assay.inputs`)?
   Recommended yes, for the same layering reason.
+
+## Ratification note (2026-10-27)
+
+Ratified by labadorf in the [datahelix#113](https://github.com/datahelix-platform/datahelix/issues/113)
+decision pass (item M4), together with ADR-0012. **Accepted as written**: a reverse join on
+`relationships.target_id` scoped by `relationship_type`, ADR-0011's contract otherwise unchanged
+(virtual, write-ignored, batch-hydrated, `EXISTS` predicate, available targets only). ADR-0011
+Decision item 2's load-time rejection of a multivalued forward slot is removed.
+
+Sub-questions:
+
+- **ADR-0012's forward-side declaration applies here too.** `Assay.inputs … inverse: assays` on the
+  multivalued forward slot synthesizes `Sample.assays`, for the same layering reason.
+- **Counts and `some`/`none` mirror the forward edge exactly** (ADR-0006 M5b quantifier semantics).
+  This is a test obligation on the implementing PR, not a choice left open.
+- The composite `(target_id, relationship_type)` index stays *measure, don't assume*.
+
+**Sequencing.** After ADR-0012's implementation (#230). The abstract-range cases
+(`Assay.inputs → Sample` reversed lands on `Sample`) also wait on #228. The brain-bank schema
+decisions taken the same day (datahelix#113 S3) keep `Person.cohort` multivalued and make
+`DissectFixedBrain.new_fixed_samples` multivalued, so both lean on this ADR rather than a remodel.

@@ -209,3 +209,8 @@ unreachable from a certifiable server until a release is cut ([#218](https://git
 And no deployment LinkML on the platform declares an `inverse:` slot yet, so nothing exercises it
 outside tests. The blocker consumers were recording (Reel ADR-0006's "`pivot-grain` blocked on
 mosaic#204") moves from *engineering* to *release + schema authoring*; it does not vanish.
+
+> **Amended (2026-10-27).** Two follow-ups are ratified. **ADR-0012** honours `inverse` on the
+> single-valued *forward* slot — reopening, and reversing for import-layered schemas, the first
+> sub-question above. **ADR-0013** lifts the multivalued-forward deferral, so Decision item 2's
+> load-time rejection goes. Everything else here stands.
