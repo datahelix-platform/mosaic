@@ -175,3 +175,37 @@ jobs:
           path: dist/
 
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+  notify-datahelix:
+    # Platform ADR-0001 implementation note (2026-10-27), mosaic#237: hand the
+    # published image-digest.json to DataHelix as a `component-release`
+    # dispatch; its bump-lock workflow then opens the one-pin lock PR. Best
+    # effort by design — the release is already published above, and DataHelix
+    # can be dispatched by hand from the asset (workflow_dispatch on bump-lock).
+    # DATAHELIX_DISPATCH_TOKEN is an org secret (Contents RW on
+    # datahelix-platform/datahelix only — what repository_dispatch requires).
+    needs: [validate, release]
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.validate.outputs.version }}
+    steps:
+      - name: Download the published image-digest.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "v${VERSION}" --repo "${GITHUB_REPOSITORY}" --pattern image-digest.json
+
+      - name: Dispatch component-release to DataHelix
+        env:
+          GH_TOKEN: ${{ secrets.DATAHELIX_DISPATCH_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::notice::DATAHELIX_DISPATCH_TOKEN is not set; skipping the DataHelix dispatch. Bump the lock by hand from image-digest.json."
+            exit 0
+          fi
+          jq '{event_type: "component-release", client_payload: .}' image-digest.json > payload.json
+          gh api repos/datahelix-platform/datahelix/dispatches --input payload.json
+          echo "Dispatched $(jq -r .ref image-digest.json) to datahelix-platform/datahelix"
