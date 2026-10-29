@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "datahelix-mosaic"
-version = "0.14.0"
+version = "0.15.0"
 description = "Mosaic (formerly Hippo): a runtime for LinkML schemas. Generates a typed SDK, REST API, append-only provenance store, and dynamic validation from a schema definition."
 readme = "README.md"
 requires-python = ">=3.11"
