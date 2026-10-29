@@ -2,94 +2,94 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://bu-neuromics.github.io/hippo/</loc>
-         <lastmod>2026-10-27</lastmod>
+         <lastmod>2026-10-29</lastmod>
     </url>
     <url>
          <loc>https://bu-neuromics.github.io/hippo/api-reference/</loc>
-         <lastmod>2026-10-27</lastmod>
+         <lastmod>2026-10-29</lastmod>
     </url>
     <url>
          <loc>https://bu-neuromics.github.io/hippo/cli-reference/</loc>
-         <lastmod>2026-10-27</lastmod>
+         <lastmod>2026-10-29</lastmod>
     </url>
     <url>
          <loc>https://bu-neuromics.github.io/hippo/comparison/</loc>
-         <lastmod>2026-10-27</lastmod>
+         <lastmod>2026-10-29</lastmod>
     </url>
     <url>
          <loc>https://bu-neuromics.github.io/hippo/configuration/</loc>
-         <lastmod>2026-10-27</lastmod>
+         <lastmod>2026-10-29</lastmod>
     </url>
     <url>
          <loc>https://bu-neuromics.github.io/hippo/data-model/</loc>
-         <lastmod>2026-10-27</lastmod>
+         <lastmod>2026-10-29</lastmod>
     </url>
     <url>
          <loc>https://bu-neuromics.github.io/hippo/design-principles/</loc>
-         <lastmod>2026-10-27</lastmod>
+         <lastmod>2026-10-29</lastmod>
     </url>
     <url>
          <loc>https://bu-neuromics.github.io/hippo/graphql/</loc>
-         <lastmod>2026-10-27</lastmod>
+         <lastmod>2026-10-29</lastmod>
     </url>
     <url>
          <loc>https://bu-neuromics.github.io/hippo/installation/</loc>
-         <lastmod>2026-10-27</lastmod>
+         <lastmod>2026-10-29</lastmod>
     </url>
     <url>
          <loc>https://bu-neuromics.github.io/hippo/installing-recipes/</loc>
-         <lastmod>2026-10-27</lastmod>
+         <lastmod>2026-10-29</lastmod>
     </url>
     <url>
          <loc>https://bu-neuromics.github.io/hippo/introduction/</loc>
-         <lastmod>2026-10-27</lastmod>
+         <lastmod>2026-10-29</lastmod>
     </url>
     <url>
          <loc>https://bu-neuromics.github.io/hippo/polymorphic-ingest/</loc>
-         <lastmod>2026-10-27</lastmod>
+         <lastmod>2026-10-29</lastmod>
     </url>
     <url>
          <loc>https://bu-neuromics.github.io/hippo/quickstart/</loc>
-         <lastmod>2026-10-27</lastmod>
+         <lastmod>2026-10-29</lastmod>
     </url>
     <url>
          <loc>https://bu-neuromics.github.io/hippo/recipe-reference/</loc>
-         <lastmod>2026-10-27</lastmod>
+         <lastmod>2026-10-29</lastmod>
     </url>
     <url>
          <loc>https://bu-neuromics.github.io/hippo/reference-loaders/</loc>
-         <lastmod>2026-10-27</lastmod>
+         <lastmod>2026-10-29</lastmod>
     </url>
     <url>
          <loc>https://bu-neuromics.github.io/hippo/reference_typed_client/</loc>
-         <lastmod>2026-10-27</lastmod>
+         <lastmod>2026-10-29</lastmod>
     </url>
     <url>
          <loc>https://bu-neuromics.github.io/hippo/schema-guide/</loc>
-         <lastmod>2026-10-27</lastmod>
+         <lastmod>2026-10-29</lastmod>
     </url>
     <url>
          <loc>https://bu-neuromics.github.io/hippo/tui/</loc>
-         <lastmod>2026-10-27</lastmod>
+         <lastmod>2026-10-29</lastmod>
     </url>
     <url>
          <loc>https://bu-neuromics.github.io/hippo/typed-openapi/</loc>
-         <lastmod>2026-10-27</lastmod>
+         <lastmod>2026-10-29</lastmod>
     </url>
     <url>
          <loc>https://bu-neuromics.github.io/hippo/why-mosaic/</loc>
-         <lastmod>2026-10-27</lastmod>
+         <lastmod>2026-10-29</lastmod>
     </url>
     <url>
          <loc>https://bu-neuromics.github.io/hippo/writing-a-domain-module/</loc>
-         <lastmod>2026-10-27</lastmod>
+         <lastmod>2026-10-29</lastmod>
     </url>
     <url>
          <loc>https://bu-neuromics.github.io/hippo/writing-a-recipe/</loc>
-         <lastmod>2026-10-27</lastmod>
+         <lastmod>2026-10-29</lastmod>
     </url>
     <url>
          <loc>https://bu-neuromics.github.io/hippo/writing-a-reference-loader/</loc>
-         <lastmod>2026-10-27</lastmod>
+         <lastmod>2026-10-29</lastmod>
     </url>
 </urlset>
