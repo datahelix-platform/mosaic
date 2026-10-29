@@ -209,7 +209,9 @@ def _classify_slot(slot: Any, registry: SchemaRegistry, enums: dict[str, Any]) -
         enum_values=enum_values,
         is_external_xref=bool(annotation_value(slot, HIPPO_EXTERNAL_XREF)),
         # Only the multivalued, derived side is virtual (ADR-0011); a
-        # single-valued slot carrying ``inverse`` is the stored FK.
+        # single-valued slot carrying ``inverse`` is the stored FK. A reverse
+        # the registry synthesized from such a forward declaration (ADR-0012)
+        # is already a multivalued slot by the time it reaches here.
         inverse_of=(
             str(slot.inverse)
             if kind is SlotKind.REFERENCE and slot.multivalued and getattr(slot, "inverse", None)
