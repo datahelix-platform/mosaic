@@ -43,6 +43,7 @@ ledger (`certification/composition.lock.json`) has evidence to pin.
 | `build` | wheel + sdist (`uv build`) |
 | `image` | `ghcr.io/bu-neuromics/mosaic:{X.Y.Z,latest}`, digest-addressed |
 | `release` | GitHub Release with CHANGELOG notes, `dist/*`, and `image-digest.json` |
+| `notify-datahelix` | `repository_dispatch` (`component-release`, payload = `image-digest.json`) to DataHelix, which opens the lock-bump PR. **Best-effort** (`continue-on-error`): a failed dispatch never fails the release; dispatch by hand from the release asset. Needs the `DATAHELIX_DISPATCH_TOKEN` secret (fine-grained PAT or App token, **Contents: read & write** on `datahelix-platform/datahelix` only) — adding it is a maintainer act. |
 | `pypi` | PyPI publish — **gated**, see below |
 | `notify-datahelix` | `repository_dispatch` of `image-digest.json` to `datahelix-platform/datahelix` as `component-release`; DataHelix's bump-lock workflow opens the one-pin lock PR (platform ADR-0001). Best-effort: a failed dispatch never fails the release. Needs the `DATAHELIX_DISPATCH_TOKEN` org secret |
 
