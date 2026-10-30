@@ -2,6 +2,42 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`inverse` declared on the forward slot synthesizes the reverse edge**
+  (issue #230, ADR-0012). ADR-0011 read `inverse` only on the derived,
+  multivalued side, which in an import-layered schema forces a lower module
+  to name a class from a higher one (brain bank's `person.yaml` cannot range
+  `Donor.samples` on `Sample` from `tissue.yaml`; upstream `linkml-lint`
+  rejects it), while a forward-side `Sample.donor: {range: Donor, inverse:
+  samples}` loaded and was silently ignored. The registry now synthesizes
+  `Donor.samples: {range: Sample, multivalued: true, inverse: donor}` onto
+  the range class at load time — a real slot in Mosaic's `SchemaView`, so the
+  type model, capability manifest, GraphQL (`samples`, `samplesCount`,
+  `DonorFilter.samples {some, none}`), MCP, both storage adapters, DDL and
+  `schema_diff` treat it exactly as a declared ADR-0011 slot: hydrated on
+  reads, filterable, counted, write-ignored, no column and no link table.
+  A forward slot on an abstract class synthesizes one reverse ranged on it
+  and resolved over its concrete closure (#224); `inverse` set through
+  `slot_usage` on a subclass ranges the reverse on that subclass.
+  `InverseSlot` gains `declared_on: "forward" | "reverse"` (and
+  `.synthesized`) so `inverse_reference_slots()` can tell a synthesized
+  reverse from a declared one; nothing downstream distinguishes them. New
+  load-time `SchemaError`s (`INVERSE_SLOT`): both sides declared but not
+  naming each other; the name colliding with a real slot on the range
+  class; unrelated classes sharing a forward slot with the same `inverse`.
+  ADR-0011's checks still apply to the synthesized slot and name the forward
+  declaration in their message; the reverse of a *multivalued* forward slot
+  stays rejected as before (ADR-0013). Generic LinkML tooling never sees a
+  synthesized slot — the schema guide says so.
+
+  **Behaviour change, checked as ADR-0012's ratification note asks:** a
+  forward-side `inverse` is no longer ignored. None of the deployment
+  schemas Mosaic is known to serve carries one — brainbank-hippo-schema at
+  `05c58aa` (11 `inverse` declarations), mosaic-demo-small (4) and the
+  DataHelix certification fixture (1) all declare on the reverse side and
+  load unchanged, with zero synthesized slots.
+
 ## v0.15.0 — 2026-10-27 (anchor-owned `columns` projection, inverse edges over abstract ranges, domain classes named like infrastructure, images under datahelix-platform)
 
 ### Added
