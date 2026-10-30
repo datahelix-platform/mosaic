@@ -143,6 +143,28 @@ class TestRecognition:
         donor = next(s for s in tables if '"Donor"' in s.split("(")[0])
         assert "samples" not in donor
 
+    def test_range_class_defined_at_top_level_and_in_an_import(self, tmp_path):
+        # Regression: the merged-directory loader inlines every file's classes
+        # *and* keeps their `imports:`, so `Donor` is defined both at top
+        # level and in the imported `person` module. linkml-runtime >= 1.12
+        # then hands `get_class("Donor")` a deepcopy merged across the two
+        # definitions; an attribute added to that copy never reached the
+        # view, and the synthesized reverse was silently absent (PR #240 CI).
+        _write_layered(tmp_path)
+        (tmp_path / "top.yaml").write_text(
+            PERSON_YAML.replace("id: https://example.org/person\nname: person", "id: https://example.org/top\nname: top")
+            .replace("  - hippo_core\n", "  - hippo_core\n  - person\n  - tissue\n")
+        )
+        reg = SchemaRegistry.from_path(tmp_path / "top.yaml")
+        sv = reg.schema_view
+        assert sum("Donor" in (s.classes or {}) for s in sv.all_schema(imports=True)) == 2
+        (inv,) = reg.inverse_reference_slots("Donor")
+        assert (inv.name, inv.declared_on, inv.tables) == ("samples", "forward", ("Brain", "CSF"))
+        assert [s.name for s in reg.induced_slots("Donor")].count("samples") == 1
+        for definition in sv.all_schema(imports=True):
+            if "Donor" in (definition.classes or {}):
+                assert "samples" in definition.classes["Donor"].attributes
+
     def test_rebuilding_a_registry_on_the_same_view_is_idempotent(self, registry):
         again = SchemaRegistry(registry.schema_view)
         (inv,) = again.inverse_reference_slots("Donor")

@@ -1033,6 +1033,30 @@ def _inherits_forward_inverse(sv: SchemaView, class_name: str, slot: Any) -> boo
     return False
 
 
+def _class_definitions(sv: SchemaView, class_name: str) -> list[ClassDefinition]:
+    """Every *authoritative* ``ClassDefinition`` of ``class_name`` in the view.
+
+    ``sv.get_class()`` is not safe to mutate: since linkml-runtime 1.12 a
+    class that appears in more than one schema of the import closure is
+    returned as a ``deepcopy`` merged across them (``SchemaView._get_dict``
+    folds ``rules``/``classification_rules`` together), so an attribute added
+    to that object never reaches the view. The merged-directory loader
+    (:meth:`SchemaRegistry._from_directory`) produces exactly that shape —
+    it inlines every file's classes *and* keeps their ``imports:``, so a
+    class is defined both at top level and in the imported module. Adding
+    the attribute to each definition the view actually holds makes it
+    visible whichever one the merge picks, on every runtime version.
+    """
+    out: list[ClassDefinition] = []
+    seen: set[int] = set()
+    for schema in sv.all_schema(imports=True):
+        cls = (schema.classes or {}).get(class_name)
+        if cls is not None and id(cls) not in seen:
+            seen.add(id(cls))
+            out.append(cls)
+    return out
+
+
 def _synthesize_forward_inverse_slots(sv: SchemaView) -> None:
     """Honour ``inverse`` declared on a single-valued forward slot (ADR-0012).
 
@@ -1160,26 +1184,29 @@ def _synthesize_forward_inverse_slots(sv: SchemaView) -> None:
                     f"`inverse` they must name each other (ADR-0012)."
                 )
                 continue
-            target = sv.get_class(rng)
-            if target is None:  # pragma: no cover - guarded by `rng in classes`
+            definitions = _class_definitions(sv, rng)
+            if not definitions:  # pragma: no cover - guarded by `rng in classes`
                 continue
-            target.attributes[name] = SlotDefinition(
-                name=name,
-                range=class_name,
-                multivalued=True,
-                inverse=slot.name,
-                description=(
-                    f"Reverse of {where} — every {class_name} whose "
-                    f"`{slot.name}` points at this {rng}. Synthesized by "
-                    f"Mosaic from the forward slot's `inverse` (ADR-0012); "
-                    f"derived, never stored or written."
-                ),
-                annotations={
-                    SYNTHESIZED_INVERSE_ANNOTATION: Annotation(
-                        tag=SYNTHESIZED_INVERSE_ANNOTATION, value=where
-                    )
-                },
-            )
+            for target in definitions:
+                # Mutate the definitions the view holds, never the (possibly
+                # copied) object ``get_class`` returns — see _class_definitions.
+                target.attributes[name] = SlotDefinition(
+                    name=name,
+                    range=class_name,
+                    multivalued=True,
+                    inverse=slot.name,
+                    description=(
+                        f"Reverse of {where} — every {class_name} whose "
+                        f"`{slot.name}` points at this {rng}. Synthesized by "
+                        f"Mosaic from the forward slot's `inverse` (ADR-0012); "
+                        f"derived, never stored or written."
+                    ),
+                    annotations={
+                        SYNTHESIZED_INVERSE_ANNOTATION: Annotation(
+                            tag=SYNTHESIZED_INVERSE_ANNOTATION, value=where
+                        )
+                    },
+                )
             synthesized[(rng, name)] = where
             # The SchemaView memoizes induced slots on its own hash;
             # bump it so the new attribute is visible to every later walk.
