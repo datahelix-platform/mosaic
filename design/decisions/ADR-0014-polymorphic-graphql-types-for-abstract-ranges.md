@@ -80,11 +80,26 @@ parent:
    way, in **both SQLite and Postgres**, forward and inverse alike. A nested `where` on such an
    edge accepts the slots induced on `C`; a slot only some descendants have is `UNKNOWN_SLOT`, as
    on an inverse edge today.
-   - **Concrete parent: no GraphQL schema change.** The field keeps its type — the base object
+   - **Concrete parent: no change to field types.** The field keeps its type — the base object
      type (`Process`, `Person`) — and a subclass row is rendered as that base type, exposing the
      base's induced slots. `__typename` names the base, not the subclass. This fixes #241
      (`CNSSection.producedBy`, `Brain.producedBy`, `Measurement.person` returning `null`) and
      datahelix#113 M5's "Sample → producing process".
+   - **Concrete parent: its own collection resolves over the closure too.** A concrete parent's
+     own collection and accessor (the GraphQL list `processes` and its `Page`/count, the SDK
+     `query(entity_type="Process")`, and `QuerySpec` with `anchor: "Process"`) resolve over
+     `concrete_class_closure(Process)`, so they list `BankFreshBrain`, `SectionFixedBrain`, …
+     rows as well, rendered as the base object type the same way a reference is. Filters,
+     `order_by`, facets and `field_range` on that collection apply to the base's induced slots.
+     Each row carries its concrete type so a caller can narrow: the SDK envelope already carries
+     `entity_type` (the leaf class) on every query item; GraphQL has no such field today
+     (`__typename` names the base, and the per-type object types expose only `id`,
+     `is_available` and the schema's slots), so the implementation **adds a non-null
+     `entityType: String!` system field** to the object type of every concrete parent, naming
+     the row's concrete class. That field is additive. To narrow, a client filters or re-queries
+     the subclass's own collection. **This is a behaviour change for existing clients:** lists,
+     page `total`s and counts on a concrete parent grow by the subclass rows. It must be called
+     out in the release notes of the version that ships it.
    - **Abstract parent:** rendered through the interface of Decision 2.
 2. **GraphQL: an interface type per qualifying abstract class**, carrying the slots induced on the
    abstract class itself, implemented by every concrete descendant's object type. A reference or
@@ -147,7 +162,8 @@ parent:
 
 - #241's lost rows come back: every reference through a concrete parent (128 exposed forward
   reference fields on brain bank) and every forward count/filter into an abstract range resolves
-  over the closure, on both adapters, with no GraphQL schema change for the concrete case.
+  over the closure, on both adapters, with no change to field types for the concrete case (the
+  only GraphQL addition there is the `entityType` field).
 - Every brain-bank reverse ranged on `Sample`, `Activity` or `Assessment` becomes usable from
   every transport, which is the condition ADR-0012 and ADR-0013 both name. Donor → samples works
   end to end with M3 + this.
@@ -158,9 +174,13 @@ parent:
   from introspection and will list abstract collections; its `deriveEdges` and the result table
   need to handle interface-typed references (a follow-up on its side, gated on this landing in a
   certified pin — ADR-0029 honest degradation until then).
+- A concrete parent's own collection now includes its subclasses' rows (Decision 1): `processes`
+  on brain bank lists every banking process. Clients that read `total` or counts on a concrete
+  parent see larger numbers; release notes must say so.
 - A subclass row reached through a concrete parent shows only the parent's slots, and
-  `__typename` says `Process`, not `BankFreshBrain`. That is the price of no schema change; a
-  client that needs the subclass must query it directly until the deferred change below.
+  `__typename` says `Process`, not `BankFreshBrain`. That is the price of keeping field types
+  unchanged; `entityType` names the subclass, and a client that needs the subclass's own slots
+  must query it directly until the deferred change below.
 - Query cost: a closure resolution or abstract anchor is a `UNION ALL` over N tables (Postgres: an
   `ANY` over N types); on brain bank `samples` spans 33, and a root anchor spans every exposed
   class. Pagination applies after the union. Acceptable for paths that returned wrong answers or
@@ -197,5 +217,6 @@ parent:
   `Process.inputs: Sample`): the interface field carries the abstract range; the implementing
   object type may narrow it (GraphQL allows covariant implementations). Confirm Strawberry emits it.
 - Mixins stay excluded (`concrete_class_closure` already skips them).
-- Not decided here: whether a concrete parent's own *collection* (`processes`) lists subclass
-  rows. Decision 1 governs references and edges only.
+- **Amended 2026-11-10 (labadorf, #267 review):** the question this section left open, whether a
+  concrete parent's own collection (`processes`) lists subclass rows, is decided **yes** and moved
+  into Decision 1.
