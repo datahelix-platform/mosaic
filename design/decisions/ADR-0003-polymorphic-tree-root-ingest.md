@@ -1,8 +1,8 @@
 # ADR-0003: Polymorphic tree-root ingest via `designates_type` dispatch
 
-- **Status:** Proposed
-- **Date:** 2026-06-26
-- **Deciders:** labadorf, design session
+- **Status:** Accepted
+- **Date:** 2026-11-10 (ratified as built; proposed 2026-06-26)
+- **Deciders:** labadorf; design session
 - **Related:** sec9 §9.8 (typed-client accessor surface / synthesized tree-root), sec3b (per-class table storage), [issue #80](https://github.com/BU-Neuromics/hippo/issues/80)
 
 ## Context
@@ -119,6 +119,22 @@ working.
   (`src/hippo/cli/commands/ingest.py`).
 - Author-facing guide: `docs/polymorphic-ingest.md` (linked from every dispatch error).
 - Tests: `tests/cli/test_ingest_polymorphic.py`.
+
+## Ratification (2026-11-10)
+
+**Accepted as built** by labadorf in the 2026-11-10 decision pass over stale Proposed ADRs.
+Verified at mosaic `v0.15.0`: `_dispatch_class` / `_downcast_message` in
+`src/mosaic/cli/commands/ingest.py` implement the dispatch and downcast guard exactly as
+decided (resolve via `SchemaRegistry.type_designator_slot` / `resolve_designated_class`;
+raise on an unresolvable or abstract designator value, and on a fallback to a polymorphic
+base that would drop subtype fields); `_has_type_designator` / `_build_tree_root_class` in
+`src/mosaic/linkml_bridge.py` emit the base-ranged accessor. Covered by
+`tests/cli/test_ingest_polymorphic.py` against the SQLite backend. Dispatch happens in the
+ingest command before `put`, so it is backend-agnostic in design; it is not separately
+exercised on Postgres.
+
+Ratified separately from [#99](https://github.com/datahelix-platform/mosaic/issues/99) (the
+1.0 Postgres parity epic that listed ADR-0002/0003 ratification in its scope).
 
 ## Notes / open sub-questions
 
