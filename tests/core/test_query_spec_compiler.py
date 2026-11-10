@@ -15,6 +15,7 @@ from mosaic.core.query_spec import parse_query_spec, validate_query_spec
 from mosaic.core.query_spec_compiler import compile_query_spec
 from mosaic.core.schema_typing import build_capability_manifest
 from mosaic.linkml_bridge import SchemaRegistry
+from tests.support import traversal_fixture
 
 _SCHEMA = """
 id: https://example.org/hippo/test_compiler
@@ -381,3 +382,109 @@ class TestInverseEdges:
         )
         page = client.query(entity_type=compiled.entity_type, where=compiled.where)
         assert [i["id"] for i in page.items] == ["d1"]
+
+
+# -- traversal columns (issue #236) -------------------------------------------
+
+
+class TestTraversalColumns:
+    """Compilation of traversal paths and their server-side hydration on
+    SQLite. ``tests/integration/test_postgres_query_spec_traversal.py``
+    runs the identical ``CASES`` against Postgres."""
+
+    @pytest.fixture
+    def tclient(self, tmp_path):
+        from mosaic.core.client import MosaicClient
+        from mosaic.core.storage.adapters.sqlite_adapter import SQLiteAdapter
+
+        registry = traversal_fixture.registry()
+        client = MosaicClient(
+            storage=SQLiteAdapter(str(tmp_path / "t.db"), schema_registry=registry), registry=registry
+        )
+        traversal_fixture.seed(client)
+        return client
+
+    def test_compiles_hops_with_their_cardinality(self):
+        from mosaic.core.query_spec_compiler import Hop
+
+        manifest = build_capability_manifest(traversal_fixture.registry())
+        spec = parse_query_spec(
+            {
+                "v": 1,
+                "anchor": "Sample",
+                "mode": "AND",
+                "criteria": [],
+                "columns": [
+                    {"path": ["name"]},
+                    {"path": ["donor", "age_at_death"]},
+                    {"path": ["aliquots", "container", "kind"], "mode": "explode"},
+                ],
+            }
+        )
+        assert validate_query_spec(spec, manifest).valid
+        compiled = compile_query_spec(spec, manifest)
+        # Hop slots must be read before trimming, so no `fields` pushdown.
+        assert compiled.fields is None
+        t = compiled.traversal
+        assert t.anchor_fields == ("name",)
+        assert [(c.key, c.hops, c.leaf, c.mode) for c in t.columns] == [
+            ("name", (), "name", None),
+            ("donor.age_at_death", (Hop("donor", False),), "age_at_death", None),
+            ("aliquots.container.kind", (Hop("aliquots", True), Hop("container", False)), "kind", "explode"),
+        ]
+        assert t.explode.link == ("aliquots",)
+        assert t.columns[1].link is None
+
+    def test_anchor_only_columns_compile_without_a_traversal(self):
+        compiled = _compile(
+            {"v": 1, "anchor": "Sample", "mode": "AND", "criteria": [], "columns": [{"path": ["name"]}]}
+        )
+        assert compiled.fields == ("name",)
+        assert compiled.traversal is None
+
+    @pytest.mark.parametrize(
+        "name, anchor, columns, expected, grain",
+        traversal_fixture.CASES,
+        ids=[case[0] for case in traversal_fixture.CASES],
+    )
+    def test_hydrates(self, tclient, name, anchor, columns, expected, grain):
+        got, got_grain, rows = traversal_fixture.run_case(tclient, anchor, columns)
+        assert got == expected
+        assert got_grain == grain
+        anchor_slots = {c["path"][0] for c in columns if len(c["path"]) == 1}
+        for row in rows:
+            # `data` is trimmed to anchor-owned columns; the envelope stays.
+            assert set(row["data"]) == anchor_slots
+            assert row["entity_type"] == anchor
+
+    def test_hydration_is_batched_per_hop_not_per_anchor(self, tclient, monkeypatch):
+        calls: list[str] = []
+        real_query, real_resolve = tclient.query, tclient.resolve_types
+
+        def query(*a, **kw):
+            calls.append(f"query:{kw.get('entity_type')}")
+            return real_query(*a, **kw)
+
+        def resolve(ids):
+            calls.append("resolve")
+            return real_resolve(ids)
+
+        monkeypatch.setattr(tclient, "query", query)
+        monkeypatch.setattr(tclient, "resolve_types", resolve)
+        traversal_fixture.run_case(
+            tclient,
+            "Sample",
+            [
+                {"path": ["donor", "age_at_death"]},
+                {"path": ["donor", "samples", "name"], "mode": "count"},
+                {"path": ["aliquots", "container", "kind"], "mode": "joinIds"},
+            ],
+        )
+        # 1 anchor page; hop 1 = one resolve + one query per concrete type
+        # (Donor, Aliquot); hop 2 = one resolve + (Sample, SolidSample,
+        # Container). Independent of how many anchors the page holds.
+        assert calls[0] == "query:Sample"
+        assert calls.count("resolve") == 2
+        assert sorted(calls[1:]) == sorted(
+            ["resolve", "query:Donor", "query:Aliquot", "resolve", "query:Sample", "query:SolidSample", "query:Container"]
+        )

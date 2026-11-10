@@ -35,14 +35,18 @@ it is *what Mosaic's ``where:`` surface can actually compile today*:
   ``order_by``/``order_dir`` pair, mirrored by GraphQL's single-valued
   ``orderBy`` argument) has no multi-column sort to compile a second
   entry against.
-- ``columns`` IS accepted for **anchor-owned slots only** (issue #215,
-  approved 2026-10-02, ADR-0009's 2026-10-02 note): a list of
-  ``{"path": [<slot>]}`` ColumnSpecs, each a single-hop path naming a field
-  of the anchor. Grain is untouched — one anchor entity stays one row. Any
-  path with a hop, and anything carrying the ``aggregate``/``explode`` choice,
-  is still rejected with ``COLUMNS_NOT_SUPPORTED`` (coded, not-a-crash) naming
-  what it objected to: that half needs a traversal compiler and is not
-  approved. ``COLUMNS_NOT_SUPPORTED`` therefore *narrows*, it does not lift.
+- ``columns`` IS accepted (ADR-0009's 2026-10-02 and 2026-10-27 notes;
+  issues #215 and #236): a list of ``{"path": [...], "mode"?: ...}``
+  ColumnSpecs. A single-element path names a field of the anchor (one row
+  per anchor, unchanged since #215). A longer path follows **1–2 reference
+  hops** — forward, or an ``inverse_of`` reverse — and ends in a slot of the
+  class it reaches, all spelled as LinkML slot names exactly like
+  ``criteria``. A to-many hop (at most one per path) needs ``mode``:
+  ``count`` / ``joinIds`` keep one row per anchor, ``explode`` makes one row
+  per (anchor x member) and is allowed through at most one link per spec
+  (Aperture ADR-0041's cap). ``COLUMNS_NOT_SUPPORTED`` (coded, not-a-crash)
+  now refuses only depth > 2, a to-many hop without ``mode``, a second
+  to-many hop on one path, and a second exploded link.
 
 **Op spelling:** ADR-0035's prose writes ``isNull``; both real
 implementations (Aperture's shipped ``QueryOp`` type and this module's
@@ -109,16 +113,43 @@ class SortField:
     direction: str = "asc"  # "asc" | "desc"
 
 
+#: Reference hops a ``columns`` path may follow (ADR-0009 note 2026-10-27,
+#: matching Aperture ADR-0041's client cap): ``[hop, hop, leaf]`` at most.
+MAX_COLUMN_HOPS = 2
+
+#: How a to-many hop resolves (ADR-0041's vocabulary). Only ``explode``
+#: changes the grain.
+COLUMN_MODES = ("count", "joinIds", "explode")
+
+
 @dataclass(frozen=True)
 class ColumnSpec:
-    """One ``columns`` entry (ADR-0035): an anchor-owned slot to return.
+    """One ``columns`` entry (ADR-0035/ADR-0041).
 
-    ``path`` is always a single segment here — multi-hop paths are rejected at
-    parse time (issue #215 scope), so a ``ColumnSpec`` that exists is
-    anchor-owned by construction.
+    ``path`` is the anchor slot alone (anchor-owned, #215) or up to
+    :data:`MAX_COLUMN_HOPS` reference hops then a leaf slot (#236). ``mode``
+    is set only when a hop is to-many — whether one is depends on the
+    schema, so that is :func:`validate_query_spec`'s check, not the parser's.
     """
 
-    slot: str
+    path: tuple[str, ...]
+    mode: Optional[str] = None
+
+    @property
+    def slot(self) -> str:
+        """The anchor slot the path starts from (the whole column when the
+        path has no hop)."""
+        return self.path[0]
+
+    @property
+    def is_traversal(self) -> bool:
+        return len(self.path) > 1
+
+    @property
+    def key(self) -> str:
+        """The column's name in a result row: the path, dot-joined (the
+        same ``pathKey`` Aperture's result table uses)."""
+        return ".".join(self.path)
 
 
 @dataclass(frozen=True)
@@ -218,8 +249,9 @@ def _parse_sort_field(raw: Any, path: str) -> SortField:
     return SortField(slot=raw["slot"], direction=direction)
 
 
-#: ColumnSpec keys that only make sense on a to-many traversal (ADR-0035/0041).
-_TRAVERSAL_COLUMN_KEYS = frozenset({"aggregate", "explode", "mode", "many"})
+#: Grain-choice spellings from ADR-0035 drafts that never shipped; named in
+#: the error so a client that sends one learns the real key.
+_LEGACY_GRAIN_KEYS = frozenset({"aggregate", "explode", "many"})
 
 
 def _parse_column_spec(raw: Any, path: str) -> ColumnSpec:
@@ -231,26 +263,64 @@ def _parse_column_spec(raw: Any, path: str) -> ColumnSpec:
         "'path' must be a non-empty list of slot names",
         f"{path}.path",
     )
-    if len(seg) > 1:
+    if len(seg) > MAX_COLUMN_HOPS + 1:
         raise QuerySpecShapeError(
             "COLUMNS_NOT_SUPPORTED",
-            f"column path {seg!r} follows a reference ({seg[0]!r} -> {seg[1]!r}); "
-            "only anchor-owned slots are supported (a single-element path) — "
-            "omit the traversal, or request the reference slot itself",
-            f"{path}.path",
+            f"column path {seg!r} follows {len(seg) - 1} reference hops; the "
+            f"depth cap is {MAX_COLUMN_HOPS} hops (at most {MAX_COLUMN_HOPS + 1} "
+            f"path elements: hop, hop, slot) — {seg[MAX_COLUMN_HOPS]!r} is one "
+            "hop too many",
+            f"{path}.path[{MAX_COLUMN_HOPS}]",
         )
-    traversal = sorted(_TRAVERSAL_COLUMN_KEYS & raw.keys())
-    if traversal:
+    extra = sorted(set(raw) - {"path", "mode"})
+    if extra:
+        hint = (
+            " — a to-many hop's grain is chosen with 'mode': "
+            f"{' | '.join(repr(m) for m in COLUMN_MODES)}"
+            if _LEGACY_GRAIN_KEYS & set(extra)
+            else ""
+        )
         raise QuerySpecShapeError(
-            "COLUMNS_NOT_SUPPORTED",
-            f"{traversal} choose an aggregate-vs-explode grain for a to-many "
-            "traversal, which is not supported — anchor-owned columns keep one "
-            "row per anchor entity",
-            f"{path}.{traversal[0]}",
+            "INVALID_QUERYSPEC_SHAPE", f"unknown ColumnSpec key(s) {extra}{hint}", path
         )
-    extra = sorted(set(raw) - {"path"})
-    _require(not extra, "INVALID_QUERYSPEC_SHAPE", f"unknown ColumnSpec key(s) {extra}", path)
-    return ColumnSpec(slot=seg[0])
+    mode = raw.get("mode")
+    if mode is not None:
+        _require(
+            mode in COLUMN_MODES,
+            "INVALID_QUERYSPEC_SHAPE",
+            f"'mode' must be one of {list(COLUMN_MODES)} (got {mode!r})",
+            f"{path}.mode",
+        )
+        _require(
+            len(seg) > 1,
+            "INVALID_QUERYSPEC_SHAPE",
+            f"'mode' chooses how a to-many HOP resolves, and {seg!r} has no hop "
+            "(an anchor slot is returned as stored) — drop 'mode'",
+            f"{path}.mode",
+        )
+    return ColumnSpec(path=tuple(seg), mode=mode)
+
+
+def _parse_columns(raw_columns: list) -> tuple[ColumnSpec, ...]:
+    """Parse every ColumnSpec, dropping exact repeats (a repeated column is
+    one column) and refusing one path asked for in two different modes —
+    a result row names its columns by path, so the two would collide."""
+    out: dict[tuple[str, ...], ColumnSpec] = {}
+    for i, raw in enumerate(raw_columns):
+        col = _parse_column_spec(raw, f"$.columns[{i}]")
+        seen = out.get(col.path)
+        if seen is None:
+            out[col.path] = col
+            continue
+        _require(
+            seen.mode == col.mode,
+            "INVALID_QUERYSPEC_SHAPE",
+            f"column path {list(col.path)!r} is asked for twice, as mode "
+            f"{seen.mode!r} and {col.mode!r}; a row names its columns by path, "
+            "so pick one",
+            f"$.columns[{i}].mode",
+        )
+    return tuple(out.values())
 
 
 def parse_query_spec(raw: Any) -> QuerySpec:
@@ -272,7 +342,7 @@ def parse_query_spec(raw: Any) -> QuerySpec:
     if raw_columns is None:
         raw_columns = []
     _require(isinstance(raw_columns, list), "INVALID_QUERYSPEC_SHAPE", "'columns' must be a list", "$.columns")
-    columns = tuple(_parse_column_spec(c, f"$.columns[{i}]") for i, c in enumerate(raw_columns))
+    columns = _parse_columns(raw_columns)
     raw_criteria = raw.get("criteria", [])
     _require(isinstance(raw_criteria, list), "INVALID_QUERYSPEC_SHAPE", "'criteria' must be a list", "$.criteria")
     criteria = tuple(
@@ -450,6 +520,145 @@ def _validate_criteria(
             _validate_criteria(c.criteria, entity, manifest, f"{cpath}.criteria", errors)
 
 
+def _validate_column(
+    col: ColumnSpec,
+    anchor: EntityCapability,
+    manifest: dict[str, EntityCapability],
+    path: str,
+    errors: list[QuerySpecError],
+    as_of: Optional[str] = None,
+) -> Optional[tuple[str, ...]]:
+    """Validate one ColumnSpec hop by hop (issue #236).
+
+    Returns the column's to-many LINK — the path up to and including its
+    to-many hop, which is what an ``explode`` repeats rows over — or
+    ``None`` when the column has no to-many hop or is invalid.
+    """
+    if not col.is_traversal:
+        # Anchor-owned (#215): unchanged, including the error path.
+        if col.slot not in anchor.fields_by_name:
+            errors.append(
+                QuerySpecError(
+                    "UNKNOWN_SLOT",
+                    f"{anchor.class_name!r} has no field {col.slot!r}. "
+                    f"Known fields: {sorted(anchor.fields_by_name)}",
+                    f"{path}.path",
+                )
+            )
+        return None
+    entity = anchor
+    to_many: list[int] = []
+    for j, hop in enumerate(col.path[:-1]):
+        hop_path = f"{path}.path[{j}]"
+        field = entity.fields_by_name.get(hop)
+        if field is None:
+            errors.append(
+                QuerySpecError(
+                    "UNKNOWN_SLOT",
+                    f"{entity.class_name!r} has no field {hop!r} (hop {j + 1} "
+                    f"of column path {list(col.path)!r}). Known references: "
+                    f"{sorted(f.slot.name for f in entity.fields if f.slot.kind is SlotKind.REFERENCE)}",
+                    hop_path,
+                )
+            )
+            return None
+        if field.slot.kind is not SlotKind.REFERENCE:
+            errors.append(
+                QuerySpecError(
+                    "NOT_A_REFERENCE",
+                    f"{entity.class_name}.{hop} is a {field.slot.kind.value} "
+                    f"field, not a reference, so column path {list(col.path)!r} "
+                    f"cannot follow it as hop {j + 1} — put {hop!r} last to "
+                    "show its value",
+                    hop_path,
+                )
+            )
+            return None
+        target = manifest.get(field.slot.target_class) if field.predicate else None
+        if target is None:
+            errors.append(
+                QuerySpecError(
+                    "NOT_PREDICATE_FILTERABLE",
+                    f"{entity.class_name}.{hop} targets "
+                    f"{field.slot.target_class!r}, which is not exposed on this "
+                    f"deployment — column path {list(col.path)!r} cannot "
+                    "traverse it",
+                    hop_path,
+                )
+            )
+            return None
+        if field.slot.inverse_of is not None and as_of is not None:
+            # As-of reconstruction rebuilds an entity's stored slots, not
+            # the virtual reverse lists derived from other entities' FKs
+            # (ADR-0011), so the hop would read as empty — refuse it rather
+            # than answer wrongly. Forward hops reconstruct and stay legal.
+            errors.append(
+                QuerySpecError(
+                    "ASOF_REVERSE_HOP_UNSUPPORTED",
+                    f"{entity.class_name}.{hop} is a reverse edge (inverse of "
+                    f"{field.slot.target_class}.{field.slot.inverse_of}), and "
+                    "'asOf' cannot reconstruct a reverse edge — drop 'asOf', or "
+                    f"anchor on {field.slot.target_class} and follow "
+                    f"{field.slot.inverse_of!r} forward instead",
+                    hop_path,
+                )
+            )
+            return None
+        if field.slot.multivalued:
+            to_many.append(j)
+        entity = target
+    leaf = col.path[-1]
+    if leaf not in entity.fields_by_name:
+        errors.append(
+            QuerySpecError(
+                "UNKNOWN_SLOT",
+                f"{entity.class_name!r} has no field {leaf!r} (the leaf of "
+                f"column path {list(col.path)!r}). Known fields: "
+                f"{sorted(entity.fields_by_name)}",
+                f"{path}.path[{len(col.path) - 1}]",
+            )
+        )
+        return None
+    if len(to_many) > 1:
+        second = to_many[1]
+        errors.append(
+            QuerySpecError(
+                "COLUMNS_NOT_SUPPORTED",
+                f"column path {list(col.path)!r} has two to-many hops "
+                f"({col.path[to_many[0]]!r} and {col.path[second]!r}); at most "
+                "one hop on a path may be to-many",
+                f"{path}.path[{second}]",
+            )
+        )
+        return None
+    if not to_many:
+        if col.mode is not None:
+            errors.append(
+                QuerySpecError(
+                    "INVALID_QUERYSPEC_SHAPE",
+                    f"column path {list(col.path)!r} has no to-many hop (every "
+                    "hop is a single reference), so it resolves to one value "
+                    f"per row — drop 'mode' ({col.mode!r})",
+                    f"{path}.mode",
+                )
+            )
+        return None
+    many = to_many[0]
+    if col.mode is None:
+        errors.append(
+            QuerySpecError(
+                "COLUMNS_NOT_SUPPORTED",
+                f"hop {col.path[many]!r} of column path {list(col.path)!r} is "
+                "to-many, so the column needs 'mode': 'count' or 'joinIds' "
+                "(one row per anchor) or 'explode' (one row per anchor x "
+                "member)",
+                f"{path}.path[{many}]",
+            )
+        )
+        return None
+    return tuple(col.path[: many + 1])
+
+
 def validate_query_spec(
     spec: QuerySpec, manifest: dict[str, EntityCapability]
 ) -> ValidationResult:
@@ -493,14 +702,25 @@ def validate_query_spec(
                 "$.sort",
             )
         )
+    exploded_link: Optional[tuple[str, ...]] = None
     for i, col in enumerate(spec.columns):
-        if col.slot not in anchor.fields_by_name:
+        link = _validate_column(
+            col, anchor, manifest, f"$.columns[{i}]", errors, as_of=spec.as_of
+        )
+        if link is None or col.mode != "explode":
+            continue
+        if exploded_link is None:
+            exploded_link = link
+        elif link != exploded_link:
             errors.append(
                 QuerySpecError(
-                    "UNKNOWN_SLOT",
-                    f"{anchor.class_name!r} has no field {col.slot!r}. "
-                    f"Known fields: {sorted(anchor.fields_by_name)}",
-                    f"$.columns[{i}].path",
+                    "COLUMNS_NOT_SUPPORTED",
+                    f"column {list(col.path)!r} explodes through "
+                    f"{'.'.join(link)!r}, but {'.'.join(exploded_link)!r} is "
+                    "already exploded; at most one link may explode per spec "
+                    "(two would be a cartesian product) — use 'count' or "
+                    "'joinIds' for this one",
+                    f"$.columns[{i}].mode",
                 )
             )
     for i, s in enumerate(spec.sort):

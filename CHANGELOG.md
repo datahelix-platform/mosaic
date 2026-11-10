@@ -2,6 +2,40 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Traversal paths in `QuerySpec.columns`, hydrated server-side** (issue
+  #236, ADR-0009 note of 2026-10-27, datahelix#113 M6). A column path may now
+  follow **one or two reference hops** — forward, or an `inverse_of` reverse
+  edge — before its leaf slot, spelled as LinkML slot names like `criteria`:
+  `{"path": ["donor", "age_at_death"]}`. A to-many hop needs `"mode"`:
+  `count` (members), `joinIds` (the members' leaf values, as a list) or
+  `explode` (one item per anchor × member, the anchor repeated; an anchor
+  with no members keeps one row). Each hop is validated against the
+  capability manifest with its own error at `$.columns[i].path[j]` —
+  `UNKNOWN_SLOT`, `NOT_A_REFERENCE` (a scalar used as a hop),
+  `NOT_PREDICATE_FILTERABLE` (a hop into a non-exposed class).
+  `COLUMNS_NOT_SUPPORTED` narrows again: it refuses only depth over 2, a
+  to-many hop without `mode`, two to-many hops on one path, and a second
+  exploded link. A `mode` with no to-many hop is `INVALID_QUERYSPEC_SHAPE`,
+  and so are the never-shipped `aggregate`/`explode`/`many` keys (the
+  message points at `mode`). `execute_query_spec` returns each item with
+  `data` trimmed to the anchor-owned columns plus `columns: {"<dot.path>":
+  value}` for every column, and, when a column explodes, a top-level
+  `grain: {"anchor", "rows", "edge"}`; `total` still counts anchors and
+  `limit`/`offset` page anchors. Hydration lives in the core SDK
+  (`mosaic.core.query_spec_traversal`), batched per hop — one type
+  resolution and one `id in [...]` query per concrete class — and reads each
+  member under the class that actually holds it, so a reverse hop reaches a
+  subclass's rows. It is adapter-agnostic: SQLite and Postgres run the same
+  cases. `asOf` with a reverse hop is refused (`ASOF_REVERSE_HOP_UNSUPPORTED`)
+  because as-of reconstruction does not rebuild derived reverse lists;
+  forward hops work under `asOf`. The manifest now advertises
+  `column_projection: "traversal"` (every `"anchor"` spec is accepted
+  unchanged), and the `construct-query-spec` prompt describes paths and the
+  to-many choice. The aggregate tools keep rejecting `columns`; GraphQL is
+  unaffected.
+
 ## v0.15.0 — 2026-10-27 (anchor-owned `columns` projection, inverse edges over abstract ranges, domain classes named like infrastructure, images under datahelix-platform)
 
 ### Added
