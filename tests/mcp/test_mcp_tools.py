@@ -148,7 +148,7 @@ class TestExecuteQuerySpec:
             assert item["id"] == whole["id"]
             assert item["entity_type"] == "Sample"
 
-    async def test_unknown_or_multi_hop_columns_come_back_coded(self, hippo_client):
+    async def test_unknown_or_over_deep_columns_come_back_coded(self, hippo_client):
         _seed(hippo_client)
         server = create_mcp_server(hippo_client)
         base = {"v": 1, "anchor": "Sample", "mode": "AND", "criteria": []}
@@ -157,13 +157,36 @@ class TestExecuteQuerySpec:
         )
         assert unknown["valid"] is False
         assert unknown["errors"][0]["code"] == "UNKNOWN_SLOT"
-        hop = await _call_tool(
+        deep = await _call_tool(
             server,
             "execute_query_spec",
-            {"query_spec": {**base, "columns": [{"path": ["donor_id", "name"]}]}},
+            {"query_spec": {**base, "columns": [{"path": ["donor_id", "a", "b", "c"]}]}},
         )
-        assert hop["valid"] is False
-        assert hop["errors"][0]["code"] == "COLUMNS_NOT_SUPPORTED"
+        assert deep["valid"] is False
+        assert deep["errors"][0]["code"] == "COLUMNS_NOT_SUPPORTED"
+        assert deep["items"] is None
+
+    async def test_a_hop_through_a_reference_returns_its_value(self, hippo_client):
+        _seed(hippo_client)
+        server = create_mcp_server(hippo_client)
+        payload = await _call_tool(
+            server,
+            "execute_query_spec",
+            {
+                "query_spec": {
+                    "v": 1,
+                    "anchor": "Sample",
+                    "mode": "AND",
+                    "criteria": [],
+                    "columns": [{"path": ["name"]}, {"path": ["donor_id", "name"]}],
+                }
+            },
+        )
+        assert payload["valid"] is True
+        assert "grain" not in payload
+        assert sorted(i["columns"]["name"] for i in payload["items"]) == ["S1", "S2"]
+        assert {i["columns"]["donor_id.name"] for i in payload["items"]} == {"D1"}
+        assert all(set(i["data"]) == {"name"} for i in payload["items"])
 
     async def test_columns_are_rejected_loudly_by_aggregate_tools(self, hippo_client):
         _seed(hippo_client)
@@ -350,3 +373,173 @@ class TestRealMountTools:
         finally:
             server.should_exit = True
             thread.join(timeout=5)
+
+
+@pytest.fixture
+def traversal_client(tmp_path):
+    """The shared traversal shape (issue #236) behind a real SQLite store."""
+    from mosaic.core.client import MosaicClient
+    from mosaic.core.storage.adapters.sqlite_adapter import SQLiteAdapter
+    from tests.support import traversal_fixture
+
+    registry = traversal_fixture.registry()
+    client = MosaicClient(
+        storage=SQLiteAdapter(str(tmp_path / "t.db"), schema_registry=registry), registry=registry
+    )
+    traversal_fixture.seed(client)
+    return client
+
+
+async def _execute(client, anchor, columns, **extra):
+    return await _call_tool(
+        create_mcp_server(client),
+        "execute_query_spec",
+        {"query_spec": {"v": 1, "anchor": anchor, "mode": "AND", "criteria": [], "columns": columns, **extra}},
+    )
+
+
+def _rows(payload):
+    return [(i["id"], i["columns"]) for i in payload["items"]]
+
+
+@pytest.mark.anyio
+class TestExecuteTraversalColumns:
+    """Issue #236 acceptance, over the MCP wire: per-column values under
+    `columns`, one item per (anchor x member) on explode, `grain` stated."""
+
+    async def test_to_one_chain(self, traversal_client):
+        payload = await _execute(traversal_client, "Sample", [{"path": ["donor", "age_at_death"]}])
+        assert payload["valid"] is True and payload["total"] == 3
+        assert _rows(payload) == [
+            ("s1", {"donor.age_at_death": 71}),
+            ("s2", {"donor.age_at_death": None}),
+            ("s3", {"donor.age_at_death": None}),
+        ]
+        assert "grain" not in payload
+
+    async def test_to_many_count_and_join_ids_keep_anchor_grain(self, traversal_client):
+        payload = await _execute(
+            traversal_client,
+            "Sample",
+            [
+                {"path": ["aliquots", "volume_ul"], "mode": "count"},
+                {"path": ["aliquots", "id"], "mode": "joinIds"},
+            ],
+        )
+        assert _rows(payload) == [
+            ("s1", {"aliquots.volume_ul": 2, "aliquots.id": ["a1", "a2"]}),
+            ("s2", {"aliquots.volume_ul": 1, "aliquots.id": ["a3"]}),
+            ("s3", {"aliquots.volume_ul": 0, "aliquots.id": []}),
+        ]
+        assert "grain" not in payload
+
+    async def test_explode_repeats_the_anchor_and_states_the_grain(self, traversal_client):
+        payload = await _execute(
+            traversal_client, "Sample", [{"path": ["name"]}, {"path": ["aliquots", "volume_ul"], "mode": "explode"}]
+        )
+        assert payload["valid"] is True
+        # `total` still counts anchors; the grain says what a row is.
+        assert payload["total"] == 3
+        assert payload["grain"] == {"anchor": 3, "rows": 4, "edge": "aliquots"}
+        assert _rows(payload) == [
+            ("s1", {"name": "S1", "aliquots.volume_ul": 10.0}),
+            ("s1", {"name": "S1", "aliquots.volume_ul": 20.0}),
+            ("s2", {"name": "S2", "aliquots.volume_ul": 5.0}),
+            ("s3", {"name": "S3", "aliquots.volume_ul": None}),
+        ]
+        assert [i["data"] for i in payload["items"]][:2] == [{"name": "S1"}, {"name": "S1"}]
+
+    async def test_explode_shows_all_members_whatever_the_criteria(self, traversal_client):
+        payload = await _execute(
+            traversal_client,
+            "Sample",
+            [{"path": ["aliquots", "volume_ul"], "mode": "explode"}],
+            criteria=[
+                {
+                    "kind": "related",
+                    "edge": "aliquots",
+                    "quantifier": "some",
+                    "criteria": [{"kind": "field", "slot": "volume_ul", "op": "gt", "value": 15.0}],
+                }
+            ],
+        )
+        # The criteria pick the anchor (s1); both its aliquots are shown.
+        assert _rows(payload) == [("s1", {"aliquots.volume_ul": 10.0}), ("s1", {"aliquots.volume_ul": 20.0})]
+        assert payload["grain"] == {"anchor": 1, "rows": 2, "edge": "aliquots"}
+
+    async def test_reverse_hop_from_the_certification_fixture_shape(self, traversal_client):
+        payload = await _execute(traversal_client, "Author", [{"path": ["books", "title"], "mode": "explode"}])
+        assert _rows(payload) == [
+            ("au1", {"books.title": "The Dispossessed"}),
+            ("au1", {"books.title": "The Lathe of Heaven"}),
+            ("au2", {"books.title": None}),
+        ]
+        assert payload["grain"] == {"anchor": 2, "rows": 3, "edge": "books"}
+
+    async def test_two_hops_whose_list_is_the_first_hop(self, traversal_client):
+        payload = await _execute(
+            traversal_client, "Sample", [{"path": ["aliquots", "container", "kind"], "mode": "joinIds"}]
+        )
+        assert _rows(payload) == [
+            ("s1", {"aliquots.container.kind": ["tube", "plate"]}),
+            ("s2", {"aliquots.container.kind": []}),
+            ("s3", {"aliquots.container.kind": []}),
+        ]
+
+    async def test_pagination_pages_anchors_not_rows(self, traversal_client):
+        payload = await _call_tool(
+            create_mcp_server(traversal_client),
+            "execute_query_spec",
+            {
+                "query_spec": {
+                    "v": 1,
+                    "anchor": "Sample",
+                    "mode": "AND",
+                    "criteria": [],
+                    "columns": [{"path": ["aliquots", "label"], "mode": "explode"}],
+                },
+                "limit": 1,
+            },
+        )
+        assert payload["total"] == 3
+        assert _rows(payload) == [("s1", {"aliquots.label": "A1"}), ("s1", {"aliquots.label": "A2"})]
+        assert payload["grain"] == {"anchor": 1, "rows": 2, "edge": "aliquots"}
+
+    async def test_per_hop_errors_come_back_coded_with_their_path(self, traversal_client):
+        payload = await _execute(traversal_client, "Sample", [{"path": ["aliquots", "volume_ul"]}])
+        assert payload["valid"] is False and payload["items"] is None
+        (err,) = payload["errors"]
+        assert (err["code"], err["path"]) == ("COLUMNS_NOT_SUPPORTED", "$.columns[0].path[0]")
+        assert "'aliquots'" in err["message"]
+        validated = await _call_tool(
+            create_mcp_server(traversal_client),
+            "validate_query_spec",
+            {
+                "query_spec": {
+                    "v": 1,
+                    "anchor": "Sample",
+                    "mode": "AND",
+                    "criteria": [],
+                    "columns": [{"path": ["name", "x"]}],
+                }
+            },
+        )
+        assert validated["valid"] is False
+        assert validated["errors"][0]["code"] == "NOT_A_REFERENCE"
+        assert validated["errors"][0]["path"] == "$.columns[0].path[0]"
+
+    async def test_aggregate_tools_still_reject_traversal_columns(self, traversal_client):
+        payload = await _call_tool(
+            create_mcp_server(traversal_client),
+            "count_query_spec",
+            {
+                "query_spec": {
+                    "v": 1,
+                    "anchor": "Sample",
+                    "mode": "AND",
+                    "criteria": [],
+                    "columns": [{"path": ["donor", "age_at_death"]}],
+                }
+            },
+        )
+        assert payload["errors"][0]["code"] == "COLUMNS_NOT_APPLICABLE"

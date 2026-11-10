@@ -47,12 +47,14 @@ def entity_type_model_to_dict(entity: EntityTypeModel) -> dict[str, Any]:
     }
 
 
-#: What ``QuerySpec.columns`` can name on this deployment (issue #215,
-#: ADR-0029 honest degradation). ``"anchor"`` = anchor-owned slots only; a
-#: deployment that predates projection omits the key, so a client tells the
-#: two apart without probing. Widens (e.g. to ``"traversal"``) only if the
-#: second ADR-0009 follow-up is ever approved.
-COLUMN_PROJECTION = "anchor"
+#: What ``QuerySpec.columns`` can name on this deployment (ADR-0029 honest
+#: degradation). Three generations, told apart without probing: the key is
+#: absent (no projection), ``"anchor"`` (anchor-owned slots only, issue
+#: #215), ``"traversal"`` (also 1–2 reference hops with ``count|joinIds|
+#: explode`` on a to-many hop, issue #236). ``"traversal"`` accepts every
+#: ``"anchor"`` spec unchanged, so a client written against ``"anchor"`` is
+#: unaffected.
+COLUMN_PROJECTION = "traversal"
 
 
 def entity_capability_to_dict(entity: EntityCapability) -> dict[str, Any]:

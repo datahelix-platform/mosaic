@@ -95,6 +95,7 @@ from mosaic.core.query_spec import (
     validate_query_spec as _validate_query_spec,
 )
 from mosaic.core.query_spec_compiler import compile_query_spec
+from mosaic.core.query_spec_traversal import project_traversal
 from mosaic.core.schema_typing import (
     EntityCapability,
     build_capability_manifest,
@@ -367,7 +368,11 @@ def create_mcp_server(hippo_client: MosaicClient) -> MCPServer:
         description=(
             "Validate a QuerySpec, then execute it if valid (ADR-0009): "
             "compiles to Mosaic's where:/order_by query surface and runs "
-            "it through the same MosaicClient REST/GraphQL use. Always "
+            "it through the same MosaicClient REST/GraphQL use. When "
+            "'columns' follows a reference, each item also carries "
+            "'columns': {<dot.joined.path>: value}; an 'explode' column "
+            "returns one item per (anchor x member) and a 'grain' object "
+            "{anchor, rows, edge} — 'total' always counts anchors. Always "
             "validates first — an invalid QuerySpec returns {valid: "
             "false, errors: [...]} with no items, exactly like "
             "validate_query_spec, so a client can validate-fix-retry with "
@@ -439,7 +444,18 @@ def create_mcp_server(hippo_client: MosaicClient) -> MCPServer:
                 "total": None,
             }
         dumped = page.model_dump(mode="json")
-        return {"valid": True, "errors": [], "items": dumped["items"], "total": dumped["total"]}
+        if compiled.traversal is None:
+            return {"valid": True, "errors": [], "items": dumped["items"], "total": dumped["total"]}
+        # Issue #236: hydrate traversal columns server-side, batched per hop.
+        # `total` still counts anchors; when a column explodes, `grain` says
+        # how many rows the page's anchors became, and through which edge.
+        rows, grain = project_traversal(
+            client, dumped["items"], compiled.traversal, as_of=compiled.as_of
+        )
+        out = {"valid": True, "errors": [], "items": rows, "total": dumped["total"]}
+        if grain is not None:
+            out["grain"] = grain
+        return out
 
     @mcp.tool(
         annotations=ToolAnnotations(read_only_hint=True),
@@ -746,18 +762,35 @@ name>, "quantifier": "some" | "none", "criteria": [FieldCondition, ...]}. \
 whether the relationship is one-to-one or one-to-many, so never simulate \
 it with a client-side per-id fan-out (fetch-then-filter in a loop).
 
-4. `columns` takes ANCHOR slots only: a list of {"path": ["<slot name>"]}, \
-one single-element path per field of the anchor (check the field names on \
-mosaic://capabilities). Use it when the user asks which FIELD(S) to look at \
--- do not filter or sort on a field just to surface it. It trims each \
-returned entity's `data` to those slots; there is still one row per anchor \
-entity. A path that follows a reference (two or more elements), and any \
-aggregate/explode choice, is NOT supported -- omit a traversal entirely \
-(COLUMNS_NOT_SUPPORTED). Omit `columns` to get every field.
+4. `columns` chooses which FIELD(S) to return -- use it when the user asks \
+to see a field; do not filter or sort on a field just to surface it. Each \
+entry is {"path": [...]} spelled in LinkML slot names (the same names as \
+`criteria`), and mosaic://capabilities advertises `column_projection: \
+"traversal"` when paths may follow references:
+   - ["<anchor slot>"]: a field of the anchor, returned in each item's \
+`data`.
+   - ["<reference>", "<slot>"] or ["<reference>", "<reference>", "<slot>"]: \
+follow 1-2 reference hops (a forward reference, or a reverse edge whose \
+`inverse_of` is non-null) and return a field of the class reached, e.g. \
+["donor", "age_at_death"]. The value lands in each item's `columns` under \
+the dot-joined path ("donor.age_at_death"). At most 2 hops.
+   - If a hop is MULTIVALUED (to-many), add "mode": "count" (how many \
+members), "joinIds" (a list of the members' leaf values; use "id" as the \
+leaf for their ids) -- both keep one item per anchor -- or "explode" (one \
+item per anchor x member, anchor repeated; the response's `grain` says \
+how many rows came from how many anchors -- say so when you report it). \
+Explode shows ALL members (criteria choose anchors, not members) and at \
+most one link may explode per QuerySpec; at most one hop per path may be \
+to-many. No `mode` on a path with no to-many hop.
+   Over the depth cap, a to-many hop with no `mode`, or a second exploded \
+link is COLUMNS_NOT_SUPPORTED; the error names the hop -- fix that one \
+thing. Omit `columns` to get every anchor field.
 
 5. `asOf` cannot combine with a RelatedCondition anywhere in `criteria` \
 (including nested inside a group) -- pick a point in time OR a \
-relationship predicate, not both, on the same QuerySpec.
+relationship predicate, not both, on the same QuerySpec. The same holds \
+for a reverse-edge hop (`inverse_of` non-null) in a `columns` path \
+(ASOF_REVERSE_HOP_UNSUPPORTED); forward hops work under `asOf`.
 
 6. `sort` takes at most ONE field -- Mosaic's query surface has no \
 multi-column sort to compile a second entry against.
@@ -766,8 +799,8 @@ multi-column sort to compile a second entry against.
 check mosaic://capabilities/mosaic://schema, don't guess a value.
 
 8. Minimal shape: {"v": 1, "anchor": <an exposed entity type>, "mode": \
-"AND" | "OR", "criteria": [...]}. `asOf` and `sort` are optional \
-top-level additions.
+"AND" | "OR", "criteria": [...]}. `asOf`, `sort` and `columns` are \
+optional top-level additions.
 
 9. A QuerySpec has NO aggregation shape of its own -- execute_query_spec \
 always returns full entity rows, never a count or a per-value breakdown. \

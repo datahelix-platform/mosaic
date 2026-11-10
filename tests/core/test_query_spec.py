@@ -129,19 +129,12 @@ def test_absent_or_null_columns_means_no_selection():
     assert parse_query_spec({**_BASE, "columns": []}).columns == ()
 
 
-def test_multi_hop_column_is_still_rejected_naming_the_hop():
+@pytest.mark.parametrize("key", ["aggregate", "explode", "many"])
+def test_legacy_grain_keys_are_unknown_and_point_at_mode(key):
     with pytest.raises(QuerySpecShapeError) as exc:
-        parse_query_spec({**_BASE, "columns": [{"path": ["donor", "name"]}]})
-    assert exc.value.code == "COLUMNS_NOT_SUPPORTED"
-    assert "donor" in str(exc.value) and "name" in str(exc.value)
-    assert exc.value.path == "$.columns[0].path"
-
-
-@pytest.mark.parametrize("key", ["aggregate", "explode", "mode", "many"])
-def test_grain_choice_is_still_rejected(key):
-    with pytest.raises(QuerySpecShapeError) as exc:
-        parse_query_spec({**_BASE, "columns": [{"path": ["name"], key: True}]})
-    assert exc.value.code == "COLUMNS_NOT_SUPPORTED"
+        parse_query_spec({**_BASE, "columns": [{"path": ["donor", "name"], key: True}]})
+    assert exc.value.code == "INVALID_QUERYSPEC_SHAPE"
+    assert "'mode'" in str(exc.value)
 
 
 @pytest.mark.parametrize(
@@ -398,3 +391,157 @@ def test_sort_on_reference_field_is_rejected():
     result = validate_query_spec(spec, _manifest())
     assert not result.valid
     assert result.errors[0].code == "UNORDERABLE_SORT_FIELD"
+
+
+# -- traversal columns (issue #236) -------------------------------------------
+
+from tests.support import traversal_fixture  # noqa: E402
+
+_T = {"v": 1, "mode": "AND", "criteria": []}
+
+
+def _tmanifest():
+    return build_capability_manifest(traversal_fixture.registry())
+
+
+def _terrors(anchor, columns, **extra):
+    spec = parse_query_spec({**_T, "anchor": anchor, "columns": columns, **extra})
+    return validate_query_spec(spec, _tmanifest()).errors
+
+
+def _tshape_error(columns):
+    with pytest.raises(QuerySpecShapeError) as exc:
+        parse_query_spec({**_T, "anchor": "Sample", "columns": columns})
+    return exc.value
+
+
+def test_parses_paths_and_mode():
+    spec = parse_query_spec(
+        {
+            **_T,
+            "anchor": "Sample",
+            "columns": [{"path": ["donor", "age_at_death"]}, {"path": ["aliquots", "volume_ul"], "mode": "count"}],
+        }
+    )
+    assert [(c.path, c.mode) for c in spec.columns] == [
+        (("donor", "age_at_death"), None),
+        (("aliquots", "volume_ul"), "count"),
+    ]
+    assert [c.key for c in spec.columns] == ["donor.age_at_death", "aliquots.volume_ul"]
+
+
+@pytest.mark.parametrize(
+    "anchor, columns",
+    [
+        ("Sample", [{"path": ["donor", "age_at_death"]}]),
+        ("Sample", [{"path": ["aliquots", "volume_ul"], "mode": "count"}]),
+        ("Sample", [{"path": ["aliquots", "volume_ul"], "mode": "joinIds"}]),
+        ("Sample", [{"path": ["aliquots", "volume_ul"], "mode": "explode"}]),
+        ("Sample", [{"path": ["aliquots", "container", "kind"], "mode": "explode"}]),
+        ("Sample", [{"path": ["donor", "samples", "name"], "mode": "joinIds"}]),
+        ("Author", [{"path": ["books", "title"], "mode": "explode"}]),
+        # Two columns exploding through ONE link are one explode, not two.
+        ("Sample", [{"path": ["aliquots", "label"], "mode": "explode"}, {"path": ["aliquots", "volume_ul"], "mode": "explode"}]),
+        # A leaf may itself be a reference (its id) or the identifier.
+        ("Sample", [{"path": ["donor", "samples"]}, {"path": ["aliquots", "id"], "mode": "joinIds"}]),
+    ],
+)
+def test_valid_traversal_columns(anchor, columns):
+    assert _terrors(anchor, columns) == ()
+
+
+def test_unknown_hop_names_the_class_and_hop():
+    (e,) = _terrors("Sample", [{"path": ["name"]}, {"path": ["donr", "age_at_death"]}])
+    assert (e.code, e.path) == ("UNKNOWN_SLOT", "$.columns[1].path[0]")
+    assert "'Sample'" in e.message and "'donr'" in e.message
+
+
+def test_unknown_second_hop_names_the_class_it_reached():
+    (e,) = _terrors("Sample", [{"path": ["donor", "sample", "name"], "mode": "count"}])
+    assert (e.code, e.path) == ("UNKNOWN_SLOT", "$.columns[0].path[1]")
+    assert "'Donor'" in e.message and "'sample'" in e.message
+
+
+def test_unknown_leaf_names_the_class_it_reached():
+    (e,) = _terrors("Sample", [{"path": ["donor", "age"]}])
+    assert (e.code, e.path) == ("UNKNOWN_SLOT", "$.columns[0].path[1]")
+    assert "'Donor'" in e.message and "'age'" in e.message
+
+
+def test_scalar_used_as_a_hop_is_not_a_reference():
+    (e,) = _terrors("Sample", [{"path": ["name", "length"]}])
+    assert (e.code, e.path) == ("NOT_A_REFERENCE", "$.columns[0].path[0]")
+    assert "Sample.name" in e.message
+
+
+def test_hop_into_a_non_exposed_target_is_not_traversable():
+    (e,) = _terrors("Sample", [{"path": ["protocol", "title"]}])
+    assert (e.code, e.path) == ("NOT_PREDICATE_FILTERABLE", "$.columns[0].path[0]")
+    assert "Sample.protocol" in e.message and "'Protocol'" in e.message
+
+
+def test_depth_over_the_cap_is_refused_at_parse_naming_the_cap():
+    e = _tshape_error([{"path": ["donor", "samples", "donor", "name"], "mode": "count"}])
+    assert (e.code, e.path) == ("COLUMNS_NOT_SUPPORTED", "$.columns[0].path[2]")
+    assert "depth cap is 2" in str(e) and "'donor'" in str(e)
+
+
+def test_to_many_hop_without_mode_names_the_hop():
+    (e,) = _terrors("Sample", [{"path": ["donor", "samples", "name"]}])
+    assert (e.code, e.path) == ("COLUMNS_NOT_SUPPORTED", "$.columns[0].path[1]")
+    assert "'samples'" in e.message and "'mode'" in e.message
+
+
+def test_two_to_many_hops_on_one_path_name_the_second():
+    (e,) = _terrors("Donor", [{"path": ["samples", "aliquots", "label"], "mode": "count"}])
+    assert (e.code, e.path) == ("COLUMNS_NOT_SUPPORTED", "$.columns[0].path[1]")
+    assert "'aliquots'" in e.message
+
+
+def test_a_second_exploded_link_is_refused():
+    (e,) = _terrors(
+        "Sample",
+        [
+            {"path": ["aliquots", "label"], "mode": "explode"},
+            {"path": ["donor", "samples", "name"], "mode": "explode"},
+        ],
+    )
+    assert (e.code, e.path) == ("COLUMNS_NOT_SUPPORTED", "$.columns[1].mode")
+    assert "'donor.samples'" in e.message and "'aliquots'" in e.message
+
+
+def test_mode_on_a_path_with_no_to_many_hop_is_a_shape_error():
+    (e,) = _terrors("Sample", [{"path": ["donor", "age_at_death"], "mode": "count"}])
+    assert (e.code, e.path) == ("INVALID_QUERYSPEC_SHAPE", "$.columns[0].mode")
+    assert "'donor', 'age_at_death'" in e.message
+
+
+def test_mode_on_an_anchor_slot_is_a_shape_error_at_parse():
+    e = _tshape_error([{"path": ["aliquots"], "mode": "count"}])
+    assert (e.code, e.path) == ("INVALID_QUERYSPEC_SHAPE", "$.columns[0].mode")
+
+
+def test_unknown_mode_is_a_shape_error():
+    e = _tshape_error([{"path": ["aliquots", "label"], "mode": "aggregate"}])
+    assert (e.code, e.path) == ("INVALID_QUERYSPEC_SHAPE", "$.columns[0].mode")
+
+
+def test_one_path_in_two_modes_is_a_shape_error():
+    e = _tshape_error(
+        [{"path": ["aliquots", "label"], "mode": "count"}, {"path": ["aliquots", "label"], "mode": "joinIds"}]
+    )
+    assert (e.code, e.path) == ("INVALID_QUERYSPEC_SHAPE", "$.columns[1].mode")
+
+
+def test_repeated_column_is_one_column():
+    spec = parse_query_spec(
+        {**_T, "anchor": "Sample", "columns": [{"path": ["donor", "name"]}, {"path": ["donor", "name"]}]}
+    )
+    assert len(spec.columns) == 1
+
+
+def test_as_of_refuses_a_reverse_hop_naming_it_but_keeps_forward_hops():
+    (e,) = _terrors("Author", [{"path": ["books", "title"], "mode": "count"}], asOf="2026-01-01T00:00:00Z")
+    assert (e.code, e.path) == ("ASOF_REVERSE_HOP_UNSUPPORTED", "$.columns[0].path[0]")
+    assert "Author.books" in e.message
+    assert _terrors("Sample", [{"path": ["donor", "age_at_death"]}], asOf="2026-01-01T00:00:00Z") == ()
