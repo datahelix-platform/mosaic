@@ -1,0 +1,46 @@
+# Weekly unlocked test run (mosaic#242).
+#
+# PR and push CI install from uv.lock so local runs, CI and the image test the
+# same dependency versions. This job does the opposite on purpose: it resolves
+# the newest versions pyproject.toml allows -- what a downstream project that
+# installs Mosaic as a library gets -- and runs the suite, so upstream changes
+# (linkml / linkml-runtime above all) surface before we refresh the lock.
+#
+# It runs on a schedule and on demand only, never on pull requests, so it
+# cannot block a merge. When it fails: refresh the lock
+# (`uv lock --upgrade-package <pkg>`), fix what breaks, open a PR.
+
+name: Tests (unlocked, weekly)
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"  # Mondays 06:17 UTC
+  workflow_dispatch:
+
+jobs:
+  mosaic-unlocked:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies (unlocked, fresh resolve)
+        run: uv pip install --system -e ".[dev,graphql,mcp]"
+
+      - name: Show resolved linkml versions
+        run: python -c "import importlib.metadata as m; print('linkml', m.version('linkml'), '| linkml-runtime', m.version('linkml-runtime'))"
+
+      - name: Run tests (SQLite)
+        run: pytest -v --ignore=tests/integration/test_postgres_adapter.py
