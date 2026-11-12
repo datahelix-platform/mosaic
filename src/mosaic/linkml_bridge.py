@@ -953,11 +953,24 @@ class InverseSlot:
     target_class: str
     forward_slot: str
     target_classes: tuple[str, ...] = ()
+    #: Where the schema author wrote ``inverse`` (ADR-0012). ``"reverse"``:
+    #: on this multivalued slot itself (ADR-0011's site). ``"forward"``: on
+    #: the single-valued forward slot (``Sample.donor: {inverse: samples}``)
+    #: and Mosaic *synthesized* this slot onto the range class at load time.
+    #: Storage, query, manifest and transport treat both identically; the
+    #: marker is for diagnostics and documentation — generic LinkML tooling
+    #: never sees a synthesized slot.
+    declared_on: str = "reverse"
 
     @property
     def tables(self) -> tuple[str, ...]:
         """Concrete classes to resolve against (falls back to the range)."""
         return self.target_classes or (self.target_class,)
+
+    @property
+    def synthesized(self) -> bool:
+        """True when this reverse edge was synthesized from the forward slot."""
+        return self.declared_on == "forward"
 
 
 def concrete_class_closure(sv: SchemaView, class_name: str) -> tuple[str, ...]:
@@ -981,6 +994,233 @@ def concrete_class_closure(sv: SchemaView, class_name: str) -> tuple[str, ...]:
     return tuple(head + sorted(n for n in out if n != class_name))
 
 
+#: Annotation Mosaic stamps on a reverse slot it synthesized from a
+#: forward-side ``inverse`` (ADR-0012). Its value is the forward
+#: declaration (``"Sample.donor"``). Not a ``hippo_*`` key, so hippo_ext
+#: validation ignores it; it survives a ``yaml_dumper`` round-trip, so a
+#: registry rebuilt from a dumped view still reports ``declared_on``.
+SYNTHESIZED_INVERSE_ANNOTATION = "mosaic_synthesized_from"
+
+
+def synthesized_from(slot: Any) -> Optional[str]:
+    """``"<Class>.<slot>"`` the reverse ``slot`` was synthesized from, else ``None``."""
+    value = annotation_value(slot, SYNTHESIZED_INVERSE_ANNOTATION)
+    return str(value) if value is not None else None
+
+
+def _inherits_forward_inverse(sv: SchemaView, class_name: str, slot: Any) -> bool:
+    """True if ``slot``'s ``inverse`` is inherited from an ancestor of ``class_name``.
+
+    A forward slot declared once on an abstract base (``Sample.donor``) is
+    induced on every descendant (``Brain.donor``, ``CSF.donor``) with the
+    same ``inverse``; only the class that *introduces* the declaration
+    synthesizes the reverse, ranged on itself. A subclass that sets a
+    *different* ``inverse`` through ``slot_usage`` (``Diagnosis.person:
+    {inverse: diagnoses}`` narrowing an inherited ``person``) introduces a
+    new declaration and gets its own reverse, ranged on the subclass.
+    """
+    wanted = str(slot.inverse)
+    for ancestor in sv.class_ancestors(class_name, reflexive=False):
+        try:
+            induced = sv.class_induced_slots(ancestor)
+        except Exception:
+            continue
+        for candidate in induced:
+            if candidate.name != slot.name:
+                continue
+            if getattr(candidate, "inverse", None) and str(candidate.inverse) == wanted:
+                return True
+    return False
+
+
+def _class_definitions(sv: SchemaView, class_name: str) -> list[ClassDefinition]:
+    """Every *authoritative* ``ClassDefinition`` of ``class_name`` in the view.
+
+    ``sv.get_class()`` is not safe to mutate: since linkml-runtime 1.12 a
+    class that appears in more than one schema of the import closure is
+    returned as a ``deepcopy`` merged across them (``SchemaView._get_dict``
+    folds ``rules``/``classification_rules`` together), so an attribute added
+    to that object never reaches the view. The merged-directory loader
+    (:meth:`SchemaRegistry._from_directory`) produces exactly that shape —
+    it inlines every file's classes *and* keeps their ``imports:``, so a
+    class is defined both at top level and in the imported module. Adding
+    the attribute to each definition the view actually holds makes it
+    visible whichever one the merge picks, on every runtime version.
+    """
+    out: list[ClassDefinition] = []
+    seen: set[int] = set()
+    for schema in sv.all_schema(imports=True):
+        cls = (schema.classes or {}).get(class_name)
+        if cls is not None and id(cls) not in seen:
+            seen.add(id(cls))
+            out.append(cls)
+    return out
+
+
+def _synthesize_forward_inverse_slots(sv: SchemaView) -> None:
+    """Honour ``inverse`` declared on a single-valued forward slot (ADR-0012).
+
+    ADR-0011 reads ``inverse`` on the derived, multivalued side, which in an
+    import-layered schema forces a lower module to name a class from a
+    higher one (``person.yaml`` cannot range ``Donor.samples`` on
+    ``Sample`` from ``tissue.yaml``). The forward slot can carry the
+    declaration instead: ``Sample.donor: {range: Donor, inverse: samples}``
+    synthesizes ``Donor.samples: {range: Sample, multivalued: true,
+    inverse: donor}`` onto the range class — a real ``SlotDefinition``
+    added to the SchemaView, so the type model, capability manifest, both
+    storage adapters, GraphQL, MCP, DDL and ``schema_diff`` all see it
+    exactly as a declared ADR-0011 slot. It is stamped with
+    :data:`SYNTHESIZED_INVERSE_ANNOTATION` so
+    :meth:`SchemaRegistry.inverse_reference_slots` can report
+    ``declared_on="forward"``. Runs *before* :func:`_validate_inverse_slots`,
+    which then validates the synthesized slot like any other.
+
+    Rules (``SchemaError``, aggregated):
+
+    - the forward slot's range must be an entity class (there is no class
+      to place the reverse on otherwise);
+    - **both sides declared must agree**: a reverse already on the range
+      class must be named by the forward slot and name it back;
+    - **collision**: a real slot of that name already on the range class
+      is an error — Mosaic never silently reuses it;
+    - one forward declaration per reverse: two unrelated classes sharing
+      a forward slot with the same ``inverse`` cannot both synthesize
+      ``Range.<name>`` (declare it once, on a shared ancestor).
+
+    A forward declaration inherited from an ancestor is skipped (see
+    :func:`_inherits_forward_inverse`): an abstract ``Sample.donor``
+    synthesizes ``Donor.samples`` ranged on ``Sample``, whose concrete
+    closure (#224) then covers every subclass table. A *multivalued* slot
+    carrying ``inverse`` is not a forward slot in this sense — ADR-0011
+    reads it as the derived side and validates it as such (the reverse of
+    a multivalued forward slot is ADR-0013).
+    """
+    if sv.schema.name == "hippo_ext":
+        return
+    from linkml_runtime.linkml_model.annotations import Annotation
+
+    classes = sv.all_classes()
+    value_types = value_type_class_names(sv)
+    failures: list[str] = []
+    synthesized: dict[tuple[str, str], str] = {}
+    for class_name in sorted(classes):
+        try:
+            induced = sv.class_induced_slots(class_name)
+        except Exception:
+            continue
+        for slot in induced:
+            inverse = getattr(slot, "inverse", None)
+            if not inverse or slot.multivalued:
+                continue
+            name = str(inverse)
+            where = f"{class_name}.{slot.name}"
+            if _inherits_forward_inverse(sv, class_name, slot):
+                continue
+            rng = slot.range
+            if not rng or rng not in classes or rng in value_types:
+                failures.append(
+                    f"{where} declares `inverse: {name}` but its range "
+                    f"{rng!r} is not an entity class, so there is no class to "
+                    f"place the reverse slot on; `inverse` is only meaningful "
+                    f"on a slot ranged against another class (ADR-0012)."
+                )
+                continue
+            rng = str(rng)
+            ancestors = set(sv.class_ancestors(class_name, reflexive=True))
+            range_slots = sv.class_induced_slots(rng)
+            existing = next((s for s in range_slots if s.name == name), None)
+            if existing is not None:
+                ex_inverse = getattr(existing, "inverse", None)
+                if (
+                    existing.multivalued
+                    and ex_inverse
+                    and str(ex_inverse) == slot.name
+                    and existing.range in ancestors
+                ):
+                    # Declared on both sides and they name each other —
+                    # LinkML's symmetric form; the reverse side already
+                    # carries the edge (ADR-0011).
+                    continue
+                origin = synthesized.get((rng, name))
+                if origin is not None:
+                    failures.append(
+                        f"{where} declares `inverse: {name}` but {rng}.{name} "
+                        f"was already synthesized from {origin}; a reverse "
+                        f"slot can range on only one class — declare "
+                        f"`inverse` once, on a slot of a shared ancestor "
+                        f"(ADR-0012)."
+                    )
+                elif existing.multivalued and ex_inverse:
+                    failures.append(
+                        f"{where} declares `inverse: {name}` but {rng}.{name} "
+                        f"declares `inverse: {ex_inverse}` (range "
+                        f"{existing.range!r}); when both sides declare "
+                        f"`inverse` they must name each other (ADR-0012)."
+                    )
+                else:
+                    failures.append(
+                        f"{where} declares `inverse: {name}` but {rng} already "
+                        f"has a slot named {name!r} (range {existing.range!r}"
+                        f"{', multivalued' if existing.multivalued else ''}); "
+                        f"the synthesized reverse edge would collide with it "
+                        f"(ADR-0012)."
+                    )
+                continue
+            other = next(
+                (
+                    s
+                    for s in range_slots
+                    if s.multivalued
+                    and getattr(s, "inverse", None)
+                    and str(s.inverse) == slot.name
+                    and s.range == class_name
+                ),
+                None,
+            )
+            if other is not None:
+                failures.append(
+                    f"{where} declares `inverse: {name}` but {rng}.{other.name} "
+                    f"declares `inverse: {slot.name}`; when both sides declare "
+                    f"`inverse` they must name each other (ADR-0012)."
+                )
+                continue
+            definitions = _class_definitions(sv, rng)
+            if not definitions:  # pragma: no cover - guarded by `rng in classes`
+                continue
+            for target in definitions:
+                # Mutate the definitions the view holds, never the (possibly
+                # copied) object ``get_class`` returns — see _class_definitions.
+                target.attributes[name] = SlotDefinition(
+                    name=name,
+                    range=class_name,
+                    multivalued=True,
+                    inverse=slot.name,
+                    description=(
+                        f"Reverse of {where} — every {class_name} whose "
+                        f"`{slot.name}` points at this {rng}. Synthesized by "
+                        f"Mosaic from the forward slot's `inverse` (ADR-0012); "
+                        f"derived, never stored or written."
+                    ),
+                    annotations={
+                        SYNTHESIZED_INVERSE_ANNOTATION: Annotation(
+                            tag=SYNTHESIZED_INVERSE_ANNOTATION, value=where
+                        )
+                    },
+                )
+            synthesized[(rng, name)] = where
+            # The SchemaView memoizes induced slots on its own hash;
+            # bump it so the new attribute is visible to every later walk.
+            sv.set_modified()
+    if failures:
+        from mosaic.core.exceptions import SchemaError
+
+        raise SchemaError(
+            f"{len(failures)} inverse-slot error(s) in schema (ADR-0012):\n  - "
+            + "\n  - ".join(failures),
+            error_code="INVERSE_SLOT",
+        )
+
+
 def _validate_inverse_slots(sv: SchemaView) -> None:
     """Validate every ``inverse``-declared multivalued slot (ADR-0011).
 
@@ -999,8 +1239,11 @@ def _validate_inverse_slots(sv: SchemaView) -> None:
     - the forward slot's range is the declaring class or one of its
       ancestors (so ``forward = <declaring id>`` is well-typed).
 
-    A *single-valued* slot carrying ``inverse`` is the stored side and is
-    left alone (LinkML permits declaring the pair symmetrically).
+    A *single-valued* slot carrying ``inverse`` is the stored side; by the
+    time this runs :func:`_synthesize_forward_inverse_slots` has turned it
+    into a multivalued reverse slot on its range class (ADR-0012), which is
+    validated here like any declared one — failure messages name the
+    forward declaration it came from.
 
     Raises ``SchemaError`` aggregating all failures.
     """
@@ -1019,6 +1262,9 @@ def _validate_inverse_slots(sv: SchemaView) -> None:
             if not inverse or not slot.multivalued:
                 continue
             where = f"{class_name}.{slot.name}"
+            origin = synthesized_from(slot)
+            if origin is not None:
+                where += f" (synthesized from {origin}'s `inverse`, ADR-0012)"
             rng = slot.range
             if not rng or rng not in classes or rng in value_types:
                 failures.append(
@@ -1101,6 +1347,9 @@ class SchemaRegistry:
 
     def __init__(self, schema_view: SchemaView) -> None:
         _validate_hippo_annotations(schema_view)
+        # ADR-0012: a forward-side ``inverse`` becomes a real reverse slot on
+        # the range class before ADR-0011 validation sees the schema.
+        _synthesize_forward_inverse_slots(schema_view)
         _validate_inverse_slots(schema_view)
         self._sv = schema_view
         self._inverse_slots_cache: dict[str, list[InverseSlot]] = {}
@@ -1357,12 +1606,15 @@ class SchemaRegistry:
 
         Each is a virtual reverse edge: ``Donor.samples: {range: Sample,
         multivalued: true, inverse: donor}`` yields
-        ``InverseSlot("samples", "Sample", "donor")``. Validated at
-        registry construction (:func:`_validate_inverse_slots`), so every
-        entry here has a single-valued forward slot on its target class
-        pointing back at the declaring class. These slots get no column,
-        no link table, and no relationship rows; storage adapters hydrate,
-        filter, and count them through ``forward_slot``. Cached per class.
+        ``InverseSlot("samples", "Sample", "donor")``. A reverse Mosaic
+        synthesized from the forward slot (``Sample.donor: {inverse:
+        samples}``, ADR-0012) is reported the same way with
+        ``declared_on="forward"``. Validated at registry construction
+        (:func:`_validate_inverse_slots`), so every entry here has a
+        single-valued forward slot on its target class pointing back at
+        the declaring class. These slots get no column, no link table, and
+        no relationship rows; storage adapters hydrate, filter, and count
+        them through ``forward_slot``. Cached per class.
         """
         cached = self._inverse_slots_cache.get(class_name)
         if cached is not None:
@@ -1379,6 +1631,9 @@ class SchemaRegistry:
                             forward_slot=str(inverse),
                             target_classes=concrete_class_closure(
                                 self._sv, str(slot.range)
+                            ),
+                            declared_on=(
+                                "forward" if synthesized_from(slot) is not None else "reverse"
                             ),
                         )
                     )
