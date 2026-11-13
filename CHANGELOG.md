@@ -4,6 +4,36 @@
 
 ### Added
 
+- **Reverse edges over multivalued (relationship-row) forward slots**
+  (issue #231, ADR-0013 and its 2026-11-10 amendment). ADR-0011 rejected an
+  `inverse` whose forward slot is multivalued at load; that rejection is
+  gone. Such a reverse (`Cohort.members: {inverse: cohort}` over a
+  multivalued `Person.cohort`, or `Sample.assays` synthesized from
+  `Assay.inputs: {multivalued: true, inverse: assays}`) is virtual, like
+  ADR-0011's: hydrated in batch, filterable with `some`/`none`, counted by
+  `count_relationship`, write-ignored, no column and no link table — but it
+  resolves through the ADR-0002 `relationships` table joined on
+  `target_id`, scoped by `relationship_type` to the forward slot and by the
+  forward class's concrete closure, on SQLite and Postgres. Available source
+  rows and available edges only. `InverseSlot` gains `forward_multivalued`.
+
+  **Which side of an `inverse` pair is stored is now decided by the pair**
+  (`linkml_bridge.is_virtual_inverse`, used by `inverse_reference_slots`,
+  `multivalued_reference_slots` and the type model's `inverse_of`), replacing
+  the "multivalued + `inverse` ⇒ virtual" test that would have silently
+  stopped storing writes to a multivalued forward slot such as
+  `Assay.inputs`. For `A.x: {inverse: y}` ranged on `B`: `B.y` real and not
+  declaring back → `B.y` stored, `A.x` virtual; `B.y` absent → `A.x` stored,
+  `B.y` synthesized; both declare each other → the single-valued side is
+  stored. **Behaviour change:** a multivalued slot whose `inverse` names a
+  slot the range class lacks used to fail with "no slot named …"; by the
+  pair rule it is now the stored forward side and the reverse is
+  synthesized. New load-time `SchemaError`s (`INVERSE_SLOT`): two multivalued
+  slots declaring `inverse` on each other ("declare `inverse` on one side
+  only"); a reverse naming another derived reverse. A forward count or
+  filter *into* an abstract range (`Assay.inputs` → `Sample`) still ignores
+  the concrete closure — that is #241 / ADR-0014, not changed here.
+
 - **`inverse` declared on the forward slot synthesizes the reverse edge**
   (issue #230, ADR-0012). ADR-0011 read `inverse` only on the derived,
   multivalued side, which in an import-layered schema forces a lower module
@@ -28,7 +58,7 @@
   class; unrelated classes sharing a forward slot with the same `inverse`.
   ADR-0011's checks still apply to the synthesized slot and name the forward
   declaration in their message; the reverse of a *multivalued* forward slot
-  stays rejected as before (ADR-0013). Generic LinkML tooling never sees a
+  stayed rejected until ADR-0013 (#231, above). Generic LinkML tooling never sees a
   synthesized slot — the schema guide says so.
 
   **Behaviour change, checked as ADR-0012's ratification note asks:** a
