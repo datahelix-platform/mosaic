@@ -8,6 +8,10 @@ src_path = Path(__file__).parent.parent / "src"
 if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
+# Shared test-case mixins live in tests/support; rewrite their asserts so
+# failures show the compared values (closure_fixture, #241).
+pytest.register_assert_rewrite("tests.support.closure_fixture")
+
 
 def _build_minimal_schema_registry():
     """Return a SchemaRegistry over hippo_core plus generic test classes.
