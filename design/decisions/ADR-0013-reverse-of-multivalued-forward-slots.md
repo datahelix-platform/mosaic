@@ -116,3 +116,18 @@ Open PR [#240](https://github.com/datahelix-platform/mosaic/pull/240) (ADR-0012'
 keeps the old test. That is correct for ADR-0012 alone, where every forward slot carrying `inverse`
 is single-valued; it becomes wrong the moment M4 allows a multivalued forward slot, so the switch
 belongs in M4 (or in #240, if it lands after this note is read).
+
+## Implementation note (#231)
+
+- The pair rule lives in `linkml_bridge.is_virtual_inverse`; `inverse_reference_slots`,
+  `multivalued_reference_slots` and `_classify_slot`'s `inverse_of` all use it.
+  `InverseSlot.forward_multivalued` tells adapters which storage the forward slot uses.
+- SQLite and Postgres resolve the reverse as `relationships` rows with `target_id` = this
+  entity and `relationship_type` = the forward slot, joined to the forward class's concrete
+  closure (so `Run.inputs` and `Assay.inputs`, sharing a slot name, never mix). Hydration,
+  `some`/`none` and `count_relationship` count available source rows with an available edge.
+  Postgres runs on the current JSONB `entities` layout; it moves with ADR-0008.
+- The composite `(target_id, relationship_type)` index was not added — still *measure, don't
+  assume*.
+- A forward count or filter through `Assay.inputs` into abstract `Sample` still ignores the
+  concrete closure; that is #241 under ADR-0014.

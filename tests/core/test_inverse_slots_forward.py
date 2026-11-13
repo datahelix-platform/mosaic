@@ -394,11 +394,12 @@ class TestErrors:
             "already has a slot named 'samples' (range 'integer')",
         )
 
-    def test_forward_slot_multivalued_keeps_the_adr_0011_rejection(self):
-        # ADR-0011's existing shape and message: the reverse side names a
-        # relationships-backed multivalued forward slot (ADR-0013 territory).
-        _rejects(
-            """\
+    def test_multivalued_forward_slot_is_accepted_on_the_reverse_side(self):
+        # ADR-0013 lifted ADR-0011's rejection of a relationships-backed
+        # multivalued forward slot; the derived-side declaration loads.
+        registry = SchemaRegistry.from_yaml(
+            _HEADER
+            + """\
   Workflow:
     is_a: Entity
     attributes:
@@ -412,17 +413,18 @@ class TestErrors:
         range: Workflow
         multivalued: true
         inverse: input_samples
-""",
-            "Sample.workflows", "is multivalued", "single-valued",
+"""
         )
+        (inv,) = registry.inverse_reference_slots("Sample")
+        assert inv.forward_multivalued and inv.declared_on == "reverse"
 
-    def test_multivalued_slot_carrying_inverse_is_still_read_as_the_derived_side(self):
-        # A multivalued slot with `inverse` is ADR-0011's derived side, not a
-        # forward declaration: nothing is synthesized and the existing
-        # validation message stands (the reverse of a multivalued forward
-        # slot is ADR-0013).
-        _rejects(
-            """\
+    def test_multivalued_forward_slot_carrying_inverse_synthesizes_the_reverse(self):
+        # ADR-0013 amendment (pair rule): `B.y` does not exist, so the
+        # multivalued `A.x` carrying `inverse` is the *stored* side and
+        # Mosaic synthesizes `Sample.workflows` (ADR-0012's forward form).
+        registry = SchemaRegistry.from_yaml(
+            _HEADER
+            + """\
   Workflow:
     is_a: Entity
     attributes:
@@ -434,10 +436,15 @@ class TestErrors:
     is_a: Entity
     attributes:
       name:
-""",
-            "Workflow.input_samples declares `inverse: workflows`",
-            "Sample has no slot named 'workflows'",
+"""
         )
+        (inv,) = registry.inverse_reference_slots("Sample")
+        assert inv.name == "workflows" and inv.declared_on == "forward"
+        assert inv.forward_multivalued is True
+        assert registry.inverse_reference_slots("Workflow") == []
+        assert registry.multivalued_reference_slots("Workflow") == [
+            ("input_samples", "Sample")
+        ]
 
     def test_forward_range_must_be_an_entity_class(self):
         _rejects(

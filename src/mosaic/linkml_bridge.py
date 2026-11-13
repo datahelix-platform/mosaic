@@ -961,6 +961,11 @@ class InverseSlot:
     #: marker is for diagnostics and documentation — generic LinkML tooling
     #: never sees a synthesized slot.
     declared_on: str = "reverse"
+    #: True when ``forward_slot`` is itself multivalued (ADR-0013): the
+    #: forward edge is stored as ADR-0002 relationship rows
+    #: (``relationship_type = forward_slot``), not an FK column, so the
+    #: reverse resolves by joining ``relationships.target_id``.
+    forward_multivalued: bool = False
 
     @property
     def tables(self) -> tuple[str, ...]:
@@ -1006,6 +1011,57 @@ def synthesized_from(slot: Any) -> Optional[str]:
     """``"<Class>.<slot>"`` the reverse ``slot`` was synthesized from, else ``None``."""
     value = annotation_value(slot, SYNTHESIZED_INVERSE_ANNOTATION)
     return str(value) if value is not None else None
+
+
+def _range_slot(sv: SchemaView, rng: Any, name: str) -> Any:
+    """The slot ``name`` induced on class ``rng``, or ``None``."""
+    if not rng:
+        return None
+    try:
+        return next(
+            (f for f in sv.class_induced_slots(str(rng)) if f.name == name), None
+        )
+    except Exception:
+        return None
+
+
+def is_virtual_inverse(sv: SchemaView, slot: Any) -> bool:
+    """True if ``slot`` is the *virtual* side of an ``inverse`` pair.
+
+    The pair rule of ADR-0013's 2026-11-10 amendment. For ``A.x`` declaring
+    ``inverse: y``, ranged on ``B``:
+
+    - ``B.y`` is a real slot that does not declare ``inverse: x`` back:
+      ``B.y`` is stored, ``A.x`` is the virtual reverse (ADR-0011);
+    - ``B.y`` does not exist (or was synthesized by Mosaic from ``A.x``):
+      ``A.x`` is stored, ``B.y`` is the virtual reverse (ADR-0012);
+    - both declare each other: the single-valued side is stored, the
+      multivalued side is virtual (both multivalued is a ``SchemaError``,
+      raised by :func:`_validate_inverse_slots`).
+
+    A single-valued slot is never virtual: Mosaic only derives list-valued
+    reverse edges. This replaces the old "multivalued + ``inverse`` ⇒
+    virtual" test, which would have misread a multivalued *forward* slot
+    such as ``Assay.inputs: {inverse: assays}`` and silently stopped
+    storing its writes.
+    """
+    inverse = getattr(slot, "inverse", None)
+    if not inverse or not slot.multivalued:
+        return False
+    if synthesized_from(slot) is not None:
+        return True
+    forward = _range_slot(sv, slot.range, str(inverse))
+    if forward is None:
+        return False
+    if synthesized_from(forward) is not None:
+        return False
+    back = getattr(forward, "inverse", None)
+    if back and str(back) == slot.name:
+        # Declared on both sides: the single-valued side is stored. Both
+        # multivalued is rejected at load; treat neither as virtual so the
+        # error, not a silent data loss, is what the author sees.
+        return not forward.multivalued
+    return True
 
 
 def _inherits_forward_inverse(sv: SchemaView, class_name: str, slot: Any) -> bool:
@@ -1110,10 +1166,20 @@ def _synthesize_forward_inverse_slots(sv: SchemaView) -> None:
             continue
         for slot in induced:
             inverse = getattr(slot, "inverse", None)
-            if not inverse or slot.multivalued:
+            if not inverse:
                 continue
             name = str(inverse)
             where = f"{class_name}.{slot.name}"
+            if slot.multivalued and (
+                synthesized_from(slot) is not None
+                or _range_slot(sv, slot.range, name) is not None
+            ):
+                # A multivalued slot whose partner exists is either the
+                # derived side of an ADR-0011 pair or half of a mutual
+                # declaration; :func:`_validate_inverse_slots` handles both.
+                # Only a multivalued *forward* slot with no partner yet
+                # (``Assay.inputs: {inverse: assays}``, ADR-0013) synthesizes.
+                continue
             if _inherits_forward_inverse(sv, class_name, slot):
                 continue
             rng = slot.range
@@ -1174,6 +1240,7 @@ def _synthesize_forward_inverse_slots(sv: SchemaView) -> None:
                     and getattr(s, "inverse", None)
                     and str(s.inverse) == slot.name
                     and s.range == class_name
+                    and synthesized_from(s) is None
                 ),
                 None,
             )
@@ -1198,7 +1265,8 @@ def _synthesize_forward_inverse_slots(sv: SchemaView) -> None:
                     description=(
                         f"Reverse of {where} — every {class_name} whose "
                         f"`{slot.name}` points at this {rng}. Synthesized by "
-                        f"Mosaic from the forward slot's `inverse` (ADR-0012); "
+                        f"Mosaic from the forward slot's `inverse` (ADR-0012"
+                        f"{', ADR-0013' if slot.multivalued else ''}); "
                         f"derived, never stored or written."
                     ),
                     annotations={
@@ -1226,16 +1294,18 @@ def _validate_inverse_slots(sv: SchemaView) -> None:
 
     LinkML binds ``inverse`` to ``owl:inverseOf``: the reverse direction is
     *entailed* by the forward slot, never stored independently. Mosaic
-    honours that on the multivalued side only — a multivalued slot naming
-    an ``inverse`` is a virtual reverse edge over the forward FK column
-    and must satisfy:
+    honours that on the side :func:`is_virtual_inverse` picks (ADR-0013's
+    pair rule) — a virtual reverse edge over the forward FK column, or over
+    the forward slot's relationship rows when it is multivalued — which
+    must satisfy:
 
     - its range is an entity class (not a value type);
     - it is not ``required``, ``identifier``, ``inlined`` or
       ``inlined_as_list`` (a derived field cannot be written);
     - ``inverse`` names a slot induced on the range class;
-    - that forward slot is **single-valued** (the reverse of a
-      relationships-backed multivalued slot is out of scope); and
+    - that forward slot is stored: a single-valued FK column (ADR-0011) or
+      a multivalued, relationships-backed slot (ADR-0013) — not itself a
+      derived reverse; and
     - the forward slot's range is the declaring class or one of its
       ancestors (so ``forward = <declaring id>`` is well-typed).
 
@@ -1245,6 +1315,9 @@ def _validate_inverse_slots(sv: SchemaView) -> None:
     validated here like any declared one — failure messages name the
     forward declaration it came from.
 
+    Two multivalued slots declaring ``inverse`` on each other are rejected:
+    neither is the stored side (ADR-0013 amendment).
+
     Raises ``SchemaError`` aggregating all failures.
     """
     if sv.schema.name == "hippo_ext":
@@ -1252,6 +1325,7 @@ def _validate_inverse_slots(sv: SchemaView) -> None:
     classes = sv.all_classes()
     value_types = value_type_class_names(sv)
     failures: list[str] = []
+    mutual_pairs: set[tuple[str, ...]] = set()
     for class_name in classes:
         try:
             induced = sv.class_induced_slots(class_name)
@@ -1260,6 +1334,31 @@ def _validate_inverse_slots(sv: SchemaView) -> None:
         for slot in induced:
             inverse = getattr(slot, "inverse", None)
             if not inverse or not slot.multivalued:
+                continue
+            if not is_virtual_inverse(sv, slot):
+                # A stored multivalued forward slot (ADR-0013), or one half
+                # of a mutual declaration where both sides are multivalued.
+                partner = _range_slot(sv, slot.range, str(inverse))
+                if (
+                    partner is not None
+                    and partner.multivalued
+                    and synthesized_from(partner) is None
+                    and getattr(partner, "inverse", None)
+                    and str(partner.inverse) == slot.name
+                ):
+                    pair = tuple(
+                        sorted(
+                            (f"{class_name}.{slot.name}", f"{slot.range}.{inverse}")
+                        )
+                    )
+                    if pair not in mutual_pairs:
+                        mutual_pairs.add(pair)
+                        failures.append(
+                            f"{pair[0]} and {pair[1]} declare `inverse` on each "
+                            f"other and are both multivalued, so neither side "
+                            f"is the stored one; declare `inverse` on one side "
+                            f"only (ADR-0013)."
+                        )
                 continue
             where = f"{class_name}.{slot.name}"
             origin = synthesized_from(slot)
@@ -1304,12 +1403,12 @@ def _validate_inverse_slots(sv: SchemaView) -> None:
                     f"slot named {str(inverse)!r}. Slots on {rng}: {names}."
                 )
                 continue
-            if forward.multivalued:
+            if is_virtual_inverse(sv, forward):
                 failures.append(
                     f"{where} declares `inverse: {inverse}` but "
-                    f"{rng}.{inverse} is multivalued (stored as relationship "
-                    f"rows, ADR-0002); Mosaic supports the reverse of a "
-                    f"single-valued (FK-column) reference only (ADR-0011)."
+                    f"{rng}.{inverse} is itself a derived reverse edge "
+                    f"(it declares `inverse: {forward.inverse}`); a reverse "
+                    f"must name a stored forward slot."
                 )
                 continue
             if forward.inlined or forward.inlined_as_list:
@@ -1579,10 +1678,12 @@ class SchemaRegistry:
         structured JSON rather than being coerced into id-only relationship
         rows (issue #121).
 
-        An ``inverse``-declared slot is also excluded (ADR-0011): it is a
-        *virtual* reverse edge resolved through the forward FK column and
-        must never be materialized as relationship rows — see
-        :meth:`inverse_reference_slots`.
+        The *virtual* side of an ``inverse`` pair is also excluded
+        (ADR-0011): it is a reverse edge resolved through the forward slot
+        and must never be materialized as relationship rows — see
+        :meth:`inverse_reference_slots`. A multivalued *forward* slot that
+        carries ``inverse`` (``Assay.inputs: {inverse: assays}``, ADR-0013)
+        is the stored side and stays here.
         """
         known = set(self._sv.all_classes().keys())
         value_types = self.value_type_classes()
@@ -1596,7 +1697,7 @@ class SchemaRegistry:
                 and rng not in value_types
                 and not slot.inlined
                 and not slot.inlined_as_list
-                and not getattr(slot, "inverse", None)
+                and not is_virtual_inverse(self._sv, slot)
             ):
                 refs.append((slot.name, rng))
         return refs
@@ -1610,9 +1711,10 @@ class SchemaRegistry:
         synthesized from the forward slot (``Sample.donor: {inverse:
         samples}``, ADR-0012) is reported the same way with
         ``declared_on="forward"``. Validated at registry construction
-        (:func:`_validate_inverse_slots`), so every entry here has a
-        single-valued forward slot on its target class pointing back at
-        the declaring class. These slots get no column, no link table, and
+        (:func:`_validate_inverse_slots`), so every entry here has a stored
+        forward slot on its target class pointing back at the declaring
+        class: an FK column, or relationship rows when
+        ``forward_multivalued`` (ADR-0013). These slots get no column, no link table, and
         no relationship rows; storage adapters hydrate, filter, and count
         them through ``forward_slot``. Cached per class.
         """
@@ -1623,7 +1725,8 @@ class SchemaRegistry:
         if self.has_class(class_name):
             for slot in self.induced_slots(class_name):
                 inverse = getattr(slot, "inverse", None)
-                if inverse and slot.multivalued and slot.range:
+                if inverse and slot.range and is_virtual_inverse(self._sv, slot):
+                    forward = _range_slot(self._sv, slot.range, str(inverse))
                     out.append(
                         InverseSlot(
                             name=slot.name,
@@ -1634,6 +1737,9 @@ class SchemaRegistry:
                             ),
                             declared_on=(
                                 "forward" if synthesized_from(slot) is not None else "reverse"
+                            ),
+                            forward_multivalued=bool(
+                                forward is not None and forward.multivalued
                             ),
                         )
                     )
@@ -1651,6 +1757,10 @@ class SchemaRegistry:
         names = {name for name, _ in self.multivalued_reference_slots(class_name)}
         names.update(inv.name for inv in self.inverse_reference_slots(class_name))
         return names
+
+    def is_virtual_inverse(self, slot: Any) -> bool:
+        """See :func:`is_virtual_inverse` (ADR-0013 pair rule)."""
+        return is_virtual_inverse(self._sv, slot)
 
     def has_subclasses(self, class_name: str) -> bool:
         """True if ``class_name`` has any proper descendant class.
