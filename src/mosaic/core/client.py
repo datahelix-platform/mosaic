@@ -855,13 +855,24 @@ class MosaicClient:
         order_by: Optional[str] = None,
         order_dir: str = "asc",
         fields: Optional[list[str]] = None,
+        include_subclasses: bool = True,
     ) -> "PaginatedResult":
         """Query entities with filter criteria.
 
         Args:
             entity_type: Restrict the query to one entity type. ``None``
                 queries across all types (relational adapters scan every
-                concrete per-class table / drop the type predicate).
+                concrete per-class table / drop the type predicate). A
+                concrete class with concrete subclasses (a *concrete
+                parent*: ``Process`` with ``BankBrain``) lists its
+                subclasses' rows too (ADR-0014 Decision 1); each item's
+                ``entity_type`` names its concrete class, and filters,
+                ordering and aggregates address the parent's slots.
+            include_subclasses: ``True`` (default) resolves a concrete
+                parent over its concrete closure, as above. ``False`` keeps
+                the rows of exactly ``entity_type`` — for code that
+                processes one class at a time (migration transforms,
+                per-class exports) and must not see a subclass row twice.
             filter_mode: How to combine filters — "and" (all must match,
                 default) or "or" (any may match).
             as_of: Optional ISO-8601 transaction-time; when given, results are
@@ -891,6 +902,7 @@ class MosaicClient:
         page = self._query_service.query(
             entity_type, filters, date_from, date_to, limit, offset, filter_mode,
             as_of=as_of, where=where, order_by=order_by, order_dir=order_dir,
+            include_subclasses=include_subclasses,
         )
         if fields is None:
             return page
@@ -910,15 +922,19 @@ class MosaicClient:
         filter_mode: str = "and",
         as_of: Optional[str] = None,
         where: Optional[dict[str, Any]] = None,
+        include_subclasses: bool = True,
     ) -> int:
         """Count matching entities without materializing them (ADR-0007).
 
         Availability-consistent: counts exactly the entities ``query()``
-        would return under the same criteria. Under ``as_of``, the count is
-        over the reconstructed match set (Python-path semantics).
+        would return under the same criteria — including a concrete
+        parent's subclass rows unless ``include_subclasses=False``
+        (ADR-0014 Decision 1). Under ``as_of``, the count is over the
+        reconstructed match set (Python-path semantics).
         """
         return self._query_service.count(
-            entity_type, filters, filter_mode, as_of=as_of, where=where
+            entity_type, filters, filter_mode, as_of=as_of, where=where,
+            include_subclasses=include_subclasses,
         )
 
     def facet_counts(

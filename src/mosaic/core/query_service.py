@@ -161,12 +161,16 @@ class QueryService:
         where: Optional[dict[str, Any]] = None,
         order_by: Optional[str] = None,
         order_dir: str = "asc",
+        include_subclasses: bool = True,
     ) -> "PaginatedResult":
         """Query entities with filter criteria.
 
         Args:
             entity_type: Restrict the query to one entity type. ``None``
-                queries across all types.
+                queries across all types. A concrete parent resolves over
+                its concrete closure (ADR-0014 Decision 1) unless
+                ``include_subclasses`` is false; items carry their own
+                concrete ``entity_type``.
             filter_mode: How to combine filters — "and" (all must match,
                 default) or "or" (any may match).
             as_of: Optional ISO-8601 transaction-time. When given, results are
@@ -215,6 +219,7 @@ class QueryService:
                 where=where,
                 order_by=order_by,
                 order_dir=order_dir,
+                include_subclasses=include_subclasses,
             )
             page_entities = list(self._storage.find(query))
             total = self._storage.count(query)
@@ -231,6 +236,7 @@ class QueryService:
             filters=filters or [],
             filter_mode=filter_mode,
             where=where,
+            include_subclasses=include_subclasses,
         )
 
         # Pass as_of only when set, so adapters whose find() predates the as-of
@@ -437,6 +443,7 @@ class QueryService:
         filter_mode: str = "and",
         as_of: Optional[str] = None,
         where: Optional[dict[str, Any]] = None,
+        include_subclasses: bool = True,
     ) -> int:
         """Count matching entities without materializing them (ADR-0007).
 
@@ -454,6 +461,7 @@ class QueryService:
             filters=filters or [],
             filter_mode=filter_mode,
             where=where,
+            include_subclasses=include_subclasses,
         )
         if as_of is not None:
             return self._storage.count(query, as_of=as_of)
@@ -484,6 +492,7 @@ class QueryService:
             filters=filters or [],
             filter_mode=filter_mode,
             where=where,
+            include_subclasses=True,
         )
         return list(self._storage.facet_counts(query, field))
 
@@ -507,6 +516,7 @@ class QueryService:
             filters=filters or [],
             filter_mode=filter_mode,
             where=where,
+            include_subclasses=True,
         )
         return tuple(self._storage.field_range(query, field))
 
@@ -776,7 +786,15 @@ class QueryService:
             # Reverse column edges: schema-driven FK queries, one per
             # (class, slot) pair whose target class is on the frontier.
             for cls, slot_name, target in ref_slots:
-                target_ids = by_type.get(target)
+                # The frontier row may be a subclass of the slot's range
+                # (``Brain.produced_by -> Process`` pointing at a
+                # ``BankBrain``): match over the range's concrete closure
+                # (ADR-0014 Decision 1).
+                target_ids = [
+                    tid
+                    for t in (registry.concrete_closure(target) or (target,))
+                    for tid in by_type.get(t, ())
+                ]
                 if not target_ids:
                     continue
                 for entity in self._storage.find(

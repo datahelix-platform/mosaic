@@ -17,11 +17,13 @@ Design reference: Document 1 — Brain Bank LinkML Schema Design (PTS-347 /
 doc1-brainbank-linkml-schema). §7 is the load-bearing section; the tests map
 directly to §7.1–§7.8.
 
-Polymorphic query — resolved (PM §7.6 carry-forward):
-    The SQLite adapter targets per-class tables by exact ``entity_type``; a
-    ``query("Subject")`` call reads only the ``Subject`` table. ``BrainDonor``
-    rows live in a separate ``BrainDonor`` table. No polymorphic sweep; no
-    double-migration risk. ``TestQueryDisjoint`` asserts this directly.
+Polymorphic query (PM §7.6 carry-forward; revised by ADR-0014 Decision 1):
+    ``BrainDonor`` rows live in their own ``BrainDonor`` table, but
+    ``query("Subject")`` resolves over Subject's concrete closure, so it lists
+    them too (each item's ``entity_type`` names its class).
+    ``query("Subject", include_subclasses=False)`` reads only the ``Subject``
+    table; the migration transforms below use it so no subclass row is
+    migrated twice. ``TestQueryDisjoint`` asserts both directly.
 
 Stranded-field gate mechanism — doc-correction note (Doc 1 §7.3/§7.7):
     Doc 1 states the gate bites because ``age_value`` and ``age_unit`` are
@@ -226,7 +228,7 @@ class _CorePackage(SchemaPackage):
 
 def _subject_v1_0_to_v1_1(ctx: MigrationContext) -> None:
     """Carry-forward Subject records to v1.1.0 (adds cohort_id, collection_site)."""
-    for item in ctx.client.query("Subject").items:
+    for item in ctx.client.query("Subject", include_subclasses=False).items:
         old = item.get("data") or {}
         new = {
             "external_id":        old.get("external_id"),
@@ -243,7 +245,7 @@ def _subject_v1_0_to_v1_1(ctx: MigrationContext) -> None:
 
 def _subject_v1_1_to_v2_0(ctx: MigrationContext) -> None:
     """Breaking: rename age_at_collection → age_value + age_unit (years)."""
-    for item in ctx.client.query("Subject").items:
+    for item in ctx.client.query("Subject", include_subclasses=False).items:
         old = item.get("data") or {}
         age = old.get("age_at_collection")
         new = {
@@ -307,7 +309,7 @@ def _coerce_bool(v: object) -> bool | None:
 
 def _brainbank_v1_to_v2(ctx: MigrationContext) -> None:
     """Complementary step: migrate BrainDonor age_at_collection → age_value + age_unit."""
-    for item in ctx.client.query("BrainDonor").items:
+    for item in ctx.client.query("BrainDonor", include_subclasses=False).items:
         old = item.get("data") or {}
         age = old.get("age_at_collection")
         new = {
@@ -478,21 +480,36 @@ def _standard_bundle() -> Bundle:
 # ---------------------------------------------------------------------------
 
 class TestQueryDisjoint:
-    """query("Subject") does not sweep BrainDonor rows (type-exact per-class tables)."""
+    """Per-class tables stay disjoint; a concrete parent's query spans its
+    closure (ADR-0014 Decision 1) unless ``include_subclasses=False``."""
 
     def test_subject_query_excludes_brain_donors(self, client: MosaicClient) -> None:
         _seed_subject(client, "s1", external_id="VA-001", age=65.3)
         _seed_brain_donor(client, "bd1", external_id="VA-DON-001",
                           brain_bank_id="BB-001", age=72.5)
 
-        subjects = client.query("Subject").items
+        exact = client.query("Subject", include_subclasses=False).items
         donors = client.query("BrainDonor").items
 
-        # Each table contains only its own records — no polymorphic sweep.
-        assert len(subjects) == 1
-        assert subjects[0]["id"] == "s1"
+        # Type-exact read: each table contains only its own records.
+        assert len(exact) == 1
+        assert exact[0]["id"] == "s1"
         assert len(donors) == 1
         assert donors[0]["id"] == "bd1"
+
+    def test_subject_query_lists_brain_donors_over_closure(
+        self, client: MosaicClient
+    ) -> None:
+        _seed_subject(client, "s1", external_id="VA-001", age=65.3)
+        _seed_brain_donor(client, "bd1", external_id="VA-DON-001",
+                          brain_bank_id="BB-001", age=72.5)
+
+        page = client.query("Subject")
+        types = {item["id"]: item["entity_type"] for item in page.items}
+        assert types == {"s1": "Subject", "bd1": "BrainDonor"}
+        assert page.total == 2
+        assert client.count("Subject") == 2
+        assert client.count("Subject", include_subclasses=False) == 1
 
     def test_brain_sample_query_excludes_base_samples(self, client: MosaicClient) -> None:
         client.put("Sample",
@@ -502,7 +519,7 @@ class TestQueryDisjoint:
         _seed_brain_sample(client, "bs1", external_id="BB-SAMP-001",
                            brain_region="prefrontal cortex")
 
-        samples = client.query("Sample").items
+        samples = client.query("Sample", include_subclasses=False).items
         brain_samples = client.query("BrainSample").items
 
         assert len(samples) == 1
@@ -690,7 +707,7 @@ class TestMultiHopUpgradeHappyPath:
         assert "age_at_collection" in (bd1_sup["state_snapshot"] or {}).get("reason", "")
 
         # Only the final live records remain queryable.
-        assert len(client.query("Subject").items) == 1
+        assert len(client.query("Subject", include_subclasses=False).items) == 1
         assert len(client.query("BrainDonor").items) == 1
 
     def test_migration_result_records_three_entries(self, client: MosaicClient) -> None:
@@ -767,7 +784,7 @@ class TestStrandedFieldGateFailure:
         assert any("age_unit" in e for e in exc.value.errors)
 
         # Full rollback: Subjects are still at v1 shape (no age_value migrated).
-        subjects = client.query("Subject").items
+        subjects = client.query("Subject", include_subclasses=False).items
         assert len(subjects) == 2
         for item in subjects:
             assert item["data"].get("age_value") is None, "rollback should undo migration"
