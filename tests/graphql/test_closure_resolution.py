@@ -1,8 +1,7 @@
 """Closure-aware reference resolution, GraphQL on SQLite (#241, ADR-0014 Decision 1).
 
-The cases and fixture live in ``tests/support/closure_fixture.py``; the
-lost-row cases are ``xfail(strict=True)`` until closure-aware resolution
-lands. Postgres parity: ``tests/integration/test_postgres_closure_resolution.py``.
+The cases and fixture live in ``tests/support/closure_fixture.py``.
+Postgres parity: ``tests/integration/test_postgres_closure_resolution.py``.
 """
 
 from __future__ import annotations

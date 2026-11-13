@@ -243,8 +243,12 @@ class MigrationContext:
     """Everything a migration transform receives for one hop.
 
     Read old-shape records via ``ctx.client`` (e.g.
-    ``ctx.client.query(type).items``) and stage new-shape records via
-    ``ctx.plan`` (:meth:`MigrationPlan.migrate` / ``put`` / ``supersede``).
+    ``ctx.client.query(type, include_subclasses=False).items``) and stage
+    new-shape records via ``ctx.plan`` (:meth:`MigrationPlan.migrate` /
+    ``put`` / ``supersede``). Pass ``include_subclasses=False``: a concrete
+    parent's ``query`` lists its subclasses' rows too (ADR-0014 Decision
+    1), and a transform that migrates them as the parent class would
+    migrate a subclass row twice.
     The transform must **not** write to the client directly — staging
     keeps the dry-run gate ahead of every committed write.
     """
@@ -417,7 +421,9 @@ class DomainModule(SchemaPackage):
         # transition (no hard delete). The provenance log retains the
         # lineage so a re-provision/restore stays auditable.
         for entity_type in live:
-            for item in client.query(entity_type).items:
+            for item in client.query(
+                entity_type, include_subclasses=False
+            ).items:
                 client.delete(entity_type, item["id"])
 
     def _live_data_types(self, client: "MosaicClient") -> list[str]:
@@ -431,7 +437,7 @@ class DomainModule(SchemaPackage):
         live: list[str] = []
         for entity_type in self.populates_types():
             try:
-                if client.query(entity_type).items:
+                if client.query(entity_type, include_subclasses=False).items:
                     live.append(entity_type)
             except Exception:
                 # A type the client's schema doesn't know (or an empty

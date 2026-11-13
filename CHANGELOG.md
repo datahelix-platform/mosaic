@@ -68,6 +68,56 @@
   DataHelix certification fixture (1) all declare on the reverse side and
   load unchanged, with zero synthesized slots.
 
+- **`entityType: String!` on a concrete parent's GraphQL type** (ADR-0014
+  Decision 1). Every concrete class with exposed concrete subclasses
+  (`Process` with `BankBrain`, `Person` with `Donor`) gains a non-null
+  `entityType` system field naming the row's concrete class, since a
+  subclass row reached through the parent renders as the parent type
+  (`__typename` names the parent). Leaf types are unchanged. A slot named
+  `entity_type` on such a class is a build-time error.
+- **`include_subclasses` on `MosaicClient.query` / `count`** (default
+  `True`). `False` reads exactly the named class's rows — the pre-ADR-0014
+  behaviour, for code that walks one class at a time. The migration gate
+  bundle and domain-module teardown use it.
+
+### Changed
+
+- **Behaviour change — a concrete parent's collection now includes its
+  subclasses' rows** (ADR-0014 Decision 1, issue #241). `query("Process")`,
+  `count("Process")`, `facet_counts`/`field_range` on `Process`, the GraphQL
+  `processes` list with its `total` and `processesCount`, REST and MCP
+  listings, and a `QuerySpec` anchored on `Process` resolve over
+  `Process`'s concrete closure: **lists, page `total`s and counts on a
+  concrete parent grow by the subclass rows.** Filters, `order_by`, facets
+  and `field_range` address the parent's slots; pagination applies after
+  the union (SQLite `UNION ALL` across the per-class tables, Postgres
+  `entity_type = ANY(...)`). Each SDK item carries its concrete
+  `entity_type` and its full stored data; GraphQL renders it as the parent
+  type with `entityType` naming the subclass. A leaf class's collection,
+  `get`, and search are unchanged. **Migration transforms that read old
+  rows with `ctx.client.query(type)` must pass `include_subclasses=False`**,
+  or a concrete parent's transform also sees (and would re-migrate) its
+  subclasses' rows.
+
+### Fixed
+
+- **Rows lost through concrete parents and forward abstract edges**
+  (issue #241, ADR-0014 Decision 1). Every reference now resolves over the
+  concrete closure of its range class, on SQLite and Postgres:
+  - GraphQL forward references ranged on a concrete parent render a subclass
+    row as the parent type instead of `null` (`Brain.producedBy` →
+    `BankBrain`, `Measurement.person` → `Donor`), and an inverse on a
+    concrete parent lists the same rows its count reports.
+  - Forward edge predicates (to-one nesting and `some`/`none` over
+    relationship-backed slots) match a target row in any table of the
+    range's closure. Into an abstract range, the nested `where` may name a
+    field only some leaves have (`inputs some {hemisphere: L}`); rows of a
+    class without that field read it as absent (null).
+  - `count_relationship` on a forward to-many slot into an abstract range
+    (`Assay.inputs` → `Sample`) counts across the leaves instead of 0.
+  - `neighbors` finds a reverse column edge whose target is a subclass row
+    of the slot's range.
+
 ## v0.15.0 — 2026-10-27 (anchor-owned `columns` projection, inverse edges over abstract ranges, domain classes named like infrastructure, images under datahelix-platform)
 
 ### Added

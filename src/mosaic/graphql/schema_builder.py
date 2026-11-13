@@ -122,6 +122,11 @@ COMPUTED_FIELDS: list[tuple[str, Any]] = [
 ]
 
 
+#: System field on a concrete parent's object type naming the row's concrete
+#: class (``entityType`` in GraphQL; ADR-0014 Decision 1).
+ENTITY_TYPE_FIELD = "entity_type"
+
+
 def snake_case(name: str) -> str:
     """``DNASample`` → ``dna_sample`` (same regex as ``default_accessor``)."""
     s1 = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", name)
@@ -223,6 +228,11 @@ class EntityGraphQLInfo:
     #: Generated ``<Class>OrderField`` enum (ADR-0007 increment 3): the
     #: orderable stored columns. Member values are LinkML slot names.
     order_field_enum: Any = None
+    #: Exposed concrete subclasses when this class is a *concrete parent*
+    #: (ADR-0014 Decision 1): its collection and every reference ranged on
+    #: it may return their rows, rendered as this type, so the type carries
+    #: the non-null ``entityType`` system field naming each row's class.
+    exposed_subclasses: list[str] = dc_field(default_factory=list)
 
     def filterable_slot_names(self) -> list[str]:
         """Slot names a list query's ``filters.field`` can match on.
@@ -352,6 +362,13 @@ class GraphQLTypeBuilder:
         for name in entity.computed_fields:
             kwargs[name] = envelope.get(name)
 
+        if entity.exposed_subclasses:
+            # The row's concrete class (ADR-0014 Decision 1): a subclass row
+            # reached through a concrete parent renders as the parent type.
+            kwargs[ENTITY_TYPE_FIELD] = str(
+                envelope.get("entity_type") or class_name
+            )
+
         return entity.gql_type(**kwargs)
 
     def input_to_dict(self, class_name: str, data: Any, mode: str) -> dict[str, Any]:
@@ -393,6 +410,11 @@ class GraphQLTypeBuilder:
                 plural_name=model.accessor_name,
                 model=model,
             )
+        for class_name, entity in self.entities.items():
+            entity.exposed_subclasses = [
+                c for c in self._registry.concrete_closure(class_name)
+                if c != class_name and c in self.entities
+            ]
 
     def _build_enums(self) -> None:
         # Enum membership comes from the type model's slot classification
@@ -662,6 +684,29 @@ class GraphQLTypeBuilder:
                 annotations[name] = annotation
                 setattr(cls, name, None)
                 entity.computed_fields.append(name)
+
+            if entity.exposed_subclasses:
+                if ENTITY_TYPE_FIELD in slot_names:
+                    raise ValueError(
+                        f"{class_name}.{ENTITY_TYPE_FIELD}: the slot collides "
+                        f"with the entityType system field a concrete parent "
+                        f"carries (ADR-0014 Decision 1). Rename the slot."
+                    )
+                annotations[ENTITY_TYPE_FIELD] = str
+                setattr(
+                    cls,
+                    ENTITY_TYPE_FIELD,
+                    strawberry.field(
+                        default=class_name,
+                        description=(
+                            f"Concrete class of this row: {class_name} or "
+                            f"one of its subclasses "
+                            f"({', '.join(entity.exposed_subclasses)}), whose "
+                            f"rows this type also renders (ADR-0014). Query "
+                            f"the subclass's own collection for its slots."
+                        ),
+                    ),
+                )
 
             cls.__annotations__ = annotations
             entity.gql_type = strawberry.type(

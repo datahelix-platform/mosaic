@@ -1452,6 +1452,7 @@ class SchemaRegistry:
         _validate_inverse_slots(schema_view)
         self._sv = schema_view
         self._inverse_slots_cache: dict[str, list[InverseSlot]] = {}
+        self._closure_cache: dict[str, tuple[str, ...]] = {}
         # Schema-driven set of inline value types (issue #90): identifier-less,
         # non-tree-root classes stored inline as JSON TEXT rather than reified
         # into their own table. Computed once — the SchemaView is immutable
@@ -1632,6 +1633,23 @@ class SchemaRegistry:
 
     def has_class(self, name: str) -> bool:
         return name in self._sv.all_classes()
+
+    def concrete_closure(self, class_name: str) -> tuple[str, ...]:
+        """See :func:`concrete_class_closure` (issue #224, ADR-0014 Decision 1).
+
+        ``class_name`` first when concrete, then its concrete descendants
+        sorted. Cached per class (the SchemaView is immutable after
+        construction). Unknown classes yield ``()``.
+        """
+        cached = self._closure_cache.get(class_name)
+        if cached is None:
+            cached = (
+                concrete_class_closure(self._sv, class_name)
+                if self.has_class(class_name)
+                else ()
+            )
+            self._closure_cache[class_name] = cached
+        return cached
 
     def induced_slots(self, class_name: str) -> list[SlotDefinition]:
         return self._sv.class_induced_slots(class_name)

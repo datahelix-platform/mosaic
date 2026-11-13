@@ -42,6 +42,7 @@ from mosaic.core.storage import (
     EntityStore,
     Query,
     ScoredMatch,
+    collection_classes,
     escape_like,
     has_relationship_predicate,
     matches_operator,
@@ -2148,8 +2149,11 @@ class PostgresAdapter(EntityStore):
                 # psycopg substitutes positionally: the placeholders render
                 # as edge key → target type → subtree, so the params must
                 # append in exactly that order (subtree recursion last).
+                # The target type is the range's concrete closure: an
+                # abstract range or a concrete parent's subclass row lives
+                # under its own entity_type (ADR-0014 Decision 1, #241).
                 params.append(edge)
-                params.append(target)
+                params.append(self._closure_types(target))
                 sub = self._tree_predicate(
                     node["where"], target, params,
                     scope=f"{alias}.", alias_seq=alias_seq,
@@ -2157,7 +2161,7 @@ class PostgresAdapter(EntityStore):
                 return (
                     f"EXISTS (SELECT 1 FROM entities {alias} "
                     f"WHERE {alias}.id = {outer}data->>%s "
-                    f"AND {alias}.entity_type = %s "
+                    f"AND {alias}.entity_type = ANY(%s) "
                     f"AND {alias}.is_available = TRUE AND {sub})"
                 )
             # To-many (M5b): quantify over the ADR-0002 link table joined
@@ -2165,7 +2169,7 @@ class PostgresAdapter(EntityStore):
             # relationship_type → target type → subtree.
             link = f"{alias}l"
             params.append(edge)
-            params.append(target)
+            params.append(self._closure_types(target))
             sub = self._tree_predicate(
                 node["where"], target, params,
                 scope=f"{alias}.", alias_seq=alias_seq,
@@ -2176,7 +2180,7 @@ class PostgresAdapter(EntityStore):
                 f"WHERE {link}.source_id = {outer}id "
                 f"AND {link}.relationship_type = %s "
                 f"AND {link}.is_available = TRUE "
-                f"AND {alias}.entity_type = %s "
+                f"AND {alias}.entity_type = ANY(%s) "
                 f"AND {alias}.is_available = TRUE AND {sub})"
             )
             return exists if quantifier == "some" else f"NOT {exists}"
@@ -2216,18 +2220,26 @@ class PostgresAdapter(EntityStore):
         cached = self._filter_cast_cache.get(entity_type)
         if cached is None:
             registry = self.schema_registry
-            cached = (
-                {
-                    name: self._RANGE_CASTS.get(base, "")
-                    for name, base in registry.slot_base_ranges(
-                        entity_type
-                    ).items()
-                }
-                if registry is not None
-                else {}
-            )
+            cached = {}
+            if registry is not None:
+                # The class's own slots first; then slots only some class
+                # of its concrete closure has, so an edge filter into an
+                # abstract range on a leaf field (ADR-0014 Decision 1)
+                # still compares by value.
+                for cls in (entity_type, *registry.concrete_closure(entity_type)):
+                    for name, base in registry.slot_base_ranges(cls).items():
+                        cached.setdefault(name, self._RANGE_CASTS.get(base, ""))
             self._filter_cast_cache[entity_type] = cached
         return cached.get(field, "")
+
+    def _closure_types(self, class_name: str) -> list[str]:
+        """``entity_type`` values a reference ranged on ``class_name`` may
+        point at: its concrete closure (issue #224, ADR-0014 Decision 1).
+        Falls back to the class itself without a registry."""
+        registry = self.schema_registry
+        if registry is None:
+            return [class_name]
+        return list(registry.concrete_closure(class_name))
 
     def update_data(
         self,
@@ -2522,8 +2534,15 @@ class PostgresAdapter(EntityStore):
         (ADR-0007's availability-consistency rule)."""
         sql = "is_available = TRUE"
         if query.entity_type:
-            sql += " AND entity_type = %s"
-            params.append(query.entity_type)
+            classes = collection_classes(self.schema_registry, query)
+            if classes == [query.entity_type]:
+                sql += " AND entity_type = %s"
+                params.append(query.entity_type)
+            else:
+                # A concrete parent's collection spans its concrete closure
+                # (ADR-0014 Decision 1); rows keep their own entity_type.
+                sql += " AND entity_type = ANY(%s)"
+                params.append(classes)
 
         if query.filters:
             joiner = " OR " if getattr(query, "filter_mode", "and") == "or" else " AND "
@@ -2615,6 +2634,7 @@ class PostgresAdapter(EntityStore):
                 filters=query.filters,
                 filter_mode=query.filter_mode,
                 where=query.where,
+                include_subclasses=getattr(query, "include_subclasses", False),
             )
             return sum(1 for _ in self._find_as_of(unpaged, as_of))
         params: list[Any] = []
@@ -2724,12 +2744,13 @@ class PostgresAdapter(EntityStore):
             "SELECT COUNT(*) AS c FROM relationships rel "
             "JOIN entities tgt ON tgt.id = rel.target_id "
             "WHERE rel.source_id = %s AND rel.relationship_type = %s "
-            "AND rel.is_available = TRUE AND tgt.entity_type = %s "
+            "AND rel.is_available = TRUE AND tgt.entity_type = ANY(%s) "
             "AND tgt.is_available = TRUE"
         )
         with self._transaction() as conn:
             cur = conn.cursor()
-            cur.execute(sql, (entity_id, edge, target))
+            # Over the range's concrete closure (ADR-0014 Decision 1, #241).
+            cur.execute(sql, (entity_id, edge, self._closure_types(target)))
             return int(cur.fetchone()["c"])
 
     def _require_aggregate_field(
@@ -2810,9 +2831,14 @@ class PostgresAdapter(EntityStore):
             )
         with self._transaction() as conn:
             prov = PostgresProvenanceStore(conn, self._schema_version)
-            candidates = prov.entities_created_by(
-                as_of, entity_type=query.entity_type
-            )
+            if query.entity_type:
+                candidates = [
+                    pair
+                    for cls in collection_classes(self.schema_registry, query)
+                    for pair in prov.entities_created_by(as_of, entity_type=cls)
+                ]
+            else:
+                candidates = prov.entities_created_by(as_of)
 
             matched: list[PostgresEntity] = []
             for entity_id, entity_type in candidates:
