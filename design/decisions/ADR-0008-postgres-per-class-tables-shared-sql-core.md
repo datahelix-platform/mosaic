@@ -1,8 +1,8 @@
 # ADR-0008: Postgres storage converges to generated per-class typed tables (shared SQL core)
 
-- **Status:** Proposed
-- **Date:** 2026-08-19
-- **Deciders:** labadorf (pending), design session
+- **Status:** Accepted
+- **Date:** 2026-11-10 (ratified; proposed 2026-08-19)
+- **Deciders:** labadorf; design session
 - **Related:** sec3b (Relational Storage Mapping — the per-class, LinkML-generated design SQLite
   implements; class-table-over-single-table rationale in §3b), ADR-0002 (multivalued reference
   slots as relationships — already physically identical on both backends), ADR-0006/0007 (the
@@ -12,7 +12,8 @@
   *feature*-parity campaigns that shipped against the JSONB model), `core/storage/
   pg_ddl_generator.py` (`PostgresDDLGenerator` — "the not-yet-wired-into-CRUD per-class-table
   migration path", maintained in lockstep with the SQLite DDL generator).
-- **Tracking issue:** [#162](https://github.com/datahelix-platform/mosaic/issues/162)
+- **Tracking issue:** [#162](https://github.com/datahelix-platform/mosaic/issues/162) (decision);
+  implementation [#268](https://github.com/datahelix-platform/mosaic/issues/268)
 
 ## Context
 
@@ -86,6 +87,34 @@ model makes a remaining feature disproportionately expensive (candidate: M5b's l
 this ADR with a coded not-implemented error rather than built twice — an honest gap, never a
 silent one.
 
+## Ratification (2026-11-10)
+
+**Accepted** by labadorf in the 2026-11-10 decision pass over stale Proposed ADRs, with three
+decisions folded in:
+
+1. **In-flight Postgres work may defer onto this ADR.** The Sequencing clause above is
+   exercised for the expensive Postgres pieces of the current work: **ADR-0014**'s
+   closure-aware counts and edge filters over abstract ranges
+   ([#228](https://github.com/datahelix-platform/mosaic/issues/228),
+   [#241](https://github.com/datahelix-platform/mosaic/issues/241)) and **ADR-0013**'s
+   multivalued reverse joins ([#231](https://github.com/datahelix-platform/mosaic/issues/231))
+   may raise a **coded not-implemented error** on Postgres and land with this convergence,
+   rather than be built once on JSONB and again on per-class tables. SQLite ships them in
+   full. The gap must be coded and documented — never silent.
+2. **Schedule: next after mosaic v0.16.0.** The convergence is the next storage feature once
+   v0.16.0 is released (superseding the "after #155–#158" sequencing, which that campaign has
+   since completed).
+3. **Migration UX: explicit, never automatic.** An explicit **`mosaic migrate`** command
+   performs the one-time JSONB `entities` → per-class typed-table move (idempotent,
+   transactional, as Consequences requires). The server **refuses to start** against the old
+   JSONB layout, failing with a message that tells the operator to run `mosaic migrate`.
+   There is **no auto-migration on startup** — unlike SQLite's `_run_migrations` precedent,
+   because Postgres is the server-deployment backend where a silent schema rewrite at boot is
+   the wrong default. (Resolves the first open sub-question below.)
+
+Implementation is tracked in [#268](https://github.com/datahelix-platform/mosaic/issues/268);
+the decision issue #162 closes at ratification.
+
 ## Consequences
 
 - **The double-pricing dissolves at the root.** Post-convergence, a new query-surface feature
@@ -128,12 +157,14 @@ silent one.
 
 ## Notes / open sub-questions
 
-- Migration UX: auto-migrate on adapter init (SQLite `_run_migrations` precedent) vs. an
-  explicit `mosaic migrate` step for server deployments — decide at implementation.
+- ~~Migration UX: auto-migrate on adapter init (SQLite `_run_migrations` precedent) vs. an
+  explicit `mosaic migrate` step for server deployments — decide at implementation.~~
+  **Decided at ratification (2026-11-10):** explicit `mosaic migrate`; the server refuses to
+  start on the old layout. See **Ratification**.
 - Whether the shared-core extraction (step 2) lands as an early increment during waves A3–A7
   (recommended: before the aggregation wave, so GROUP BY/ORDER BY rendering is written once)
   or together with the physical convergence.
 - `entities`-table retirement: keep a read-only compatibility view during a deprecation
   window, or clean break per the ADR-0005 precedent.
-- Implementation follows as its own OpenSpec change once ratified; do not implement ahead of
-  the current campaign (#155–#158).
+- Implementation follows as its own OpenSpec change once ratified; scheduled next after
+  v0.16.0 (see **Ratification**).

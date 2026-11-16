@@ -1588,6 +1588,30 @@ class SQLiteAdapter(EntityStore):
         """
         return [t for t in inv.tables if self._per_class_table_exists(t)]
 
+    @staticmethod
+    def _inverse_match(inv: "InverseSlot", alias: str, outer_id: str) -> str:
+        """SQL condition: row ``alias`` of the reverse's target table points
+        at ``outer_id`` through the forward slot.
+
+        Single-valued forward slot (ADR-0011): the FK column. Multivalued
+        forward slot (ADR-0013): an available ADR-0002 relationship row
+        from ``alias`` to ``outer_id``, scoped by ``relationship_type`` to
+        the forward slot so two multivalued slots between the same classes
+        never mix. The slot name is a schema identifier, inlined as a
+        quoted literal (it is already inlined as a quoted identifier for
+        the FK form), so callers' positional parameters are unaffected.
+        """
+        if not inv.forward_multivalued:
+            return f'{alias}."{inv.forward_slot}" = {outer_id}'
+        rel_type = inv.forward_slot.replace("'", "''")
+        return (
+            "EXISTS (SELECT 1 FROM relationships invrel "
+            f'WHERE invrel.source_id = {alias}."id" '
+            f"AND invrel.target_id = {outer_id} "
+            f"AND invrel.relationship_type = '{rel_type}' "
+            "AND invrel.is_available = 1)"
+        )
+
     def _hydrate_inverse_refs_batch(
         self,
         conn: sqlite3.Connection,
@@ -1615,15 +1639,32 @@ class SQLiteAdapter(EntityStore):
             # One statement per slot even when the range is abstract
             # (issue #224): UNION ALL across the concrete closure, ordered
             # by table position then rowid so ids stay deterministic.
-            selects = [
-                f'SELECT "id", "{inv.forward_slot}" AS fk, {i} AS t_ord, rowid AS r_ord '
-                f'FROM "{table}" WHERE "{inv.forward_slot}" IN ({id_ph}) '
-                "AND is_available = 1"
-                for i, table in enumerate(tables)
-            ]
+            if inv.forward_multivalued:
+                # Reverse of a relationships-backed forward slot (ADR-0013):
+                # join the link table on ``target_id``, scoped to the
+                # forward slot, back to each concrete source table.
+                selects = [
+                    f'SELECT DISTINCT src."id" AS "id", rel.target_id AS fk, '
+                    f"{i} AS t_ord, src.rowid AS r_ord "
+                    f'FROM relationships rel JOIN "{table}" src '
+                    f'ON src."id" = rel.source_id '
+                    f"WHERE rel.target_id IN ({id_ph}) "
+                    "AND rel.relationship_type = ? AND rel.is_available = 1 "
+                    "AND src.is_available = 1"
+                    for i, table in enumerate(tables)
+                ]
+                params = (*entity_ids, inv.forward_slot) * len(tables)
+            else:
+                selects = [
+                    f'SELECT "id", "{inv.forward_slot}" AS fk, {i} AS t_ord, rowid AS r_ord '
+                    f'FROM "{table}" WHERE "{inv.forward_slot}" IN ({id_ph}) '
+                    "AND is_available = 1"
+                    for i, table in enumerate(tables)
+                ]
+                params = tuple(entity_ids) * len(tables)
             cursor.execute(
                 " UNION ALL ".join(selects) + " ORDER BY t_ord, r_ord",
-                tuple(entity_ids) * len(tables),
+                params,
             )
             for row in cursor.fetchall():
                 out.setdefault(row["fk"], {}).setdefault(slot_name, []).append(
@@ -3059,7 +3100,7 @@ class SQLiteAdapter(EntityStore):
                 tables = self._inverse_tables(inv)
                 if tables != [target]:
                     return self._inverse_closure_predicate(
-                        node, tables, inverse_of, quantifier, outer, params,
+                        node, tables, inv, quantifier, outer, params,
                         alias_seq=alias_seq,
                     )
                 # Reverse FK edge (ADR-0011): the relationship is stored on
@@ -3072,9 +3113,10 @@ class SQLiteAdapter(EntityStore):
                     node["where"], target_columns, params,
                     entity_type=target, scope=f"{alias}.", alias_seq=alias_seq,
                 )
+                match = self._inverse_match(inv, alias, f'{outer}"id"')
                 exists = (
                     f'EXISTS (SELECT 1 FROM "{target}" {alias} '
-                    f'WHERE {alias}."{inverse_of}" = {outer}"id" '
+                    f"WHERE {match} "
                     f"AND {alias}.is_available = 1 AND {sub})"
                 )
                 return exists if quantifier == "some" else f"NOT {exists}"
@@ -3129,7 +3171,7 @@ class SQLiteAdapter(EntityStore):
         self,
         node: dict[str, Any],
         tables: list[str],
-        inverse_of: str,
+        inv: "InverseSlot",
         quantifier: Optional[str],
         outer: str,
         params: list[Any],
@@ -3159,9 +3201,10 @@ class SQLiteAdapter(EntityStore):
                 node["where"], shared or set(), params,
                 entity_type=table, scope=f"{alias}.", alias_seq=alias_seq,
             )
+            match = self._inverse_match(inv, alias, f'{outer}"id"')
             clauses.append(
                 f'EXISTS (SELECT 1 FROM "{table}" {alias} '
-                f'WHERE {alias}."{inverse_of}" = {outer}"id" '
+                f"WHERE {match} "
                 f"AND {alias}.is_available = 1 AND {sub})"
             )
         some = "(" + " OR ".join(clauses) + ")"
@@ -3461,7 +3504,10 @@ class SQLiteAdapter(EntityStore):
             # Virtual inverse slot (ADR-0011): count the available target
             # rows whose forward FK points at this entity, summed across
             # the range's concrete closure (issue #224).
-            tables = self._inverse_tables(self._inverse_slots(entity_type)[edge])
+            # A multivalued forward slot (ADR-0013) counts the available
+            # source rows holding an available relationship row to it.
+            inv = self._inverse_slots(entity_type)[edge]
+            tables = self._inverse_tables(inv)
             if not tables:
                 return 0
             with self._transaction() as conn:
@@ -3470,7 +3516,8 @@ class SQLiteAdapter(EntityStore):
                 for table in tables:
                     cursor.execute(
                         f'SELECT COUNT(*) AS c FROM "{table}" tgt '
-                        f'WHERE tgt."{inverse_of}" = ? AND tgt.is_available = 1',
+                        f"WHERE {self._inverse_match(inv, 'tgt', '?')} "
+                        "AND tgt.is_available = 1",
                         (entity_id,),
                     )
                     total += int(cursor.fetchone()["c"])

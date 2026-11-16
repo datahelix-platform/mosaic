@@ -1,9 +1,9 @@
 # ADR-0002: Multivalued reference slots persist as relationships
 
-- **Status:** Proposed
-- **Date:** 2026-06-26
-- **Deciders:** labadorf, design session (pending)
-- **Related:** sec3 (Data Model — config-driven relational storage with graph-shaped API), sec3b (storage), ADR-0001 (as-of reconstruction — relationship edges reconstructed from `relationship_add`/`relationship_remove` provenance), [issue #79](https://github.com/BU-Neuromics/hippo/issues/79)
+- **Status:** Accepted
+- **Date:** 2026-11-10 (ratified as built; proposed 2026-06-26)
+- **Deciders:** labadorf
+- **Related:** sec3 (Data Model — config-driven relational storage with graph-shaped API), sec3b (storage), ADR-0001 (as-of reconstruction — relationship edges reconstructed from `relationship_add`/`relationship_remove` provenance), [issue #79](https://github.com/BU-Neuromics/hippo/issues/79), ADR-0011 (inverse slots — carve-out below)
 
 ## Context
 
@@ -229,11 +229,45 @@ per-class table scan. `PostgresDDLGenerator` (`src/mosaic/core/storage/pg_ddl_ge
 — a separate per-class-table migration generator not currently wired into the CRUD path) was
 also updated to exclude multivalued reference slots from generated tables and collapse
 multivalued non-reference slots to a single TEXT column, for consistency with `DDLGenerator`.
-Tests ported to `tests/integration/test_postgres_multivalued_refs.py`. Status stays
-**Proposed** per the original decision — this update documents implementation, not
-ratification.
+Tests ported to `tests/integration/test_postgres_multivalued_refs.py`. (At the time, status
+stayed Proposed — that update documented implementation, not ratification; see below.)
+
+## Ratification (2026-11-10)
+
+**Accepted as built** by labadorf in the 2026-11-10 decision pass over stale Proposed ADRs.
+The decision above is binding as implemented on both backends; the open sub-questions below
+are closed with the as-built answers, verified against `src/mosaic/core/storage/adapters/
+sqlite_adapter.py` (and the mirrored `postgres_adapter.py`) at mosaic `v0.15.0`:
+
+- **Reconciliation granularity → replace-all.** On `update_data`/`replace`,
+  `_materialize_multivalued_refs(..., reconcile=True)` soft-deletes every live edge of each
+  multivalued-reference slot for the source (recording one `relationship_remove` each), then
+  re-adds from the submitted data (one `relationship_add` each); an omitted slot clears its
+  edges, just as `_update_per_class` nulls an omitted column. A diff-based reconcile is not
+  built; the coarser provenance trail is accepted — as-of replay is correct either way.
+- **Edges to unavailable targets surface.** `_hydrate_multivalued_refs_batch` filters only
+  the relationship row's own `is_available`; it does not join the target entity. Soft-deleting
+  a target leaves the asserted edge live and its id still hydrates into `data[slot]`.
+- **No id coercion needed on read.** Hydrated values are the `relationships.target_id` TEXT
+  column, returned as-is; no `boolean_slot_names`-style decoding applies. (On *write*,
+  `_normalize_ref_list` already tolerates a bare scalar, drops `None`, and `str()`s non-string
+  ids so they match the TEXT column — that is the only normalization, and it is write-side.)
+
+**Carve-out — ADR-0011.** An `inverse`-declared slot is *excluded* from this rule:
+`SchemaRegistry.multivalued_reference_slots` skips any slot carrying `inverse`
+(`src/mosaic/linkml_bridge.py`), so it is never materialized as relationship rows — it is a
+virtual reverse edge resolved through the forward FK column. ADR-0002 governs *forward*
+multivalued references only. (Slots marked `inlined`/`inlined_as_list` are likewise excluded
+and round-trip as structured JSON — issue #121.)
+
+**Decoupled from the 1.0 parity epic.** ADR-0002 and ADR-0003 were ratified separately from
+[#99](https://github.com/datahelix-platform/mosaic/issues/99) (P2.5 Postgres feature
+parity), which listed their ratification as a scope item; #99's remaining Postgres work
+proceeds under ADR-0008.
 
 ## Notes / open sub-questions
+
+*Closed at ratification (2026-11-10) — see **Ratification** above. Kept for the record.*
 
 - **Reconciliation granularity:** replace-all (soft-delete every slot-named edge from the
   source, then re-add) is simplest and matches `_update_per_class`. A diff-based reconcile

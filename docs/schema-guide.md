@@ -325,6 +325,48 @@ Rules, checked when the schema loads (a violation is a `SchemaError`):
     a view of the first — the two can silently disagree. Only an explicit `inverse` tells
     Mosaic "one fact, two directions". See ADR-0011.
 
+#### Declaring the reverse on the forward slot (import-layered schemas)
+
+The declaration above lives on the derived side, so `Donor` has to name `Sample`. In a
+schema split across imported modules that can point a lower module at a higher one — if
+`Donor` lives in `person.yaml` and `Sample` in `tissue.yaml` (which imports `person`),
+`person.yaml` cannot range a slot on `Sample` without breaking its import DAG (and
+`linkml-lint` rejects it). Put `inverse` on the **forward** slot instead; Mosaic synthesizes
+the reverse onto the range class (ADR-0012):
+
+```yaml
+# tissue.yaml — imports person; person.yaml never mentions Sample
+classes:
+  Sample:
+    attributes:
+      donor:
+        range: Donor
+        inverse: samples        # Mosaic synthesizes Donor.samples (multivalued, inverse: donor)
+```
+
+The synthesized `Donor.samples` behaves exactly like a declared one — hydrated on reads,
+filterable with `some`/`none`, counted, write-ignored, listed in the MCP and GraphQL schema
+surfaces with `inverse_of: "donor"`. A forward slot declared on an abstract class
+(`Sample.donor` with `Brain`, `CSF`, … subclasses) synthesizes one reverse ranged on the
+abstract class, resolved across every concrete descendant's table. Setting `inverse` through
+`slot_usage` on a subclass (`Diagnosis` narrowing an inherited `person` with `inverse:
+diagnoses`) ranges that reverse on the subclass.
+
+Rules, in addition to the ones above (a violation is a `SchemaError`):
+
+- if **both** sides declare `inverse`, they must name each other;
+- the name must not already exist as a slot on the range class — Mosaic never silently reuses
+  a real slot;
+- a forward slot shared by unrelated classes with the same `inverse` cannot synthesize one
+  reverse for both: declare it once, on a slot of a shared ancestor.
+
+!!! note
+    A synthesized slot exists only in Mosaic's view of the schema. Generic LinkML tooling
+    (`gen-pydantic`, `gen-doc`, `linkml-lint`) does not see it. `SchemaRegistry.
+    inverse_reference_slots()` reports where the declaration was written as
+    `InverseSlot.declared_on` (`"forward"` for a synthesized reverse, `"reverse"` for a
+    declared one); storage, queries and transports treat both identically.
+
 ---
 
 ## Mosaic Extensions (Annotations)

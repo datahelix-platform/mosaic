@@ -1,8 +1,8 @@
 # ADR-0010: The MCP boundary may delegate outbound to a planning service, as an untrusted planner behind a validating relay
 
-- **Status:** Proposed
-- **Date:** 2026-09-08
-- **Deciders:** labadorf (review of [#199](https://github.com/datahelix-platform/mosaic/pull/199)); clandaverde (implementation)
+- **Status:** Accepted
+- **Date:** 2026-11-10 (ratified; proposed 2026-09-08)
+- **Deciders:** labadorf (ratified in the [datahelix#126](https://github.com/datahelix-platform/datahelix/issues/126) decision pass, 2026-11-10; review of [#199](https://github.com/datahelix-platform/mosaic/pull/199)); clandaverde (implementation)
 - **Related:** ADR-0009 (MCP boundary, capability manifest, QuerySpec — this ADR extends its
   surface with the one tool that is not a `MosaicClient` wrapper); **Aperture ADR-0032**
   (rejects a dedicated control-plane service — the constraint that forces the relay here) and
@@ -11,8 +11,9 @@
   Part A (authn/authz, referenced not resolved); `mosaic-demo-small`'s
   `openspec/changes/add-exon-conversational-contract/design.md` Decision 8 (the wire
   contract, owned by that repo).
-- **Tracking issue:** [#186](https://github.com/datahelix-platform/mosaic/issues/186)
-  (`converse_query_spec`), implemented in [#199](https://github.com/datahelix-platform/mosaic/pull/199).
+- **Tracking issue:** [#243](https://github.com/datahelix-platform/mosaic/issues/243) (decision);
+  implementation [#186](https://github.com/datahelix-platform/mosaic/issues/186)
+  (`converse_query_spec`), merged in [#199](https://github.com/datahelix-platform/mosaic/pull/199).
 
 ## Context
 
@@ -229,9 +230,9 @@ on them; each makes a Consequence above less sharp.
 
 ## Notes / open sub-questions
 
-- **Status is `Proposed`.** The implementation (#199) is complete and verified end to end, but
-  the terms above — particularly items 5 and 7, and the cost-amplification Consequence — were
-  settled during review of that PR and have not been ratified in a design session.
+- **Ratified 2026-11-10, as written** (see the ratification note below). Until then the status
+  was `Proposed` because the terms, particularly items 5 and 7 and the cost-amplification
+  Consequence, had been settled in review of #199 rather than in a design session.
 - Whether a future outbound delegate should share one env-var/timeout/logging convention (a
   small `mosaic.mcp.delegate` helper) or keep per-tool config, once there is a second one. One
   instance is not yet a pattern worth abstracting.
@@ -242,3 +243,21 @@ on them; each makes a Consequence above less sharp.
 - Actor propagation (E2 above) needs the sec8 vocabulary settled first: if it is carried as a
   header rather than a payload field, `X-DataHelix-Actor` is the name sec8 §8.3 already uses,
   and reusing it would make the relay slot into Bridge's model without a second convention.
+
+## Ratification note (2026-11-10)
+
+Ratified by labadorf in the [datahelix#126](https://github.com/datahelix-platform/datahelix/issues/126)
+decision pass ([#243](https://github.com/datahelix-platform/mosaic/issues/243)). **Accepted as
+written**, with no amendment:
+
+- **Item 5** (client-visible failures name the role, not the address) and **item 7** (the wire
+  contract is Decision 8's, not Mosaic's) stand as written.
+- **The cost-amplification Consequence is accepted as written: accepted, not mitigated.** Anyone
+  who can reach a configured Mosaic can still cause spend at the planning service, with no
+  attribution. Ratifying settles the shape of the boundary; it does not close that exposure.
+- **Rate limiting stays Exon-side (E4).** Mosaic will not add its own quota on the relay; the
+  bound belongs where the spend happens. E1–E3 stay on the Exon follow-up list, and per-actor
+  attribution stays tracked in [#201](https://github.com/datahelix-platform/mosaic/issues/201).
+
+This unblocks **Reel ADR-0007** (datahelix-platform/reel), which records the other side of this
+arrangement and was gated on this ADR being ratified first (its precondition P3).

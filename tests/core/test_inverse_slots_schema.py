@@ -97,13 +97,21 @@ class TestValidation:
         for n in needles:
             assert n in str(exc.value)
 
-    def test_forward_slot_must_exist(self):
-        self._rejects(
-            VALID.replace("inverse: donor", "inverse: patient"),
-            "Donor.samples", "no slot named 'patient'",
+    def test_missing_partner_makes_the_declaring_slot_the_forward_side(self):
+        # ADR-0013 amendment (pair rule): when ``B.y`` does not exist the
+        # declaring multivalued slot is the *stored* forward side and the
+        # reverse is synthesized — no longer a "no slot named" error.
+        reg = _registry(VALID.replace("inverse: donor", "inverse: patient"))
+        assert reg.inverse_reference_slots("Donor") == []
+        assert ("samples", "Sample") in reg.multivalued_reference_slots("Donor")
+        (inv,) = reg.inverse_reference_slots("Sample")
+        assert (inv.name, inv.forward_slot, inv.declared_on) == (
+            "patient", "samples", "forward",
         )
 
-    def test_forward_slot_must_be_single_valued(self):
+    def test_forward_slot_may_be_multivalued(self):
+        # ADR-0013 lifted ADR-0011's rejection: the reverse of a
+        # relationships-backed multivalued forward slot is now accepted.
         text = _HEADER + """\
   Workflow:
     is_a: Entity
@@ -119,7 +127,10 @@ class TestValidation:
         multivalued: true
         inverse: input_samples
 """
-        self._rejects(text, "Sample.workflows", "is multivalued", "single-valued")
+        reg = SchemaRegistry.from_yaml(text)
+        (inv,) = reg.inverse_reference_slots("Sample")
+        assert inv.forward_slot == "input_samples"
+        assert inv.forward_multivalued is True
 
     def test_forward_slot_must_point_back_at_declaring_class(self):
         text = _HEADER + """\
@@ -215,9 +226,12 @@ class TestValidation:
         assert reg.inverse_reference_slots("Donor")[0].forward_slot == "subject"
 
     def test_multiple_failures_aggregate(self):
-        text = VALID.replace("inverse: donor", "inverse: nope").replace(
+        # (A misspelled ``inverse`` no longer fails — by ADR-0013's pair rule
+        # it makes the declaring slot the forward side — so the second error
+        # here is ``required`` on the derived slot, plus an inlined one.)
+        text = VALID.replace("inverse: donor", "inverse: donor\n        required: true").replace(
             "      donor:\n        range: Donor\n        required: true",
-            "      donor:\n        range: Donor\n        required: true\n      studies:\n        range: string\n        multivalued: true\n        inverse: x",
+            "      donor:\n        range: Donor\n        required: true\n      ancestors:\n        range: Sample\n        multivalued: true\n        inlined: true\n        inverse: parent\n      parent:\n        range: Sample",
         )
         with pytest.raises(SchemaError) as exc:
             _registry(text)

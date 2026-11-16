@@ -84,3 +84,50 @@ Sub-questions:
 (`Assay.inputs → Sample` reversed lands on `Sample`) also wait on #228. The brain-bank schema
 decisions taken the same day (datahelix#113 S3) keep `Person.cohort` multivalued and make
 `DissectFixedBrain.new_fixed_samples` multivalued, so both lean on this ADR rather than a remodel.
+
+## Amendment (2026-11-10): which side of an `inverse` pair is stored
+
+Recorded by labadorf in the [datahelix#126](https://github.com/datahelix-platform/datahelix/issues/126)
+decision pass, for the M4 implementation ([#231](https://github.com/datahelix-platform/mosaic/issues/231)).
+The Decision above is unchanged; this pins a rule it left implicit.
+
+Once ADR-0012's forward-side declaration and this ADR's multivalued forward slots are both
+allowed, "multivalued and carries `inverse`" no longer identifies the virtual side:
+`Assay.inputs: {range: Sample, multivalued: true, inverse: assays}` is multivalued, carries
+`inverse`, and is the **stored** slot. The stored side is decided by the pair instead. For a slot
+`A.x` declaring `inverse: y`, ranged on `B`:
+
+| `B.y` | Stored | Virtual | Precedent |
+|---|---|---|---|
+| a real slot that does **not** declare `inverse` back | `B.y` | `A.x`, the reverse | ADR-0011; this ADR's derived-side declaration |
+| does **not exist** | `A.x`, the forward slot | `B.y`, synthesized | ADR-0012; this ADR's forward-side declaration (`Assay.inputs … inverse: assays`) |
+| a real slot that declares `inverse: x` back | the **single-valued** side | the multivalued side | |
+| …and both sides are multivalued | — | — | `SchemaError`: "declare `inverse` on one side only" |
+
+**This replaces the "multivalued + `inverse` ⇒ virtual" test** used today by
+`SchemaRegistry.inverse_reference_slots` (`src/mosaic/linkml_bridge.py`, ~line 1374) and by
+`inverse_of` in `_classify_slot` (`src/mosaic/core/schema_typing.py`, ~line 215). Left in place,
+that test would classify `Assay.inputs` as a virtual reverse: its relationship rows would stop
+being written on ingest (virtual slots are write-ignored), silently, and its column-less shape
+would hide the loss. The M4 implementation must swap both call sites to the pair rule above and
+test the forward-multivalued case explicitly (a write to `Assay.inputs` persists and hydrates).
+
+Open PR [#240](https://github.com/datahelix-platform/mosaic/pull/240) (ADR-0012's implementation)
+keeps the old test. That is correct for ADR-0012 alone, where every forward slot carrying `inverse`
+is single-valued; it becomes wrong the moment M4 allows a multivalued forward slot, so the switch
+belongs in M4 (or in #240, if it lands after this note is read).
+
+## Implementation note (#231)
+
+- The pair rule lives in `linkml_bridge.is_virtual_inverse`; `inverse_reference_slots`,
+  `multivalued_reference_slots` and `_classify_slot`'s `inverse_of` all use it.
+  `InverseSlot.forward_multivalued` tells adapters which storage the forward slot uses.
+- SQLite and Postgres resolve the reverse as `relationships` rows with `target_id` = this
+  entity and `relationship_type` = the forward slot, joined to the forward class's concrete
+  closure (so `Run.inputs` and `Assay.inputs`, sharing a slot name, never mix). Hydration,
+  `some`/`none` and `count_relationship` count available source rows with an available edge.
+  Postgres runs on the current JSONB `entities` layout; it moves with ADR-0008.
+- The composite `(target_id, relationship_type)` index was not added — still *measure, don't
+  assume*.
+- A forward count or filter through `Assay.inputs` into abstract `Sample` still ignores the
+  concrete closure; that is #241 under ADR-0014.
