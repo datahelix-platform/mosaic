@@ -28,11 +28,17 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install dependencies
-        run: uv pip install --system -e ".[dev,graphql,mcp]"
+      # Install from uv.lock so CI tests the same versions as `uv run pytest`
+      # and the image (mosaic#242). Upstream drift is caught by the weekly
+      # unlocked run in tests-unlocked.yml.
+      - name: Install dependencies (locked)
+        run: uv sync --locked --python ${{ matrix.python-version }} --extra dev --extra graphql --extra mcp
+
+      - name: Show resolved linkml versions
+        run: uv run --no-sync python -c "import importlib.metadata as m; print('linkml', m.version('linkml'), '| linkml-runtime', m.version('linkml-runtime'))"
 
       - name: Run tests (SQLite)
-        run: pytest -v --ignore=tests/integration/test_postgres_adapter.py
+        run: uv run --no-sync pytest -v --ignore=tests/integration/test_postgres_adapter.py
 
   mosaic-postgres:
     runs-on: ubuntu-latest
@@ -62,10 +68,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install dependencies
-        run: uv pip install --system -e ".[dev,postgres]"
+      - name: Install dependencies (locked)
+        run: uv sync --locked --python ${{ matrix.python-version }} --extra dev --extra postgres
 
       - name: Run PostgreSQL integration tests
         env:
           MOSAIC_DATABASE_URL: postgresql://hippo_test:hippo_test@localhost:5432/hippo_test
-        run: pytest tests/integration -k postgres -v
+        run: uv run --no-sync pytest tests/integration -k postgres -v
