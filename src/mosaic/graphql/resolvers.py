@@ -35,7 +35,11 @@ from mosaic.core.exceptions import (
     ValidationFailed,
     ValidationFailure,
 )
-from mosaic.core.schema_typing import EntityTypeModel, build_capability_manifest
+from mosaic.core.schema_typing import (
+    EntityTypeModel,
+    FamilyTypeModel,
+    build_capability_manifest,
+)
 from mosaic.core.storage import has_relationship_predicate
 from mosaic.core.validation.validators import WriteOperation
 from mosaic.graphql import DEFAULT_MAX_QUERY_DEPTH
@@ -634,10 +638,38 @@ class MosaicEntityTypeInfo:
     description: Optional[str]
     fields: list[MosaicSlotInfo]
     relationships: list[MosaicReferenceInfo]
+    #: Class hierarchy (ADR-0014 Decision 4, #228): ``abstract`` marks a
+    #: family — an abstract class whose rows are its ``kinds``' rows; a
+    #: family's ``fields`` are the ones every kind shares.
+    abstract: bool = False
+    parent: Optional[str] = None
+    kinds: list[str] = strawberry.field(default_factory=list)
 
 
-def _entity_type_info(model: EntityTypeModel) -> MosaicEntityTypeInfo:
+def _entity_type_info(
+    model: EntityTypeModel, builder: Optional[GraphQLTypeBuilder] = None
+) -> MosaicEntityTypeInfo:
+    family = isinstance(model, FamilyTypeModel)
+    parent: Optional[str] = None
+    kinds: list[str] = []
+    if family:
+        parent = model.parent
+        kinds = list(model.kinds)
+    elif builder is not None:
+        listed = set(builder.entities) | set(builder.families)
+        ancestors = builder.registry.schema_view.class_ancestors(model.class_name) or []
+        parent = next(
+            (a for a in ancestors if a != model.class_name and a in listed), None
+        )
+        closure = [
+            k for k in builder.registry.concrete_closure(model.class_name)
+            if k in builder.entities
+        ]
+        kinds = closure if len(closure) > 1 else []
     return MosaicEntityTypeInfo(
+        abstract=family,
+        parent=parent,
+        kinds=kinds,
         name=model.class_name,
         accessor_name=model.accessor_name,
         description=model.description,
@@ -982,7 +1014,7 @@ def _make_list_resolver(builder: GraphQLTypeBuilder, entity: EntityGraphQLInfo):
         order_by=None,
         order_dir: OrderDirection = OrderDirection.ASC,
     ):
-        ent = _builder(info).entities[class_name]
+        ent = _builder(info).info_for(class_name)
         tree = (
             _where_to_tree(ent, where)
             if where is not None and where is not strawberry.UNSET
@@ -1108,7 +1140,7 @@ def _make_count_resolver(builder: GraphQLTypeBuilder, entity: EntityGraphQLInfo)
         filter_mode: FilterMode = FilterMode.AND,
         as_of: Optional[str] = None,
     ) -> int:
-        ent = _builder(info).entities[class_name]
+        ent = _builder(info).info_for(class_name)
         tree = (
             _where_to_tree(ent, where)
             if where is not None and where is not strawberry.UNSET
@@ -1156,7 +1188,7 @@ def _make_facet_counts_resolver(
         where=None,
         filter_mode: FilterMode = FilterMode.AND,
     ) -> list[FacetCount]:
-        ent = _builder(info).entities[class_name]
+        ent = _builder(info).info_for(class_name)
         spec = _resolve_aggregate_field(ent, field)
         tree = (
             _where_to_tree(ent, where)
@@ -1200,7 +1232,7 @@ def _make_field_range_resolver(
         where=None,
         filter_mode: FilterMode = FilterMode.AND,
     ) -> FieldRange:
-        ent = _builder(info).entities[class_name]
+        ent = _builder(info).info_for(class_name)
         spec = _resolve_aggregate_field(ent, field, ordered_only=True)
         tree = (
             _where_to_tree(ent, where)
@@ -1245,7 +1277,7 @@ def _make_search_resolver(builder: GraphQLTypeBuilder, entity: EntityGraphQLInfo
         order_by=None,
         order_dir: OrderDirection = OrderDirection.ASC,
     ):
-        ent = _builder(info).entities[class_name]
+        ent = _builder(info).info_for(class_name)
         tree = (
             _where_to_tree(ent, where)
             if where is not None and where is not strawberry.UNSET
@@ -1507,10 +1539,9 @@ def _neighbors_resolver(
 
 def _make_hippo_schema_resolver(builder: GraphQLTypeBuilder):
     def resolver(info: Info) -> list[MosaicEntityTypeInfo]:
-        return [
-            _entity_type_info(model)
-            for _, model in sorted(_builder(info).type_model.items())
-        ]
+        b = _builder(info)
+        models = {**b.type_model, **{n: f.model for n, f in b.families.items()}}
+        return [_entity_type_info(model, b) for _, model in sorted(models.items())]
 
     resolver.__name__ = "hippo_schema"
     resolver.__doc__ = (
@@ -1523,10 +1554,13 @@ def _make_hippo_schema_resolver(builder: GraphQLTypeBuilder):
 
 def _make_hippo_entity_type_resolver(builder: GraphQLTypeBuilder):
     def resolver(info: Info, name: str) -> Optional[MosaicEntityTypeInfo]:
-        model = _builder(info).type_model.get(name)
+        b = _builder(info)
+        model = b.type_model.get(name)
+        if model is None and name in b.families:
+            model = b.families[name].model
         if model is None:
             return None
-        return _entity_type_info(model)
+        return _entity_type_info(model, b)
 
     resolver.__name__ = "hippo_entity_type"
     resolver.__doc__ = (
@@ -1794,7 +1828,13 @@ def _ingest_batch_resolver(
 
 def build_query_type(builder: GraphQLTypeBuilder) -> type:
     fields = []
-    for entity in builder.entities.values():
+    # Entities, then each family with its own read-only collection
+    # (ADR-0014 Decision 3, #228): the same get/list/search/count/facet/
+    # range surface; items render as their own kind.
+    anchors = list(builder.entities.values()) + [
+        builder.families[name] for name in builder.family_anchors
+    ]
+    for entity in anchors:
         fields.append(
             strawberry.field(
                 resolver=_make_get_resolver(builder, entity),

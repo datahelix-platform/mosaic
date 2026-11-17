@@ -149,6 +149,33 @@ slots:
     in_subset:
       - class_annotation
 
+  hippo_anchor:
+    description: >-
+      Whether this class may be queried as a collection of its own (ADR-0014
+      Decision 5). Default true. On a family — an abstract class with exposed
+      concrete kinds — `false` removes its read-only accessor, `<Class>Page`,
+      filter input and `search{Plural}`, and QuerySpec answers it with
+      UNKNOWN_ANCHOR; its GraphQL interface and the resolution of references
+      ranged on it are unaffected. On a concrete class it removes only
+      QuerySpec anchoring. Use it on a root class whose collection is the
+      whole graph (e.g. `NamedThing`).
+    range: boolean
+    ifabsent: "true"
+    in_subset:
+      - class_annotation
+
+  hippo_manifest:
+    description: >-
+      Whether this class is listed in the planner-facing capability manifest
+      (`mosaic://capabilities`; ADR-0014 Decision 5). Default true. `false`
+      hides the class from the planner — it is not offered as an anchor, not
+      named as any entry's `parent`, and a reference ranged on it reports
+      `predicate: false` — without removing it from GraphQL or the SDK.
+    range: boolean
+    ifabsent: "true"
+    in_subset:
+      - class_annotation
+
   hippo_namespace:
     description: >-
       Declare the namespace this class belongs to for typed-client

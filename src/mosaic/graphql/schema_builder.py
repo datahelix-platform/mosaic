@@ -50,6 +50,7 @@ from mosaic.core.schema_typing import (
     EntityTypeModel,
     SlotKind,
     SlotModel,
+    build_family_model,
     build_type_model,
 )
 from mosaic.linkml_bridge import SchemaRegistry
@@ -324,9 +325,23 @@ class GraphQLTypeBuilder:
         self.type_model: dict[str, EntityTypeModel] = {}
         self.entities: dict[str, EntityGraphQLInfo] = {}
         self.enums: dict[str, type] = {}
+        #: Families (ADR-0014 Decisions 2-3, #228): abstract classes with
+        #: exposed kinds. Each is a GraphQL interface its kinds implement,
+        #: with the same filter/order/page machinery as an entity, but no
+        #: write surface (Decision 6).
+        self.families: dict[str, EntityGraphQLInfo] = {}
+        #: Families with their own read-only collection (accessor, page,
+        #: filter, search): ``hippo_anchor`` not false, and no accessor
+        #: collision (Decision 3/5).
+        self.family_anchors: list[str] = []
         self._built = False
 
     # -- public surface ----------------------------------------------------
+
+    @property
+    def registry(self) -> SchemaRegistry:
+        """The schema registry the types are generated from."""
+        return self._registry
 
     def build(self) -> "GraphQLTypeBuilder":
         """Generate all types. Idempotent."""
@@ -343,12 +358,25 @@ class GraphQLTypeBuilder:
         self._built = True
         return self
 
+    def info_for(self, class_name: str) -> EntityGraphQLInfo:
+        """The resolver-facing info of an entity or a family."""
+        info = self.entities.get(class_name) or self.families.get(class_name)
+        if info is None:
+            raise KeyError(class_name)
+        return info
+
     def instance_from_envelope(
         self, class_name: str, envelope: dict[str, Any]
     ) -> Any:
         """SDK entity envelope (``client.get``/``client.query`` item) →
         generated GraphQL type instance. Pure shape mapping.
+
+        A family (ADR-0014 Decision 2) renders each row as its own kind's
+        type, so ``__typename`` names the leaf; a concrete parent renders
+        it as the parent type with ``entityType`` (Decision 1).
         """
+        if class_name not in self.entities:
+            class_name = str(envelope.get("entity_type") or class_name)
         entity = self.entities[class_name]
         data = envelope.get("data") or {}
         kwargs: dict[str, Any] = {}
@@ -422,6 +450,35 @@ class GraphQLTypeBuilder:
                 c for c in self._registry.concrete_closure(class_name)
                 if c != class_name
             ]
+        # Families (ADR-0014 Decisions 2-5, #228): one rule, shared with the
+        # capability manifest (build_family_model).
+        taken = {e.plural_name for e in self.entities.values()} | {
+            e.singular_name for e in self.entities.values()
+        }
+        for name, fmodel in build_family_model(
+            self._registry, self.type_model
+        ).items():
+            info = EntityGraphQLInfo(
+                class_name=name,
+                singular_name=snake_case(name),
+                plural_name=fmodel.accessor_name,
+                model=fmodel,
+            )
+            self.families[name] = info
+            if not fmodel.anchor:
+                continue
+            clash = {info.plural_name, info.singular_name} & taken
+            if clash:
+                warnings.warn(
+                    f"{name}: family accessor {sorted(clash)} collides with "
+                    f"another class's; no read-only collection is generated "
+                    f"for it (ADR-0014 Decision 3). Set hippo_accessor on "
+                    f"{name} to name it.",
+                    stacklevel=2,
+                )
+                continue
+            taken |= {info.plural_name, info.singular_name}
+            self.family_anchors.append(name)
 
     def _build_enums(self) -> None:
         # Enum membership comes from the type model's slot classification
@@ -498,7 +555,10 @@ class GraphQLTypeBuilder:
             # raw field keeps/derives an ``*_id`` name; the resolved field
             # uses the natural slot name when the target has a generated
             # type, enabling graph traversal in one query.
-            resolvable = slot.target_class in self.entities
+            resolvable = (
+                slot.target_class in self.entities
+                or slot.target_class in self.families
+            )
             if slot.multivalued:
                 raw = slot.name if slot.name.endswith("_ids") else f"{slot.name}_ids"
                 resolved = (
@@ -576,9 +636,12 @@ class GraphQLTypeBuilder:
     def _build_object_types(self) -> None:
         # Pass 1 — bare classes so relationship annotations can use real
         # class objects (handles cycles and self-references).
+        family_shells = self._build_family_shells()
         bare: dict[str, type] = {
-            name: type(name, (), {}) for name in self.entities
+            name: type(name, self._family_bases(name, family_shells), {})
+            for name in self.entities
         }
+        self._decorate_families(family_shells, bare)
 
         # Pass 2 — attach fields and decorate.
         for class_name, entity in self.entities.items():
@@ -650,7 +713,10 @@ class GraphQLTypeBuilder:
                 annotations[spec.attr_name] = self._output_annotation(spec)
                 setattr(cls, spec.attr_name, None)
                 if spec.kind == "reference" and spec.resolvable:
-                    target = bare[spec.target_class]  # type: ignore[index]
+                    target = (
+                        bare.get(spec.target_class)  # type: ignore[arg-type]
+                        or family_shells[spec.target_class]  # type: ignore[index]
+                    )
                     resolver = self._make_reference_resolver(spec, target)
                     setattr(
                         cls,
@@ -731,10 +797,117 @@ class GraphQLTypeBuilder:
                 cls, description=model.description or None
             )
 
+    def _family_order(self) -> list[str]:
+        """Families, every parent before its children."""
+        depth: dict[str, int] = {}
+
+        def d(name: str) -> int:
+            if name not in depth:
+                parent = self.families[name].model.parent  # type: ignore[union-attr]
+                depth[name] = 0 if parent is None else d(parent) + 1
+            return depth[name]
+
+        return sorted(self.families, key=lambda n: (d(n), n))
+
+    def _build_family_shells(self) -> dict[str, type]:
+        """Bare interface classes, each extending its parent family's."""
+        shells: dict[str, type] = {}
+        for name in self._family_order():
+            parent = self.families[name].model.parent  # type: ignore[union-attr]
+            shells[name] = type(name, (shells[parent],) if parent else (), {})
+        return shells
+
+    def _family_chain(self, name: str) -> set[str]:
+        out: set[str] = set()
+        parent = self.families[name].model.parent  # type: ignore[union-attr]
+        while parent is not None:
+            out.add(parent)
+            parent = self.families[parent].model.parent  # type: ignore[union-attr]
+        return out
+
+    def _family_bases(
+        self, class_name: str, shells: dict[str, type]
+    ) -> tuple[type, ...]:
+        """The interfaces a concrete kind implements: every family it belongs
+        to, most specific only (a family interface extends its parent's)."""
+        mine = [
+            f for f, info in self.families.items()
+            if class_name in info.model.kinds  # type: ignore[union-attr]
+        ]
+        inherited = set().union(*(self._family_chain(f) for f in mine)) if mine else set()
+        return tuple(shells[f] for f in self._family_order() if f in mine and f not in inherited)
+
+    def _decorate_families(
+        self, shells: dict[str, type], bare: dict[str, type]
+    ) -> None:
+        """Attach each family's shared fields and decorate it as a GraphQL
+        interface, parents first (ADR-0014 Decision 2). It carries every
+        field its kinds store alike — scalars, enums and references
+        (``Sample.donor``), so a shared field needs no fragment per kind.
+        A reference to a class with no GraphQL type is left off."""
+        for name in self._family_order():
+            info = self.families[name]
+            model = info.model
+            assert model is not None
+            cls = shells[name]
+            annotations: dict[str, Any] = {}
+            specs = [self._slot_spec(slot) for slot in model.fields]
+            info.slots = []
+            for spec in specs:
+                if spec.slot_name == "is_available":
+                    continue
+                if spec.kind == "reference":
+                    if not spec.resolvable:
+                        continue
+                    target = bare.get(spec.target_class) or shells.get(  # type: ignore[arg-type]
+                        spec.target_class  # type: ignore[arg-type]
+                    )
+                    info.slots.append(spec)
+                    attr = spec.resolved_attr
+                    annotations[attr] = (  # type: ignore[index]
+                        list[target] if spec.multivalued else Optional[target]  # type: ignore[valid-type]
+                    )
+                    setattr(cls, attr, None)  # type: ignore[arg-type]
+                    if spec.multivalued:
+                        annotations[f"{attr}_count"] = int
+                        setattr(cls, f"{attr}_count", None)
+                    continue
+                info.slots.append(spec)
+                if spec.slot_name == "id":
+                    annotations[spec.attr_name] = strawberry.ID
+                    continue
+                base: Any = spec.enum_cls if spec.kind == "enum" else spec.scalar_type
+                annotations[spec.attr_name] = (
+                    Optional[list[base]] if spec.multivalued else Optional[base]
+                )
+                setattr(cls, spec.attr_name, None)
+            cls.__annotations__ = annotations
+            # Kind-only fields filter, order and facet on the family (read
+            # as NULL for kinds without them) but are not interface fields.
+            info.slots.extend(
+                spec
+                for spec in (self._slot_spec(s) for s in model.kind_fields)  # type: ignore[union-attr]
+                if spec.kind != "reference" or spec.resolvable
+            )
+            kinds = ", ".join(model.kinds)  # type: ignore[union-attr]
+            info.gql_type = strawberry.interface(
+                cls,
+                description=(
+                    (model.description or f"Any kind of {name}.")
+                    + f" Kinds: {kinds} (ADR-0014). Shared fields select "
+                    f"directly; a kind's own fields need `... on <Kind>`."
+                ),
+            )
+
     def _make_reference_resolver(self, spec: SlotSpec, target: type) -> Any:
         builder = self
         target_class: str = spec.target_class  # type: ignore[assignment]
         raw_attr = spec.attr_name
+
+        def render(env: dict[str, Any]) -> Any:
+            # A family target renders each row as its own kind (ADR-0014
+            # Decision 2); a concrete parent as the parent (Decision 1).
+            return builder.instance_from_envelope(target_class, env)
 
         if spec.multivalued:
 
@@ -742,11 +915,7 @@ class GraphQLTypeBuilder:
                 ids = getattr(self, raw_attr) or []
                 loader = get_entity_loader(info.context, target_class)
                 envelopes = await loader.load_many([str(i) for i in ids])
-                return [
-                    builder.instance_from_envelope(target_class, env)
-                    for env in envelopes
-                    if env is not None
-                ]
+                return [render(env) for env in envelopes if env is not None]
 
             resolver.__annotations__["return"] = list[target]  # type: ignore[valid-type]
         else:
@@ -759,7 +928,7 @@ class GraphQLTypeBuilder:
                 envelope = await loader.load(str(ref_id))
                 if envelope is None:
                     return None
-                return builder.instance_from_envelope(target_class, envelope)
+                return render(envelope)
 
             resolver.__annotations__["return"] = Optional[target]
         return resolver
@@ -773,8 +942,13 @@ class GraphQLTypeBuilder:
 
         return resolver
 
+    def _all_infos(self) -> dict[str, EntityGraphQLInfo]:
+        """Entities and families: everything with a type, page, filter and
+        order enum (families have no write inputs, ADR-0014 Decision 6)."""
+        return {**self.entities, **self.families}
+
     def _build_page_types(self) -> None:
-        for entity in self.entities.values():
+        for entity in self._all_infos().values():
             page_name = f"{entity.class_name}Page"
             page = type(page_name, (), {})
             page.__annotations__ = {
@@ -989,7 +1163,7 @@ class GraphQLTypeBuilder:
         # self-reference (and M5a can later cross-reference target filters)
         # with real class objects.
         bare: dict[str, type] = {
-            name: type(f"{name}Filter", (), {}) for name in self.entities
+            name: type(f"{name}Filter", (), {}) for name in self._all_infos()
         }
 
         # Per-target quantifier inputs for to-many edges (ADR-0006 M5b):
@@ -1040,7 +1214,7 @@ class GraphQLTypeBuilder:
             return quantifier_inputs[target]
 
         # Pass 2 — attach per-slot operator fields + combinators, decorate.
-        for class_name, entity in self.entities.items():
+        for class_name, entity in self._all_infos().items():
             cls = bare[class_name]
             annotations: dict[str, Any] = {}
             fields: list[tuple[str, SlotSpec]] = []
@@ -1097,7 +1271,7 @@ class GraphQLTypeBuilder:
                         (
                             attr,
                             spec,
-                            self.entities[spec.target_class],
+                            self.info_for(spec.target_class),  # type: ignore[arg-type]
                             spec.multivalued,
                         )
                     )
@@ -1185,7 +1359,7 @@ class GraphQLTypeBuilder:
         slot names, so introspection doubles as the aggregation-field
         capability contract.
         """
-        for entity in self.entities.values():
+        for entity in self._all_infos().values():
             # SCREAMING_SNAKE member names (GraphQL enum convention, like
             # FilterOp); values stay the LinkML slot names.
             members = {

@@ -462,12 +462,15 @@ def validate_query_spec(
     """
     errors: list[QuerySpecError] = []
     anchor = manifest.get(spec.anchor)
-    if anchor is None:
+    if anchor is None or not anchor.anchor:
+        # A class opted out with ``hippo_anchor: false`` (ADR-0014
+        # Decision 5) stays in the manifest as an edge target only.
+        known = sorted(name for name, cap in manifest.items() if cap.anchor)
         return ValidationResult(
             errors=(
                 QuerySpecError(
                     "UNKNOWN_ANCHOR",
-                    f"unknown anchor {spec.anchor!r}. Known types: {sorted(manifest)}",
+                    f"unknown anchor {spec.anchor!r}. Known types: {known}",
                     "$.anchor",
                 ),
             )

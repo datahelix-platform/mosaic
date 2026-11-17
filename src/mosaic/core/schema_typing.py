@@ -248,6 +248,121 @@ def build_type_model(registry: SchemaRegistry) -> dict[str, EntityTypeModel]:
     return model
 
 
+@dataclass(frozen=True)
+class FamilyTypeModel(EntityTypeModel):
+    """An abstract class with exposed concrete descendants — a *family*
+    (ADR-0014 Decisions 2-5, #228). It has no rows of its own: its
+    collection is its ``kinds``' rows, each keeping its own class.
+
+    ``fields`` are the slots every kind stores alike (same name, kind,
+    range, cardinality and target), so one GraphQL interface can carry
+    them; a slot narrowed differently per kind (``format`` on brain bank's
+    solid vs. liquid samples) is a kind-only field.
+    """
+
+    #: Exposed concrete descendants (``concrete_closure``), sorted as the
+    #: registry returns them.
+    kinds: tuple[str, ...] = ()
+    #: Nearest ancestor that is itself a family, if any.
+    parent: Optional[str] = None
+    #: ``hippo_anchor`` (Decision 5): the family has its own collection
+    #: (accessor, page, filter input, search, QuerySpec anchor).
+    anchor: bool = True
+    #: ``hippo_manifest`` (Decision 5): the family is listed in the
+    #: planner-facing capability manifest.
+    manifest: bool = True
+    #: Fields only some kinds store (alike across those kinds), filterable
+    #: and orderable on the family under ADR-0014's read-as-NULL rule
+    #: (2026-11-17 amendment): a kind without the field reads it as NULL.
+    #: Not on the GraphQL interface; select them with ``... on <Kind>``.
+    kind_fields: tuple[SlotModel, ...] = ()
+    #: ``(field name, kinds that have it)`` for each of ``kind_fields``.
+    kind_field_owners: tuple[tuple[str, tuple[str, ...]], ...] = ()
+
+
+def class_flag(cls: Any, key: str, default: bool = True) -> bool:
+    """A boolean class annotation (``hippo_anchor``/``hippo_manifest``,
+    ADR-0014 Decision 5), ``default`` when absent."""
+    value = annotation_value(cls, key) if cls is not None else None
+    if value is None:
+        return default
+    return str(value).strip().lower() not in ("false", "0", "no")
+
+
+def _same_slot(a: SlotModel, b: SlotModel) -> bool:
+    return (
+        a.kind is b.kind
+        and a.range == b.range
+        and a.multivalued == b.multivalued
+        and a.target_class == b.target_class
+        and a.enum_name == b.enum_name
+        and a.inverse_of == b.inverse_of
+    )
+
+
+def build_family_model(
+    registry: SchemaRegistry,
+    type_model: Optional[dict[str, EntityTypeModel]] = None,
+) -> dict[str, FamilyTypeModel]:
+    """Every family of the schema (ADR-0014 Decision 5's one rule): an
+    abstract, non-infrastructure class with at least one exposed concrete
+    descendant — whether or not a reference is ranged on it. The single
+    source of which families exist, for GraphQL and the manifest alike.
+    """
+    if type_model is None:
+        type_model = build_type_model(registry)
+    sv = registry.schema_view
+    value_types = registry.value_type_classes()
+    names: list[str] = []
+    for name in registry.class_names():
+        cls = sv.get_class(name)
+        if cls is None or not cls.abstract or name in type_model:
+            continue
+        if is_infrastructure_class(registry, name) or name in value_types:
+            continue
+        if any(k in type_model for k in registry.concrete_closure(name)):
+            names.append(name)
+    family_set = set(names)
+    families: dict[str, FamilyTypeModel] = {}
+    for name in sorted(names):
+        cls = sv.get_class(name)
+        kinds = tuple(k for k in registry.concrete_closure(name) if k in type_model)
+        per_kind = [{s.name: s for s in type_model[k].fields} for k in kinds]
+        first = per_kind[0]
+        fields = tuple(
+            first[n] for n in first
+            if all(n in m and _same_slot(first[n], m[n]) for m in per_kind[1:])
+        )
+        shared = {s.name for s in fields}
+        kind_fields: list[SlotModel] = []
+        owners: list[tuple[str, tuple[str, ...]]] = []
+        seen: set[str] = set()
+        for m in per_kind:
+            for n, slot in m.items():
+                if n in shared or n in seen:
+                    continue
+                seen.add(n)
+                having = [(k, pk[n]) for k, pk in zip(kinds, per_kind) if n in pk]
+                if all(_same_slot(slot, s) for _, s in having):
+                    kind_fields.append(slot)
+                    owners.append((n, tuple(k for k, _ in having)))
+        ancestors = sv.class_ancestors(name) or []
+        parent = next((a for a in ancestors if a != name and a in family_set), None)
+        families[name] = FamilyTypeModel(
+            class_name=name,
+            accessor_name=class_accessor_name(name, cls),
+            description=getattr(cls, "description", None),
+            fields=fields,
+            kinds=kinds,
+            parent=parent,
+            anchor=class_flag(cls, "hippo_anchor"),
+            manifest=class_flag(cls, "hippo_manifest"),
+            kind_fields=tuple(kind_fields),
+            kind_field_owners=tuple(owners),
+        )
+    return families
+
+
 # ---------------------------------------------------------------------------
 # Capability manifest (ADR-0009 / issue #181): what the ``where:``-shaped
 # query boundary supports per field, on top of the type model above. Feeds
@@ -343,6 +458,10 @@ class FieldCapability:
     aggregatable: bool  # legal `facetCounts` field
     range_queryable: bool  # legal `fieldRange` (min/max) field
     searchable: bool  # carries a `hippo_search` annotation
+    #: On a family (ADR-0014 Decision 4): the kinds that have this field
+    #: when only some do — the others read it as NULL. Empty = every kind
+    #: (or not a family).
+    kinds: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -359,62 +478,129 @@ class EntityCapability:
     #: silently returns an empty result with no FTS-annotated slot — callers
     #: must read this flag, not field presence, to know if search works.
     search_available: bool
+    #: Class hierarchy (ADR-0014 Decision 4, #228). ``abstract`` marks a
+    #: family: an abstract class whose collection is its ``kinds``' rows.
+    abstract: bool = False
+    #: Nearest ``is_a`` ancestor that is itself in the manifest.
+    parent: Optional[str] = None
+    #: Exposed concrete closure — a family's kinds, or a concrete parent
+    #: with its subclasses (itself first). Empty for a leaf.
+    kinds: tuple[str, ...] = ()
+    #: ``hippo_anchor`` (Decision 5): may anchor a QuerySpec.
+    anchor: bool = True
 
     @property
     def fields_by_name(self) -> dict[str, FieldCapability]:
         return {f.slot.name: f for f in self.fields}
 
 
+def _field_capability(
+    slot: SlotModel,
+    registry: SchemaRegistry,
+    searchable_names: set[str],
+    targets: set[str],
+    kinds: tuple[str, ...] = (),
+) -> FieldCapability:
+    if slot.kind is SlotKind.REFERENCE:
+        filter_ops: tuple[FilterOp, ...] = ()
+        predicate = slot.target_class in targets
+        orderable = aggregatable = range_queryable = False
+    else:
+        filter_ops = _filter_ops_for_slot(slot, registry)
+        predicate = False
+        orderable = aggregatable = slot.kind in (
+            SlotKind.SCALAR,
+            SlotKind.ENUM,
+        ) and not slot.multivalued
+        range_queryable = (
+            aggregatable
+            and slot.kind is SlotKind.SCALAR
+            and registry.base_scalar_range(slot.range) in ORDERED_BASE_RANGES
+        )
+    return FieldCapability(
+        slot=slot,
+        filter_ops=filter_ops,
+        predicate=predicate,
+        orderable=orderable,
+        aggregatable=aggregatable,
+        range_queryable=range_queryable,
+        searchable=slot.name in searchable_names,
+        kinds=kinds,
+    )
+
+
 def build_capability_manifest(
     registry: SchemaRegistry,
 ) -> dict[str, EntityCapability]:
     """Build the ``where:``/aggregation/search capability manifest for every
-    exposed entity class, on top of :func:`build_type_model`.
+    exposed entity class, on top of :func:`build_type_model`, plus every
+    family listed in it (ADR-0014 Decision 4, #228).
 
-    Returns a mapping ``class_name -> EntityCapability``.
+    Returns a mapping ``class_name -> EntityCapability``. Each entry carries
+    the class hierarchy: ``abstract``, ``parent`` (the nearest ``is_a``
+    ancestor in the manifest) and ``kinds`` (the exposed concrete closure,
+    empty for a leaf). A reference is predicate-filterable when its target
+    is in the manifest, families included.
     """
+    sv = registry.schema_view
     type_model = build_type_model(registry)
-    exposed = set(type_model)
-    manifest: dict[str, EntityCapability] = {}
+    families = {
+        name: fam
+        for name, fam in build_family_model(registry, type_model).items()
+        if fam.manifest
+    }
+    listed = set(type_model) | set(families)
 
+    def nearest_listed_ancestor(name: str) -> Optional[str]:
+        for ancestor in sv.class_ancestors(name) or []:
+            if ancestor != name and ancestor in listed:
+                return ancestor
+        return None
+
+    def searchable(name: str) -> set[str]:
+        return {slot.name for slot, _mode in registry.searchable_slots(name)}
+
+    manifest: dict[str, EntityCapability] = {}
     for class_name, entity in type_model.items():
-        searchable_names = {
-            slot.name for slot, _mode in registry.searchable_slots(class_name)
-        }
-        fields = []
-        for slot in entity.fields:
-            if slot.kind is SlotKind.REFERENCE:
-                filter_ops: tuple[FilterOp, ...] = ()
-                predicate = slot.target_class in exposed
-                orderable = aggregatable = range_queryable = False
-            else:
-                filter_ops = _filter_ops_for_slot(slot, registry)
-                predicate = False
-                orderable = aggregatable = slot.kind in (
-                    SlotKind.SCALAR,
-                    SlotKind.ENUM,
-                ) and not slot.multivalued
-                range_queryable = (
-                    aggregatable
-                    and slot.kind is SlotKind.SCALAR
-                    and registry.base_scalar_range(slot.range) in ORDERED_BASE_RANGES
-                )
-            fields.append(
-                FieldCapability(
-                    slot=slot,
-                    filter_ops=filter_ops,
-                    predicate=predicate,
-                    orderable=orderable,
-                    aggregatable=aggregatable,
-                    range_queryable=range_queryable,
-                    searchable=slot.name in searchable_names,
-                )
-            )
+        searchable_names = searchable(class_name)
+        closure = tuple(
+            k for k in registry.concrete_closure(class_name) if k in type_model
+        )
         manifest[class_name] = EntityCapability(
             class_name=entity.class_name,
             accessor_name=entity.accessor_name,
             description=entity.description,
+            fields=tuple(
+                _field_capability(slot, registry, searchable_names, listed)
+                for slot in entity.fields
+            ),
+            search_available=bool(searchable_names),
+            abstract=False,
+            parent=nearest_listed_ancestor(class_name),
+            kinds=closure if len(closure) > 1 else (),
+            anchor=class_flag(sv.get_class(class_name), "hippo_anchor"),
+        )
+    for class_name, fam in families.items():
+        searchable_names = set().union(*(searchable(k) for k in fam.kinds))
+        owners = dict(fam.kind_field_owners)
+        fields = [
+            _field_capability(slot, registry, searchable_names, listed)
+            for slot in fam.fields
+        ] + [
+            _field_capability(
+                slot, registry, searchable_names, listed, owners[slot.name]
+            )
+            for slot in fam.kind_fields
+        ]
+        manifest[class_name] = EntityCapability(
+            class_name=class_name,
+            accessor_name=fam.accessor_name,
+            description=fam.description,
             fields=tuple(fields),
             search_available=bool(searchable_names),
+            abstract=True,
+            parent=nearest_listed_ancestor(class_name),
+            kinds=fam.kinds,
+            anchor=fam.anchor,
         )
     return manifest

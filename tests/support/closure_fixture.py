@@ -318,9 +318,68 @@ class ClosureSDKCases:
             client.get("BankBrain", "pr1")
         with pytest.raises(EntityNotFoundError):
             client.get("Process", "d1")
-        # Abstract classes keep the exact match (abstract anchors are #228).
+
+    # -- ADR-0014 Decisions 2-3 (#228): a family's own collection -----------
+    # ``Sample`` is abstract: its collection is its kinds' rows (Brain br1,
+    # Blood bl1), each keeping its own class; it has no rows of its own.
+
+    def test_family_collection_lists_every_kind(self, client):
+        page = client.query("Sample")
+        assert {i["id"]: i["entity_type"] for i in page.items} == {
+            "br1": "Brain", "bl1": "Blood"
+        }
+        assert page.total == 2
+        assert client.count("Sample") == 2
+        # Each row keeps its own stored slots.
+        bl1 = next(i for i in page.items if i["id"] == "bl1")
+        assert bl1["data"]["volume_ml"] == 2.0
+
+    def test_family_include_subclasses_false_reads_nothing(self, client):
+        # The family names a class with no rows of its own: a one-class-at-a-
+        # time reader (a migration transform) sees none of its kinds' rows.
+        assert client.query("Sample", include_subclasses=False).total == 0
+        assert client.count("Sample", include_subclasses=False) == 0
+
+    def test_family_get_by_id_returns_the_kind(self, client):
+        import pytest
+
+        from mosaic.core.exceptions import EntityNotFoundError
+
+        row = client.get("Sample", "br1")
+        assert row["entity_type"] == "Brain"
+        assert row["data"]["hemisphere"] == "L"
+        assert client.get("Sample", "bl1")["entity_type"] == "Blood"
         with pytest.raises(EntityNotFoundError):
-            client.get("Sample", "br1")
+            client.get("Sample", "br1", include_subclasses=False)
+        with pytest.raises(EntityNotFoundError):
+            client.get("Sample", "a1")  # not a kind of Sample
+
+    def test_family_filters_shared_and_kind_only_fields(self, client):
+        import pytest
+
+        from mosaic.core.exceptions import ValidationError
+
+        assert _ids(client, "Sample", {"field": "label", "value": "blood"}) == {"bl1"}
+        # A field only one kind has reads as NULL on the others (the
+        # 2026-11-17 read-as-NULL rule, applied to the family's collection).
+        assert _ids(client, "Sample", {"field": "hemisphere", "value": "L"}) == {"br1"}
+        assert _ids(client, "Sample", {
+            "field": "hemisphere", "op": "is_null", "value": True}) == {"bl1"}
+        assert _ids(client, "Sample", {
+            "field": "volume_ml", "op": "gt", "value": 1.0}) == {"bl1"}
+        assert _ids(client, "Sample", {"not": {"field": "hemisphere", "value": "L"}}) == {"bl1"}
+        # A shared reference filters too.
+        where = {"edge": "produced_by", "where": {"field": "name", "value": "banked"}}
+        assert _ids(client, "Sample", where) == {"br1"}
+        # A name no kind has is still rejected.
+        with pytest.raises(ValidationError):
+            _ids(client, "Sample", {"field": "no_such_field", "value": "x"})
+
+    def test_family_order_facets_and_range(self, client):
+        page = client.query("Sample", order_by="label")
+        assert [i["id"] for i in page.items] == ["bl1", "br1"]
+        assert dict(client.facet_counts("Sample", "label")) == {"blood": 1, "brain": 1}
+        assert client.field_range("Sample", "volume_ml") == (2.0, 2.0)
 
     def test_neighbors_reverse_column_edge_reaches_subclass_row(self, client):
         result = client.neighbors("bb1", depth=1)
@@ -435,3 +494,67 @@ class ClosureGraphQLCases:
         # Leaves (and classes without exposed subclasses) are unchanged.
         for leaf in ("BankBrain", "Donor", "Brain", "Assay", "Measurement"):
             assert "entityType" not in fields(leaf)
+
+    # -- ADR-0014 Decisions 2-3 (#228): families in GraphQL -----------------
+
+    def test_reference_into_family_returns_each_kind(self, gql):
+        # No raw `inputsIds` fallback: the edge resolves to the interface and
+        # each row is its own kind; a shared field needs no fragment.
+        data = gql('{ assays { items { id inputs { __typename id label } inputsCount } } }')
+        (row,) = data["assays"]["items"]
+        assert sorted(row["inputs"], key=lambda i: i["id"]) == [
+            {"__typename": "Blood", "id": "bl1", "label": "blood"},
+            {"__typename": "Brain", "id": "br1", "label": "brain"},
+        ]
+        assert row["inputsCount"] == 2
+
+    def test_family_interface_and_kinds(self, gql):
+        data = gql('{ __type(name: "Sample") { kind fields { name } '
+                   'possibleTypes { name } } }')
+        t = data["__type"]
+        assert t["kind"] == "INTERFACE"
+        assert sorted(p["name"] for p in t["possibleTypes"]) == ["Blood", "Brain"]
+        names = {f["name"] for f in t["fields"]}
+        # Shared fields, including a shared reference; kind-only ones are not.
+        assert {"id", "label", "producedBy"} <= names
+        assert "hemisphere" not in names and "volumeMl" not in names
+        assay = gql('{ __type(name: "Assay") { fields { name } } }')["__type"]
+        assay_fields = {f["name"] for f in assay["fields"]}
+        assert "inputs" in assay_fields and "inputsIds" not in assay_fields
+
+    def test_family_collection_count_and_get(self, gql):
+        data = gql('{ samples(orderBy: LABEL) { total items { __typename id '
+                   '... on Brain { hemisphere } ... on Blood { volumeMl } } } '
+                   'samplesCount '
+                   'one: sample(id: "bl1") { __typename id producedBy { id } } '
+                   'none: sample(id: "a1") { id } }')
+        assert data["samples"]["total"] == 2
+        assert data["samples"]["items"] == [
+            {"__typename": "Blood", "id": "bl1", "volumeMl": 2.0},
+            {"__typename": "Brain", "id": "br1", "hemisphere": "L"},
+        ]
+        assert data["samplesCount"] == 2
+        assert data["one"] == {"__typename": "Blood", "id": "bl1", "producedBy": {"id": "pr1"}}
+        assert data["none"] is None
+
+    def test_family_where_shared_kind_only_and_through_edge(self, gql):
+        data = gql('{ a: samples(where: {hemisphere: {eq: "L"}}) { items { id } } '
+                   'b: samples(where: {label: {eq: "blood"}}) { items { id } } '
+                   'c: samplesCount(where: {volumeMl: {gt: 1.0}}) '
+                   'd: assays(where: {inputs: {some: {label: {eq: "blood"}}}}) { items { id } } '
+                   'e: assays(where: {inputs: {some: {hemisphere: {eq: "R"}}}}) { items { id } } '
+                   'f: samplesFacetCounts(field: "label") { value count } }')
+        assert data["a"]["items"] == [{"id": "br1"}]
+        assert data["b"]["items"] == [{"id": "bl1"}]
+        assert data["c"] == 1
+        assert data["d"]["items"] == [{"id": "a1"}]
+        assert data["e"]["items"] == []
+        assert {f["value"]: f["count"] for f in data["f"]} == {"blood": 1, "brain": 1}
+
+    def test_family_schema_description(self, gql):
+        data = gql('{ s: hippoEntityType(name: "Sample") { abstract parent kinds } '
+                   'b: hippoEntityType(name: "Brain") { abstract parent kinds } '
+                   'p: hippoEntityType(name: "Process") { abstract kinds } }')
+        assert data["s"] == {"abstract": True, "parent": None, "kinds": ["Blood", "Brain"]}
+        assert data["b"] == {"abstract": False, "parent": "Sample", "kinds": []}
+        assert data["p"] == {"abstract": False, "kinds": ["Process", "BankBrain"]}
