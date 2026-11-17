@@ -3754,37 +3754,44 @@ class SQLiteAdapter(EntityStore):
             tables = self._inverse_tables(inv)
             if not tables:
                 return 0
+            # One statement: a scalar COUNT per closure table, summed.
+            parts = [
+                f'(SELECT COUNT(*) FROM "{table}" tgt '
+                f"WHERE {self._inverse_match(inv, 'tgt', '?')} "
+                "AND tgt.is_available = 1)"
+                for table in tables
+            ]
             with self._transaction() as conn:
                 cursor = conn.cursor()
-                total = 0
-                for table in tables:
-                    cursor.execute(
-                        f'SELECT COUNT(*) AS c FROM "{table}" tgt '
-                        f"WHERE {self._inverse_match(inv, 'tgt', '?')} "
-                        "AND tgt.is_available = 1",
-                        (entity_id,),
-                    )
-                    total += int(cursor.fetchone()["c"])
-                return total
+                cursor.execute(
+                    f"SELECT {' + '.join(parts)} AS c",
+                    tuple(entity_id for _ in tables),
+                )
+                return int(cursor.fetchone()["c"])
         # Forward edge: the target may live in any table of the range's
         # concrete closure — abstract ``Sample``'s leaves, or a concrete
         # parent's subclasses (ADR-0014 Decision 1, #241).
         tables = self._closure_tables(target)
         if not tables:
             return 0
+        # One statement over the source's edges: each available edge counts
+        # when its target is an available row of some closure table, probed
+        # by primary key (ids are unique across tables, so OR never double
+        # counts). Cost follows the source's edge count, not table sizes.
+        live_target = " OR ".join(
+            f'EXISTS (SELECT 1 FROM "{table}" tgt '
+            f'WHERE tgt."id" = rel.target_id AND tgt.is_available = 1)'
+            for table in tables
+        )
         with self._transaction() as conn:
             cursor = conn.cursor()
-            total = 0
-            for table in tables:
-                cursor.execute(
-                    f'SELECT COUNT(*) AS c FROM relationships rel '
-                    f'JOIN "{table}" tgt ON tgt."id" = rel.target_id '
-                    f"WHERE rel.source_id = ? AND rel.relationship_type = ? "
-                    f"AND rel.is_available = 1 AND tgt.is_available = 1",
-                    (entity_id, edge),
-                )
-                total += int(cursor.fetchone()["c"])
-            return total
+            cursor.execute(
+                "SELECT COUNT(*) AS c FROM relationships rel "
+                "WHERE rel.source_id = ? AND rel.relationship_type = ? "
+                f"AND rel.is_available = 1 AND ({live_target})",
+                (entity_id, edge),
+            )
+            return int(cursor.fetchone()["c"])
 
     def _require_aggregate_field(
         self, query: Query, field: str, *, surface: str
