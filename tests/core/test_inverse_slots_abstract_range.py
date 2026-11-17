@@ -172,10 +172,21 @@ class TestFilter:
                  "where": {"field": "label", "op": "eq", "value": "cerebrum"}}
         assert self._q(client, where) == ["d1"]
 
-    def test_subclass_only_field_is_rejected(self, client):
+    def test_subclass_only_field_reads_as_null_on_other_tables(self, client):
+        # ADR-0014 Decision 1 amendment (D1 = read-as-NULL): a field only
+        # CSF has is NULL on Brain/Cerebrum rows, so it matches CSF rows
+        # only; `is_null` matches the rows that lack it.
+        where = {"edge": "samples", "quantifier": "some",
+                 "where": {"field": "volume_ml", "op": "gte", "value": 1.5}}
+        assert self._q(client, where) == ["d1"]
+        where = {"edge": "samples", "quantifier": "some",
+                 "where": {"field": "volume_ml", "op": "is_null", "value": True}}
+        assert self._q(client, where) == ["d1"]
+
+    def test_field_no_closure_table_has_is_rejected(self, client):
         from mosaic.core.exceptions import ValidationError
 
         where = {"edge": "samples", "quantifier": "some",
-                 "where": {"field": "volume_ml", "op": "gte", "value": 1.0}}
-        with pytest.raises(ValidationError, match="volume_ml"):
+                 "where": {"field": "no_such_field", "op": "eq", "value": 1}}
+        with pytest.raises(ValidationError, match="no_such_field"):
             self._q(client, where)

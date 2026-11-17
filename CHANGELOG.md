@@ -76,7 +76,8 @@
   (`__typename` names the parent). Leaf types are unchanged. A slot named
   `entity_type` on such a class is a build-time error.
 - **`include_subclasses` on `MosaicClient.query` / `count`** (default
-  `True`). `False` reads exactly the named class's rows — the pre-ADR-0014
+  `True`; public SDK API per the ADR-0014 2026-11-17 amendment, not exposed
+  by the transports). `False` reads exactly the named class's rows — the pre-ADR-0014
   behaviour, for code that walks one class at a time. The migration gate
   bundle and domain-module teardown use it.
 
@@ -100,6 +101,18 @@
   `ctx.client.query("Subject")` still reads only `Subject` rows and a
   subclass row is never re-migrated as its parent. A transform that wants
   the closure passes `include_subclasses=True` explicitly.
+- **Leaf-only names under a closure edge read as NULL** (ADR-0014
+  amendment 2026-11-17, #276). A nested `where` on an edge whose range
+  spans several classes (an abstract range, or a concrete parent with
+  subclasses), forward or inverse, may name any field or reference edge
+  that some class of the range has. Rows of the other classes read the
+  field as NULL (`is_null` matches them; `not {field: v}` holds) and the
+  edge as having no members (`some`/to-one false, `none` true); a name no
+  class has is still an error. **Behaviour change:** an inverse closure
+  edge (`Person.processes some {site: …}` with `site` only on
+  `BankBrain`) used to reject a subclass-only field; it now answers. On
+  Postgres, an unknown field inside a nested edge's `where` is now an
+  error, as on SQLite (it used to match nothing).
 
 - **CI and the image install from `uv.lock`** (issue #242). Local
   `uv run pytest`, CI and the release image now test the same dependency

@@ -1061,6 +1061,9 @@ class PostgresAdapter(EntityStore):
         # Per-class cache of filter-cast suffixes for comparison predicates
         # (ADR-0006): slot name -> "::numeric" / "::timestamptz" / "" (text).
         self._filter_cast_cache: dict[str, dict[str, str]] = {}
+        # Per-class cache of field names a nested where tree may name: the
+        # slots of the class's concrete closure (ADR-0014 Decision 1).
+        self._closure_field_cache: dict[str, set[str]] = {}
         # Per-thread staged-transaction state (mirrors SQLiteAdapter): when a
         # ``staged_transaction`` scope is active, inner ``_transaction`` calls
         # reuse the pinned connection and defer commit to the outer scope so a
@@ -1989,6 +1992,18 @@ class PostgresAdapter(EntityStore):
         params.append(self._jsonb_text(value))
         return f"{doc}->>%s = %s"
 
+    def _reference_slots(self, entity_type: str) -> dict[str, tuple[str, bool]]:
+        """``{slot: (range_class, multivalued)}`` for ``entity_type``'s
+        reference slots — mirror of the SQLite helper."""
+        registry = self.schema_registry
+        refs: dict[str, tuple[str, bool]] = {}
+        if registry is not None:
+            known = set(registry.class_names())
+            for slot in registry.induced_slots(entity_type):
+                if slot.range in known:
+                    refs[slot.name] = (slot.range, bool(slot.multivalued))
+        return refs
+
     def _reference_edge(
         self, entity_type: str, edge: str, quantifier: Optional[str]
     ) -> tuple[str, bool, Optional[str]]:
@@ -1999,13 +2014,7 @@ class PostgresAdapter(EntityStore):
         is a virtual inverse slot (ADR-0011), else ``None``."""
         from mosaic.core.exceptions import ValidationError
 
-        registry = self.schema_registry
-        refs: dict[str, tuple[str, bool]] = {}
-        if registry is not None:
-            known = set(registry.class_names())
-            for slot in registry.induced_slots(entity_type):
-                if slot.range in known:
-                    refs[slot.name] = (slot.range, bool(slot.multivalued))
+        refs = self._reference_slots(entity_type)
         if edge not in refs:
             raise ValidationError(
                 message=(
@@ -2102,6 +2111,28 @@ class PostgresAdapter(EntityStore):
                 )
             edge = node["edge"]
             quantifier = node.get("quantifier")
+            if scope and edge not in self._reference_slots(entity_type):
+                # Nested under a closure edge (ADR-0014 Decision 1,
+                # read-as-NULL): the range lacks this edge, but some class
+                # of its concrete closure may have it. Rows of those
+                # classes evaluate the edge; every other row has no members
+                # on it (to-one / `some` false, `none` true) — the SQLite
+                # compiler's ``absent_edges``. No owner at all falls
+                # through and raises as unknown.
+                owners = [
+                    cls for cls in self._closure_types(entity_type)
+                    if edge in self._reference_slots(cls)
+                ]
+                if owners:
+                    params.append(owners)
+                    inner = self._tree_predicate(
+                        node, owners[0], params,
+                        scope=scope, alias_seq=alias_seq,
+                    )
+                    guard = f"{scope}entity_type = ANY(%s)"
+                    if quantifier == "none":
+                        return f"(NOT {guard} OR {inner})"
+                    return f"({guard} AND {inner})"
             target, multivalued, inverse_of = self._reference_edge(
                 entity_type, edge, quantifier
             )
@@ -2184,6 +2215,8 @@ class PostgresAdapter(EntityStore):
                 f"AND {alias}.is_available = TRUE AND {sub})"
             )
             return exists if quantifier == "some" else f"NOT {exists}"
+        if scope:
+            self._check_closure_field(entity_type, node["field"])
         # COALESCE to two-valued logic: a missing key makes the extracted
         # text SQL NULL, and `NOT NULL` is NULL — which would silently
         # exclude rows under `not` that the Python mirror (``matches_tree``:
@@ -2231,6 +2264,35 @@ class PostgresAdapter(EntityStore):
                         cached.setdefault(name, self._RANGE_CASTS.get(base, ""))
             self._filter_cast_cache[entity_type] = cached
         return cached.get(field, "")
+
+    def _check_closure_field(self, entity_type: Optional[str], field: str) -> None:
+        """Reject a nested leaf field no class of the range's closure has.
+
+        Inside an edge's nested tree the JSONB document reads a missing key
+        as NULL, which is exactly the read-as-NULL rule for a field *some*
+        closure class has (ADR-0014 Decision 1) — but a name *no* class has
+        is a typo, and the SQLite compiler raises on it. Same rule here.
+        """
+        registry = self.schema_registry
+        if registry is None or not entity_type:
+            return
+        known = self._closure_field_cache.get(entity_type)
+        if known is None:
+            known = {"id", "is_available"}
+            for cls in (entity_type, *self._closure_types(entity_type)):
+                known.update(slot.name for slot in registry.induced_slots(cls))
+            self._closure_field_cache[entity_type] = known
+        if field not in known:
+            from mosaic.core.exceptions import ValidationError
+
+            raise ValidationError(
+                message=(
+                    f"Unknown filter field {field!r} in where tree; no class "
+                    f"of {entity_type}'s concrete closure has it. Valid "
+                    f"fields: {sorted(known)}."
+                ),
+                field_name=field,
+            )
 
     def _closure_types(self, class_name: str) -> list[str]:
         """``entity_type`` values a reference ranged on ``class_name`` may

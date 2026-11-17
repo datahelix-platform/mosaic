@@ -15,7 +15,9 @@ The fixture is the minimal one #241 names:
 - to-many ``Assay.inputs`` → ``Sample`` (abstract range);
 - ``Measurement.person`` → ``Person``;
 - inverses ``Person.processes`` (← ``Process.operator``) and
-  ``Person.measurements`` (← ``Measurement.person``).
+  ``Person.measurements`` (← ``Measurement.person``);
+- leaf-only reference slots ``Blood.drawn_from`` → ``Person`` and
+  ``BankBrain.supervisor`` → ``Person`` (the D1 read-as-NULL cases).
 
 The SDK cases are mixed into a SQLite test class (``tests/core``) and a
 Postgres one (``tests/integration``), and so are the GraphQL cases
@@ -68,6 +70,8 @@ classes:
     is_a: Process
     attributes:
       site:
+      supervisor:
+        range: Person
   Sample:
     is_a: Entity
     abstract: true
@@ -84,6 +88,8 @@ classes:
     attributes:
       volume_ml:
         range: float
+      drawn_from:
+        range: Person
   Assay:
     is_a: Entity
     attributes:
@@ -113,14 +119,18 @@ def seed(client: Any) -> None:
       ``bl1`` (``Blood``) produced by ``pr1``, the control;
     - ``a1`` (``Assay``) with ``inputs`` ``[br1, bl1]``, one per leaf;
     - ``m1`` measures donor ``d1``, the subclass row; ``m2`` measures
-      person ``p1``, the control.
+      person ``p1``, the control;
+    - ``bl1`` was drawn from ``p1`` and ``bb1`` is supervised by ``p1``
+      (leaf-only reference slots).
     """
     client.put("Person", {"id": "p1", "name": "Pat"})
     client.put("Donor", {"id": "d1", "name": "Dee", "cohort": "case"})
     client.put("Process", {"id": "pr1", "name": "plain", "operator": "d1"})
-    client.put("BankBrain", {"id": "bb1", "name": "banked", "site": "A", "operator": "d1"})
+    client.put("BankBrain", {"id": "bb1", "name": "banked", "site": "A",
+                             "operator": "d1", "supervisor": "p1"})
     client.put("Brain", {"id": "br1", "label": "brain", "hemisphere": "L", "produced_by": "bb1"})
-    client.put("Blood", {"id": "bl1", "label": "blood", "volume_ml": 2.0, "produced_by": "pr1"})
+    client.put("Blood", {"id": "bl1", "label": "blood", "volume_ml": 2.0,
+                         "produced_by": "pr1", "drawn_from": "p1"})
     client.put("Assay", {"id": "a1", "name": "rna", "inputs": ["br1", "bl1"]})
     client.put("Measurement", {"id": "m1", "value": "5", "person": "d1"})
     client.put("Measurement", {"id": "m2", "value": "6", "person": "p1"})
@@ -208,6 +218,81 @@ class ClosureSDKCases:
         where = {"edge": "inputs", "quantifier": "some",
                  "where": {"field": "hemisphere", "op": "is_null", "value": True}}
         assert _ids(client, "Assay", where) == {"a1"}  # bl1 has none
+
+    # -- ADR-0014 Decision 1 amendment (D1 = read-as-NULL) -----------------
+    # Under a closure edge, a field or reference edge only some classes of
+    # the range have reads as NULL / memberless on the others. Inverse
+    # closure edges follow the same rule; a name no class has still raises.
+
+    def test_forward_not_on_leaf_only_field(self, client):
+        # bl1 has no hemisphere: `hemisphere = L` is false there, so `not`
+        # holds and a1 matches through its Blood input.
+        where = {"edge": "inputs", "quantifier": "some",
+                 "where": {"not": {"field": "hemisphere", "value": "L"}}}
+        assert _ids(client, "Assay", where) == {"a1"}
+        where = {"edge": "inputs", "quantifier": "none",
+                 "where": {"not": {"field": "hemisphere", "value": "L"}}}
+        assert _ids(client, "Assay", where) == set()
+
+    def test_forward_nested_leaf_only_reference_slot(self, client):
+        # Only Blood has drawn_from; br1 has no members on it.
+        where = {"edge": "inputs", "quantifier": "some",
+                 "where": {"edge": "drawn_from",
+                           "where": {"field": "name", "value": "Pat"}}}
+        assert _ids(client, "Assay", where) == {"a1"}
+        where = {"edge": "inputs", "quantifier": "none",
+                 "where": {"edge": "drawn_from",
+                           "where": {"field": "name", "value": "Pat"}}}
+        assert _ids(client, "Assay", where) == set()
+        # `not` over the absent edge holds on br1 (no members).
+        where = {"edge": "inputs", "quantifier": "some",
+                 "where": {"not": {"edge": "drawn_from",
+                                   "where": {"field": "name", "value": "Pat"}}}}
+        assert _ids(client, "Assay", where) == {"a1"}
+
+    def test_inverse_is_null_on_leaf_only_field(self, client):
+        # Person.processes spans {Process, BankBrain}; only BankBrain has
+        # site, so pr1 reads it as NULL.
+        where = {"edge": "processes", "quantifier": "some",
+                 "where": {"field": "site", "op": "is_null", "value": True}}
+        assert _ids(client, "Person", where) == {"d1"}
+        where = {"edge": "processes", "quantifier": "some",
+                 "where": {"field": "site", "value": "A"}}
+        assert _ids(client, "Person", where) == {"d1"}
+
+    def test_inverse_not_on_leaf_only_field(self, client):
+        where = {"edge": "processes", "quantifier": "some",
+                 "where": {"not": {"field": "site", "value": "A"}}}
+        assert _ids(client, "Person", where) == {"d1"}  # via pr1
+        where = {"edge": "processes", "quantifier": "none",
+                 "where": {"field": "site", "value": "A"}}
+        assert _ids(client, "Person", where) == {"p1"}  # p1 has no processes
+
+    def test_inverse_nested_leaf_only_reference_slot(self, client):
+        # Only BankBrain has supervisor; pr1 has no members on it.
+        where = {"edge": "processes", "quantifier": "some",
+                 "where": {"edge": "supervisor",
+                           "where": {"field": "name", "value": "Pat"}}}
+        assert _ids(client, "Person", where) == {"d1"}
+        where = {"edge": "processes", "quantifier": "none",
+                 "where": {"edge": "supervisor",
+                           "where": {"field": "name", "value": "Pat"}}}
+        assert _ids(client, "Person", where) == {"p1"}
+
+    def test_closure_edge_unknown_name_still_raises(self, client):
+        import pytest
+
+        from mosaic.core.exceptions import ValidationError
+
+        for nested in (
+            {"field": "no_such_field", "value": "x"},
+            {"edge": "no_such_edge", "where": {"field": "name", "value": "x"}},
+        ):
+            for edge in ("inputs", "processes"):
+                base = "Assay" if edge == "inputs" else "Person"
+                where = {"edge": edge, "quantifier": "some", "where": nested}
+                with pytest.raises(ValidationError):
+                    _ids(client, base, where)
 
     def test_neighbors_reverse_column_edge_reaches_subclass_row(self, client):
         result = client.neighbors("bb1", depth=1)

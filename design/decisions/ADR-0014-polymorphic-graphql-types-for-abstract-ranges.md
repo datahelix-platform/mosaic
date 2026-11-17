@@ -220,3 +220,22 @@ parent:
 - **Amended 2026-11-10 (labadorf, #267 review):** the question this section left open, whether a
   concrete parent's own collection (`processes`) lists subclass rows, is decided **yes** and moved
   into Decision 1.
+- **Amended 2026-11-17 (labadorf, #276 review, ruling D1 = (a)): leaf-only names under a closure
+  edge read as NULL.** This replaces Decision 1's "a slot only some descendants have is
+  `UNKNOWN_SLOT`" for the SDK `where` tree (both adapters). A nested `where` on a closure edge,
+  forward or inverse, may name any field or reference edge that *some* class of `C`'s concrete
+  closure has. A row of a class lacking it reads the field as NULL (`is_null` true, every
+  comparison false, so `not {field = v}` holds) and the edge as having no members (to-one and
+  `some` false, `none` true). A name that *no* class of the closure has is still rejected as
+  unknown. The rule applies at every nesting level: inside a nested reference's own `where`, the
+  same rule applies against that reference's range closure. This keeps the #274 case
+  (`inputs some {hemisphere: L}` → `{a1}`) and makes inverse edges, which kept the shared-slot rule
+  before this note, consistent with forward ones. `QuerySpec` edge conditions and GraphQL's nested
+  `where` input types still validate against the range's own slots (the manifest does not carry
+  the hierarchy until Decisions 4–5 / #228), so there a leaf-only name remains `UNKNOWN_SLOT`.
+- **Amended 2026-11-17 (labadorf, #276 review, ruling D2 = (a)): `include_subclasses` is public
+  SDK API.** `MosaicClient.query` and `MosaicClient.count` take `include_subclasses: bool = True`;
+  `False` reads exactly the named class's rows (the pre-ADR-0014 behaviour) for code that walks
+  one class at a time. The transports do not expose it. A migration transform's `ctx.client`
+  (`MigrationReadView`) defaults it to `False`, so a concrete parent's transform never re-migrates
+  its subclasses' rows unless it opts in with `include_subclasses=True`.

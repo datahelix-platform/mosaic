@@ -2988,6 +2988,45 @@ class SQLiteAdapter(EntityStore):
         params.append(self._coerce_for_column(value))
         return f"{col} = ?"
 
+    def _reference_slots(self, entity_type: str) -> dict[str, tuple[str, bool]]:
+        """``{slot: (range_class, multivalued)}`` for ``entity_type``'s
+        reference slots (forward and virtual inverse) — the edges a
+        relationship predicate may name on it."""
+        registry = self.schema_registry
+        refs: dict[str, tuple[str, bool]] = {}
+        if registry is not None:
+            known = set(registry.class_names())
+            for slot in registry.induced_slots(entity_type):
+                if slot.range in known:
+                    refs[slot.name] = (slot.range, bool(slot.multivalued))
+        return refs
+
+    def _closure_arms(
+        self, tables: list[str]
+    ) -> tuple[set[str], dict[str, tuple[frozenset[str], frozenset[str]]]]:
+        """Per-table scope for a nested tree over a multi-table range
+        (ADR-0014 Decision 1, read-as-NULL rule).
+
+        Returns the union of the tables' query columns — the fields the
+        nested tree may name — and, per table, ``(absent_fields,
+        absent_edges)``: the fields and reference edges some *other*
+        closure table has but this one lacks. A row of this table reads an
+        absent field as NULL and an absent edge as having no members. A
+        name no table has stays unknown and raises.
+        """
+        columns = {table: self._valid_query_columns(table) for table in tables}
+        edges = {table: set(self._reference_slots(table)) for table in tables}
+        all_columns: set[str] = set().union(*columns.values())
+        all_edges: set[str] = set().union(*edges.values())
+        arms = {
+            table: (
+                frozenset(all_columns - columns[table]),
+                frozenset(all_edges - edges[table]),
+            )
+            for table in tables
+        }
+        return all_columns, arms
+
     def _reference_edge(
         self, entity_type: str, edge: str, quantifier: Optional[str]
     ) -> tuple[str, bool, Optional[str]]:
@@ -3004,13 +3043,7 @@ class SQLiteAdapter(EntityStore):
         """
         from mosaic.core.exceptions import ValidationError
 
-        registry = self.schema_registry
-        refs: dict[str, tuple[str, bool]] = {}
-        if registry is not None:
-            known = set(registry.class_names())
-            for slot in registry.induced_slots(entity_type):
-                if slot.range in known:
-                    refs[slot.name] = (slot.range, bool(slot.multivalued))
+        refs = self._reference_slots(entity_type)
         if edge not in refs:
             raise ValidationError(
                 message=(
@@ -3051,6 +3084,7 @@ class SQLiteAdapter(EntityStore):
         scope: str = "",
         alias_seq: Optional[list[int]] = None,
         absent_fields: frozenset[str] = frozenset(),
+        absent_edges: frozenset[str] = frozenset(),
     ) -> str:
         """Compile a normalized ``where`` tree to one SQL predicate.
 
@@ -3064,7 +3098,10 @@ class SQLiteAdapter(EntityStore):
         relationship-EXISTS aliases so nested and self-referential edges
         (M5a) never collide. ``absent_fields`` are valid fields this table
         has no column for (another class of a closure edge's range,
-        ADR-0014): their leaves read the value as NULL.
+        ADR-0014): their leaves read the value as NULL. ``absent_edges``
+        are the reference edges such a table lacks: the edge has no
+        members there, so a to-one or ``some`` predicate is false and
+        ``none`` is true.
         """
         if alias_seq is None:
             alias_seq = [0]
@@ -3076,6 +3113,7 @@ class SQLiteAdapter(EntityStore):
                         c, valid_columns, params,
                         entity_type=entity_type, scope=scope,
                         alias_seq=alias_seq, absent_fields=absent_fields,
+                        absent_edges=absent_edges,
                     )
                     for c in node["and"]
                 )
@@ -3089,6 +3127,7 @@ class SQLiteAdapter(EntityStore):
                         c, valid_columns, params,
                         entity_type=entity_type, scope=scope,
                         alias_seq=alias_seq, absent_fields=absent_fields,
+                        absent_edges=absent_edges,
                     )
                     for c in node["or"]
                 )
@@ -3098,7 +3137,7 @@ class SQLiteAdapter(EntityStore):
             return "NOT " + self._tree_predicate(
                 node["not"], valid_columns, params,
                 entity_type=entity_type, scope=scope, alias_seq=alias_seq,
-                absent_fields=absent_fields,
+                absent_fields=absent_fields, absent_edges=absent_edges,
             )
         if "edge" in node:
             # Relationship predicate (ADR-0006 M5a/M5b). To-one: a
@@ -3112,6 +3151,11 @@ class SQLiteAdapter(EntityStore):
             # queries and hydration see them.
             edge = node["edge"]
             quantifier = node.get("quantifier")
+            if edge in absent_edges:
+                # Another class of a closure edge's range has this edge;
+                # this table's rows have no members on it (ADR-0014
+                # Decision 1, read-as-NULL).
+                return "1" if quantifier == "none" else "0"
             target, multivalued, inverse_of = self._reference_edge(
                 entity_type, edge, quantifier
             )
@@ -3222,16 +3266,16 @@ class SQLiteAdapter(EntityStore):
         ``some``), and ``none`` is the negation. Each EXISTS is keyed on the
         table's primary key, so it stays an index probe.
 
-        The nested tree may name any field some table of the closure has; a
-        table without that column reads it as NULL (``absent_fields``), so
-        a leaf-only field (``Brain.hemisphere`` under ``Sample``) matches
-        only rows of the classes that carry it. A field no table has is
-        rejected as unknown. With no table at all, the edge holds nowhere.
+        The nested tree may name any field or reference edge some table of
+        the closure has; a table without it reads the field as NULL and the
+        edge as memberless (:meth:`_closure_arms`), so a leaf-only field
+        (``Brain.hemisphere`` under ``Sample``) matches only rows of the
+        classes that carry it. A name no table has is rejected as unknown.
+        With no table at all, the edge holds nowhere.
         """
         if not tables:
             return "1" if quantifier == "none" else "0"
-        columns = {table: self._valid_query_columns(table) for table in tables}
-        union: set[str] = set().union(*columns.values())
+        union, arms = self._closure_arms(tables)
         # The slot name is a schema identifier; inlined as a quoted literal
         # (as ``_inverse_match`` does) so callers' positional params keep
         # their order.
@@ -3240,10 +3284,11 @@ class SQLiteAdapter(EntityStore):
         for table in tables:
             alias_seq[0] += 1
             alias = f"rel{alias_seq[0]}"
+            absent_fields, absent_edges = arms[table]
             sub = self._tree_predicate(
                 node["where"], union, params,
                 entity_type=table, scope=f"{alias}.", alias_seq=alias_seq,
-                absent_fields=frozenset(union - columns[table]),
+                absent_fields=absent_fields, absent_edges=absent_edges,
             )
             if not multivalued:
                 clauses.append(
@@ -3279,24 +3324,25 @@ class SQLiteAdapter(EntityStore):
 
         The hit may live in any concrete table of the range's closure, so
         ``some`` is an OR of one correlated EXISTS per table and ``none``
-        its negation. The nested tree may only name fields every table in
-        the closure owns (the range's own slots); a subclass-only field is
-        rejected rather than silently matching a subset of tables. With no
-        table at all, ``some`` is false and ``none`` true.
+        its negation. The nested tree follows the forward rule (ADR-0014
+        Decision 1, read-as-NULL): it may name any field or reference edge
+        some table of the closure has, and a table lacking it reads the
+        field as NULL and the edge as memberless (:meth:`_closure_arms`).
+        A name no table has is rejected. With no table at all, ``some`` is
+        false and ``none`` true.
         """
         if not tables:
             return "0" if quantifier == "some" else "1"
-        shared: Optional[set[str]] = None
-        for table in tables:
-            cols = self._valid_query_columns(table)
-            shared = set(cols) if shared is None else shared & set(cols)
+        union, arms = self._closure_arms(tables)
         clauses = []
         for table in tables:
             alias_seq[0] += 1
             alias = f"rel{alias_seq[0]}"
+            absent_fields, absent_edges = arms[table]
             sub = self._tree_predicate(
-                node["where"], shared or set(), params,
+                node["where"], union, params,
                 entity_type=table, scope=f"{alias}.", alias_seq=alias_seq,
+                absent_fields=absent_fields, absent_edges=absent_edges,
             )
             match = self._inverse_match(inv, alias, f'{outer}"id"')
             clauses.append(
