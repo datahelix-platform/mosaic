@@ -1792,6 +1792,104 @@ def _ingest_batch_resolver(
 # ---------------------------------------------------------------------------
 
 
+def _abstract_sdk_filters(
+    builder: GraphQLTypeBuilder, abstract: str, filters: Optional[list[FilterInput]]
+) -> list[dict[str, Any]]:
+    """Flat filters on an abstract anchor (ADR-0014 Decision 3): only the
+    slots every kind shares (the interface's fields) and ``id``; a slot
+    only some kinds have is rejected as unknown, never a silent empty."""
+    names: dict[str, str] = {"id": "id"}
+    for ref in builder.interface_ref_filters.get(abstract, ()):
+        names[ref] = ref
+        names[camel_case(ref)] = ref
+    for spec in builder.interface_slots[abstract]:
+        names[spec.slot_name] = spec.slot_name
+        names[spec.attr_name] = spec.slot_name
+        names[camel_case(spec.attr_name)] = spec.slot_name
+    out: list[dict[str, Any]] = []
+    for f in filters or []:
+        slot = names.get(f.field)
+        if slot is None:
+            raise GraphQLError(
+                f"Unknown filter field {f.field!r} for {abstract}: filters on "
+                f"a general category match only the fields every kind has: "
+                f"{', '.join(sorted(set(names.values())))}. Query a specific "
+                f"kind's own collection to filter on its other fields.",
+                extensions={"code": "UNKNOWN_FILTER_FIELD", "field": f.field},
+            )
+        out.append({"field": slot, "value": f.value, "op": f.op.value})
+    return out
+
+
+def _make_abstract_list_resolver(
+    builder: GraphQLTypeBuilder, abstract: str, accessor: str
+):
+    page_type = builder.interface_pages[abstract]
+
+    def resolver(
+        info: Info,
+        filters: Optional[list[FilterInput]] = None,
+        filter_mode: FilterMode = FilterMode.AND,
+        limit: int = 100,
+        offset: int = 0,
+    ):
+        b = _builder(info)
+        try:
+            paginated = _client(info).query(
+                entity_type=abstract,
+                filters=_abstract_sdk_filters(b, abstract, filters),
+                limit=limit,
+                offset=offset,
+                filter_mode=filter_mode.value,
+            )
+        except MosaicValidationError as exc:
+            raise _as_graphql_error(exc) from exc
+        return page_type(
+            items=[
+                b.instance_from_envelope(item.get("entity_type") or abstract, item)
+                for item in paginated.items
+            ],
+            total=paginated.total,
+            limit=paginated.limit,
+            offset=paginated.offset,
+        )
+
+    resolver.__name__ = accessor
+    resolver.__doc__ = (
+        f"List every {abstract} across its kinds (read-only; ADR-0014 "
+        f"Decision 3). Each item is its concrete type: select shared fields "
+        f"directly and kind-only fields with `... on <Kind>`. `filters` match "
+        f"the fields every kind has."
+    )
+    resolver.__annotations__["return"] = page_type
+    return resolver
+
+
+def _make_abstract_count_resolver(
+    builder: GraphQLTypeBuilder, abstract: str, accessor: str
+):
+    def resolver(
+        info: Info,
+        filters: Optional[list[FilterInput]] = None,
+        filter_mode: FilterMode = FilterMode.AND,
+    ) -> int:
+        try:
+            return _client(info).count(
+                entity_type=abstract,
+                filters=_abstract_sdk_filters(_builder(info), abstract, filters),
+                filter_mode=filter_mode.value,
+            )
+        except MosaicValidationError as exc:
+            raise _as_graphql_error(exc) from exc
+
+    resolver.__name__ = f"{accessor}_count"
+    resolver.__doc__ = (
+        f"Count every {abstract} across its kinds matching `filters` "
+        f"(equals the `{accessor}` list's total)."
+    )
+    return resolver
+
+
 def build_query_type(builder: GraphQLTypeBuilder) -> type:
     fields = []
     for entity in builder.entities.values():
@@ -1829,6 +1927,19 @@ def build_query_type(builder: GraphQLTypeBuilder) -> type:
             strawberry.field(
                 resolver=_make_field_range_resolver(builder, entity),
                 name=camel_case(f"{entity.plural_name}_field_range"),
+            )
+        )
+    for abstract, accessor in builder.interface_accessors.items():
+        fields.append(
+            strawberry.field(
+                resolver=_make_abstract_list_resolver(builder, abstract, accessor),
+                name=camel_case(accessor),
+            )
+        )
+        fields.append(
+            strawberry.field(
+                resolver=_make_abstract_count_resolver(builder, abstract, accessor),
+                name=camel_case(f"{accessor}_count"),
             )
         )
     fields.append(

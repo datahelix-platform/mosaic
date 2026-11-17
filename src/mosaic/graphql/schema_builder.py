@@ -52,7 +52,7 @@ from mosaic.core.schema_typing import (
     SlotModel,
     build_type_model,
 )
-from mosaic.linkml_bridge import SchemaRegistry
+from mosaic.linkml_bridge import class_accessor_name, SchemaRegistry
 
 # ISO-8601 passthrough scalars. Mosaic stores temporal values as ISO
 # strings (SQLite TEXT columns); these scalars document the format
@@ -320,6 +320,17 @@ class GraphQLTypeBuilder:
         self.type_model: dict[str, EntityTypeModel] = {}
         self.entities: dict[str, EntityGraphQLInfo] = {}
         self.enums: dict[str, type] = {}
+        #: Interface type per qualifying abstract class (ADR-0014 Decision 2,
+        #: #228), and the induced slot specs it carries.
+        self.interfaces: dict[str, type] = {}
+        self.interface_slots: dict[str, list[SlotSpec]] = {}
+        #: Read-only abstract anchors (ADR-0014 Decision 3): accessor name
+        #: and ``<Class>Page`` type per interface.
+        self.interface_accessors: dict[str, str] = {}
+        #: Single-valued references every kind shares (e.g. ``donor``):
+        #: filterable by id on the abstract anchor.
+        self.interface_ref_filters: dict[str, set[str]] = {}
+        self.interface_pages: dict[str, type] = {}
         self._built = False
 
     # -- public surface ----------------------------------------------------
@@ -415,6 +426,21 @@ class GraphQLTypeBuilder:
                 c for c in self._registry.concrete_closure(class_name)
                 if c != class_name and c in self.entities
             ]
+        # ADR-0014 Decision 2 (#228, first slice): an abstract class that is
+        # the range of an exposed reference and has an exposed concrete
+        # descendant gets an interface; a reference ranged on it resolves to
+        # the interface instead of falling back to a raw id.
+        targets = {
+            slot.target_class
+            for model in self.type_model.values()
+            for slot in model.fields
+            if slot.kind is SlotKind.REFERENCE and slot.target_class
+        }
+        self._interface_names = sorted(
+            t for t in targets
+            if t not in self.entities
+            and any(c in self.entities for c in self._registry.concrete_closure(t))
+        )
 
     def _build_enums(self) -> None:
         # Enum membership comes from the type model's slot classification
@@ -491,7 +517,10 @@ class GraphQLTypeBuilder:
             # raw field keeps/derives an ``*_id`` name; the resolved field
             # uses the natural slot name when the target has a generated
             # type, enabling graph traversal in one query.
-            resolvable = slot.target_class in self.entities
+            resolvable = (
+                slot.target_class in self.entities
+                or slot.target_class in getattr(self, "_interface_names", ())
+            )
             if slot.multivalued:
                 raw = slot.name if slot.name.endswith("_ids") else f"{slot.name}_ids"
                 resolved = (
@@ -569,8 +598,10 @@ class GraphQLTypeBuilder:
     def _build_object_types(self) -> None:
         # Pass 1 — bare classes so relationship annotations can use real
         # class objects (handles cycles and self-references).
+        self._build_interfaces()
         bare: dict[str, type] = {
-            name: type(name, (), {}) for name in self.entities
+            name: type(name, self._interface_bases(name), {})
+            for name in self.entities
         }
 
         # Pass 2 — attach fields and decorate.
@@ -643,7 +674,10 @@ class GraphQLTypeBuilder:
                 annotations[spec.attr_name] = self._output_annotation(spec)
                 setattr(cls, spec.attr_name, None)
                 if spec.kind == "reference" and spec.resolvable:
-                    target = bare[spec.target_class]  # type: ignore[index]
+                    target = (
+                        bare.get(spec.target_class)  # type: ignore[arg-type]
+                        or self.interfaces[spec.target_class]  # type: ignore[index]
+                    )
                     resolver = self._make_reference_resolver(spec, target)
                     setattr(
                         cls,
@@ -713,10 +747,135 @@ class GraphQLTypeBuilder:
                 cls, description=model.description or None
             )
 
+    def _interface_bases(self, class_name: str) -> tuple[type, ...]:
+        """The interfaces a concrete class implements: those of its
+        qualifying abstract ancestors, most specific only (an interface
+        already extends its own qualifying ancestors)."""
+        mine = [
+            a for a in self._interface_names
+            if class_name in self._registry.concrete_closure(a)
+        ]
+        # Drop an interface when a more specific one of ours extends it.
+        specific = [
+            a for a in mine
+            if not any(a in self._interface_ancestors(b) for b in mine if b != a)
+        ]
+        return tuple(self.interfaces[a] for a in specific)
+
+    def _interface_ancestors(self, abstract: str) -> list[str]:
+        """Qualifying abstract ancestors of ``abstract`` (excluding it)."""
+        ancestors = self._registry.schema_view.class_ancestors(abstract) or []
+        return [a for a in ancestors if a != abstract and a in self._interface_names]
+
+    def _build_interfaces(self) -> None:
+        """One Strawberry interface per qualifying abstract class (ADR-0014
+        Decision 2, #228 first slice). It carries ``id`` and the scalar and
+        enum slots every exposed concrete descendant has (the induced slots
+        as stored); references on the interface are a later increment."""
+        # Parents first, so an interface can extend its parent's.
+        order = sorted(self._interface_names, key=lambda a: len(self._interface_ancestors(a)))
+        for abstract in order:
+            members = [
+                c for c in self._registry.concrete_closure(abstract)
+                if c in self.entities
+            ]
+            per_member = []
+            for c in members:
+                model = self.entities[c].model
+                assert model is not None
+                per_member.append({
+                    s.name: s for s in model.fields
+                    if s.kind is not SlotKind.REFERENCE
+                })
+            common = set.intersection(*(set(m) for m in per_member)) if per_member else set()
+            # A slot narrowed differently per kind (``format``: solid vs
+            # liquid enum) has no single interface type: keep only slots
+            # whose range and cardinality agree across every member.
+            common = {
+                n for n in common
+                if len({(m[n].range, m[n].multivalued) for m in per_member}) == 1
+            }
+            specs: list[SlotSpec] = []
+            annotations: dict[str, Any] = {}
+            for name in sorted(common):
+                spec = self._slot_spec(per_member[0][name])
+                if name in ("id", "is_available"):
+                    continue
+                base = spec.enum_cls if spec.kind == "enum" else spec.scalar_type
+                annotations[spec.attr_name] = (
+                    Optional[list[base]] if spec.multivalued else Optional[base]
+                )
+                specs.append(spec)
+            annotations = {"id": strawberry.ID, **annotations}
+            parents = [self.interfaces[p] for p in self._interface_ancestors(abstract)[:1]]
+            cls = type(abstract, tuple(parents), {})
+            for attr in annotations:
+                if attr != "id":
+                    setattr(cls, attr, None)
+            cls.__annotations__ = annotations
+            cdef = self._registry.schema_view.get_class(abstract)
+            self.interfaces[abstract] = strawberry.interface(
+                cls,
+                description=(
+                    (cdef.description if cdef is not None else None)
+                    or f"Any kind of {abstract}: "
+                    f"{', '.join(members)} (ADR-0014)."
+                ),
+            )
+            self.interface_slots[abstract] = specs
+            refs = [
+                {s.name: s for s in self.entities[c].model.fields  # type: ignore[union-attr]
+                 if s.kind is SlotKind.REFERENCE and not s.multivalued and not s.inverse_of}
+                for c in members
+            ]
+            self.interface_ref_filters[abstract] = {
+                n for n in (set.intersection(*(set(r) for r in refs)) if refs else set())
+                if len({r[n].target_class for r in refs}) == 1
+            }
+            self._build_interface_anchor(abstract, members)
+
+    def _build_interface_anchor(self, abstract: str, members: list[str]) -> None:
+        """Accessor name and ``<Class>Page`` for an abstract anchor
+        (ADR-0014 Decision 3). Skipped, with a warning, when the accessor
+        would collide with a concrete class's accessor."""
+        cdef = self._registry.schema_view.get_class(abstract)
+        accessor = class_accessor_name(abstract, cdef)
+        taken = {e.plural_name for e in self.entities.values()}
+        if accessor in taken:
+            warnings.warn(
+                f"{abstract}: abstract anchor accessor '{accessor}' collides "
+                f"with a concrete class's accessor; no '{accessor}' query is "
+                f"generated for it (ADR-0014 Decision 3).",
+                stacklevel=2,
+            )
+            return
+        self.interface_accessors[abstract] = accessor
+        page = type(f"{abstract}Page", (), {})
+        page.__annotations__ = {
+            "items": list[self.interfaces[abstract]],  # type: ignore[valid-type]
+            "total": int,
+            "limit": int,
+            "offset": int,
+        }
+        self.interface_pages[abstract] = strawberry.type(
+            page,
+            description=(
+                f"Offset-paginated {abstract} result set across its kinds "
+                f"({', '.join(members)}); each item is its own concrete type."
+            ),
+        )
+
     def _make_reference_resolver(self, spec: SlotSpec, target: type) -> Any:
         builder = self
         target_class: str = spec.target_class  # type: ignore[assignment]
         raw_attr = spec.attr_name
+        polymorphic = target_class not in self.entities
+
+        def render(env: dict[str, Any]) -> Any:
+            # An interface target (ADR-0014 Decision 2) renders each row as
+            # its own concrete type, so ``__typename`` names the leaf.
+            cls = env.get("entity_type") if polymorphic else target_class
+            return builder.instance_from_envelope(cls or target_class, env)
 
         if spec.multivalued:
 
@@ -724,11 +883,7 @@ class GraphQLTypeBuilder:
                 ids = getattr(self, raw_attr) or []
                 loader = get_entity_loader(info.context, target_class)
                 envelopes = await loader.load_many([str(i) for i in ids])
-                return [
-                    builder.instance_from_envelope(target_class, env)
-                    for env in envelopes
-                    if env is not None
-                ]
+                return [render(env) for env in envelopes if env is not None]
 
             resolver.__annotations__["return"] = list[target]  # type: ignore[valid-type]
         else:
@@ -741,7 +896,7 @@ class GraphQLTypeBuilder:
                 envelope = await loader.load(str(ref_id))
                 if envelope is None:
                     return None
-                return builder.instance_from_envelope(target_class, envelope)
+                return render(envelope)
 
             resolver.__annotations__["return"] = Optional[target]
         return resolver

@@ -22,15 +22,19 @@ def collection_classes(registry: Any, query: "Query") -> list[str]:
 
     ``[query.entity_type]`` unless ``query.include_subclasses`` is set and
     the class is a concrete parent, in which case its concrete closure
-    (the class itself first). An abstract ``entity_type`` keeps its own
-    name: abstract anchors are ADR-0014 Decisions 2-5 (#228), not this
+    (the class itself first). An abstract ``entity_type`` is an abstract
+    anchor (ADR-0014 Decision 3, #228): its concrete closure, whatever the
     flag. Callers check that the type is non-empty first.
     """
     entity_type = query.entity_type
-    if not getattr(query, "include_subclasses", False) or registry is None:
+    if registry is None:
         return [entity_type]
     closure = registry.concrete_closure(entity_type)
-    if not closure or closure[0] != entity_type:
+    if closure and closure[0] != entity_type:
+        # Abstract anchor (ADR-0014 Decision 3, #228): the class has no rows
+        # of its own, so its collection is always its concrete closure.
+        return list(closure)
+    if not getattr(query, "include_subclasses", False) or not closure:
         return [entity_type]
     return list(closure)
 

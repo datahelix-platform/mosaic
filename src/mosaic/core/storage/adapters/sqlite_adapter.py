@@ -2815,7 +2815,7 @@ class SQLiteAdapter(EntityStore):
             yield from self._find_as_of(query, as_of)
             return
         if query.entity_type:
-            if not self._per_class_table_exists(query.entity_type):
+            if not self._anchor_exists(query.entity_type):
                 return
             yield from self._find_per_class(
                 query.entity_type, query, self._collection_tables(query)
@@ -3558,10 +3558,28 @@ class SQLiteAdapter(EntityStore):
                 superseded_by=row["superseded_by"],
             )
 
+    def _anchor_exists(self, entity_type: str) -> bool:
+        """``entity_type`` has rows to read: its own per-class table, or —
+        for an abstract anchor (ADR-0014 Decision 3, #228) — at least one
+        concrete descendant's table."""
+        if self._per_class_table_exists(entity_type):
+            return True
+        return bool(self._closure_tables(entity_type))
+
     def _valid_query_columns(self, entity_type: str) -> set[str]:
         """Columns filters/ordering/aggregation may address on a per-class
         table — the slot columns plus ``id``/``is_available`` (identical to
-        the set ``_find_per_class`` validates against, by construction)."""
+        the set ``_find_per_class`` validates against, by construction).
+
+        An abstract anchor has no table of its own: its columns are the
+        ones every table of its concrete closure has (the induced slots,
+        ADR-0014 Decision 3); a subclass-only slot stays unknown."""
+        if not self._per_class_table_exists(entity_type):
+            tables = self._closure_tables(entity_type)
+            if tables:
+                return set.intersection(
+                    *(self._valid_query_columns(t) for t in tables)
+                )
         slot_columns = {
             c for c in self._per_class_columns(entity_type)
             if c not in {"id", "is_available", "superseded_by"}
@@ -3597,7 +3615,11 @@ class SQLiteAdapter(EntityStore):
 
         total = 0
         for class_name in class_names:
-            if not self._per_class_table_exists(class_name):
+            exists = (
+                self._anchor_exists(class_name) if query.entity_type
+                else self._per_class_table_exists(class_name)
+            )
+            if not exists:
                 continue
             # A typed count spans the same closure ``find`` lists (ADR-0014).
             source, _ = self._collection_source(
