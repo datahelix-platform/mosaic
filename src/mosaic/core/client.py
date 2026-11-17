@@ -807,10 +807,19 @@ class MosaicClient:
         entity_id: str,
         expand: Optional[str] = None,
         include_unavailable: bool = False,
+        include_subclasses: bool = True,
     ) -> dict[str, Any]:
-        """Get an entity by its ID."""
+        """Get an entity by its ID.
+
+        A concrete parent (``Process`` with ``BankBrain``) finds its
+        subclasses' rows too, as its ``query`` lists them (ADR-0014
+        Decision 1): the envelope's ``entity_type`` names the row's
+        concrete class. ``include_subclasses=False`` keeps the type-exact
+        lookup (not found for a subclass row).
+        """
         return self._query_service.get(
-            entity_type, entity_id, expand, include_unavailable
+            entity_type, entity_id, expand, include_unavailable,
+            include_subclasses=include_subclasses,
         )
 
     def resolve_type(self, entity_id: str) -> Optional[str]:

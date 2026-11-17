@@ -46,8 +46,16 @@ class QueryService:
         entity_id: str,
         expand: Optional[str] = None,
         include_unavailable: bool = False,
+        include_subclasses: bool = True,
     ) -> dict[str, Any]:
-        """Get an entity by its ID."""
+        """Get an entity by its ID.
+
+        A concrete parent resolves the id over its concrete closure, like its
+        collection does (ADR-0014 Decision 1, 2026-11-17 amendment):
+        ``get("Process", bb_id)`` returns the ``BankBrain`` row, with its
+        concrete ``entity_type`` and full stored data.
+        ``include_subclasses=False`` keeps the type-exact lookup.
+        """
         if self._storage is None:
             raise EntityNotFoundError(
                 message=f"Entity not found: {entity_id}",
@@ -61,14 +69,18 @@ class QueryService:
             entity = self._storage.read(entity_id)
             if entity is None and hasattr(self._storage, "read_any"):
                 any_entity = self._storage.read_any(entity_id)
-                if any_entity is not None and any_entity.entity_type == entity_type:
+                if any_entity is not None and self._type_accepts(
+                    entity_type, any_entity.entity_type, include_subclasses
+                ):
                     raise EntityNotFoundError(
                         message=f"Entity not found: {entity_id}",
                         entity_type=entity_type,
                         entity_id=entity_id,
                     )
 
-        if entity is None or entity.entity_type != entity_type:
+        if entity is None or not self._type_accepts(
+            entity_type, entity.entity_type, include_subclasses
+        ):
             raise EntityNotFoundError(
                 message=f"Entity not found: {entity_id}",
                 entity_type=entity_type,
@@ -140,6 +152,25 @@ class QueryService:
             result["_expanded"] = fetch_result.expanded_data
 
         return result
+
+    def _type_accepts(
+        self, requested: str, actual: str, include_subclasses: bool
+    ) -> bool:
+        """Whether a row of class ``actual`` answers a lookup for
+        ``requested``: the same class, or, with ``include_subclasses``, a
+        class of ``requested``'s concrete closure when ``requested`` is a
+        concrete parent. Abstract classes keep the exact match: abstract
+        anchors are ADR-0014 Decisions 2-5 (#228). The same set
+        ``collection_classes`` lists."""
+        if actual == requested:
+            return True
+        if not include_subclasses:
+            return False
+        registry = getattr(self._storage, "schema_registry", None)
+        if registry is None:
+            return False
+        closure = registry.concrete_closure(requested)
+        return bool(closure) and closure[0] == requested and actual in closure
 
     def _parse_and_validate_expand(self, expand: str) -> Any:
         """Parse and validate an expand path."""

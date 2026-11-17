@@ -247,3 +247,12 @@ parent:
   its class. Today no concrete subclass of an exposed class can be unexposed; this rule is fixed
   now so that Decision 5's `hippo_anchor: false` opt-out hides the subclass's own accessor without
   hiding its rows from the parent or dropping `entityType`.
+- **Amended 2026-11-17 (labadorf, #276 review, ruling D3 = (a)): by-id lookup through a concrete
+  parent is closure-aware.** Decision 1's "accessor" covers the single get as well as the list:
+  `MosaicClient.get("Process", id)` (and so GraphQL `process(id:)`, REST and the typed client)
+  returns a `BankBrain` row whose id it is given, with its concrete `entity_type` and full stored
+  data, rendered in GraphQL as the parent type with `entityType` naming the subclass.
+  `get(..., include_subclasses=False)` keeps the type-exact lookup, and a migration transform's
+  `ctx.client.get` defaults to it. A leaf still does not answer for its parent's or a sibling's
+  row, and an abstract class keeps the exact match until abstract anchors land (Decisions 2–5,
+  #228).

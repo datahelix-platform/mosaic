@@ -294,6 +294,34 @@ class ClosureSDKCases:
                 with pytest.raises(ValidationError):
                     _ids(client, base, where)
 
+    # -- ADR-0014 Decision 1 amendment (D3 = closure-aware by-id lookup) ---
+
+    def test_get_through_concrete_parent_finds_subclass_row(self, client):
+        row = client.get("Process", "bb1")
+        assert row["entity_type"] == "BankBrain"
+        assert row["data"]["site"] == "A"
+        assert client.get("Person", "d1")["entity_type"] == "Donor"
+        # The parent's own rows and the leaf's own lookup are unchanged.
+        assert client.get("Process", "pr1")["entity_type"] == "Process"
+        assert client.get("BankBrain", "bb1")["entity_type"] == "BankBrain"
+
+    def test_get_through_parent_stays_type_checked(self, client):
+        import pytest
+
+        from mosaic.core.exceptions import EntityNotFoundError
+
+        # Opt-out keeps the type-exact lookup.
+        with pytest.raises(EntityNotFoundError):
+            client.get("Process", "bb1", include_subclasses=False)
+        # A leaf does not answer for its parent's row, nor a sibling class.
+        with pytest.raises(EntityNotFoundError):
+            client.get("BankBrain", "pr1")
+        with pytest.raises(EntityNotFoundError):
+            client.get("Process", "d1")
+        # Abstract classes keep the exact match (abstract anchors are #228).
+        with pytest.raises(EntityNotFoundError):
+            client.get("Sample", "br1")
+
     def test_neighbors_reverse_column_edge_reaches_subclass_row(self, client):
         result = client.neighbors("bb1", depth=1)
         edges = {(e["source"], e["target"], e["type"]) for e in result["edges"]}
@@ -378,6 +406,19 @@ class ClosureGraphQLCases:
         data = gql('{ measurements { items { id person { entityType } } } }')
         by_id = {i["id"]: i["person"]["entityType"] for i in data["measurements"]["items"]}
         assert by_id == {"m1": "Donor", "m2": "Person"}
+
+    def test_by_id_through_concrete_parent_finds_subclass_row(self, gql):
+        data = gql('{ process(id: "bb1") { id name entityType __typename } '
+                   'person(id: "d1") { id entityType } '
+                   'plain: process(id: "pr1") { entityType } '
+                   'wrong: process(id: "d1") { id } }')
+        assert data["process"] == {
+            "id": "bb1", "name": "banked", "entityType": "BankBrain",
+            "__typename": "Process",
+        }
+        assert data["person"] == {"id": "d1", "entityType": "Donor"}
+        assert data["plain"] == {"entityType": "Process"}
+        assert data["wrong"] is None
 
     def test_entity_type_is_non_null_and_only_on_concrete_parents(self, gql):
         def fields(type_name):

@@ -103,6 +103,12 @@
   `ctx.client.query("Subject")` still reads only `Subject` rows and a
   subclass row is never re-migrated as its parent. A transform that wants
   the closure passes `include_subclasses=True` explicitly.
+- **By-id lookup through a concrete parent finds subclass rows** (ADR-0014
+  amendment 2026-11-17, #276). `MosaicClient.get("Process", id)` returns
+  a `BankBrain` row (its `entity_type` names `BankBrain`) instead of
+  raising not-found, and GraphQL `process(id:)`, REST and the typed client
+  follow; `get` takes `include_subclasses=False` for the type-exact lookup.
+  A leaf class's `get` and an abstract class's are unchanged.
 - **Leaf-only names under a closure edge read as NULL** (ADR-0014
   amendment 2026-11-17, #276). A nested `where` on an edge whose range
   spans several classes (an abstract range, or a concrete parent with

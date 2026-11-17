@@ -245,9 +245,9 @@ class MigrationReadView:
     concrete closure (ADR-0014 Decision 1), so a transform that migrates
     ``query("Subject")`` as ``Subject`` would also see, and re-migrate,
     every ``BrainDonor`` row. This view flips the default:
-    :meth:`query` and :meth:`count` read exactly the named class unless
-    the caller passes ``include_subclasses=True``. Every other attribute
-    delegates to the wrapped client unchanged.
+    :meth:`query`, :meth:`count` and :meth:`get` read exactly the named
+    class unless the caller passes ``include_subclasses=True``. Every other
+    attribute delegates to the wrapped client unchanged.
     """
 
     def __init__(self, client: "MosaicClient") -> None:
@@ -270,6 +270,12 @@ class MigrationReadView:
             *args, include_subclasses=include_subclasses, **kwargs
         )
 
+    def get(self, *args: Any, include_subclasses: bool = False, **kwargs: Any):
+        """``MosaicClient.get`` with ``include_subclasses=False`` by default."""
+        return self._client.get(
+            *args, include_subclasses=include_subclasses, **kwargs
+        )
+
     def __getattr__(self, name: str) -> Any:
         return getattr(self._client, name)
 
@@ -282,7 +288,7 @@ class MigrationContext:
     ``ctx.client.query(type).items``) and stage new-shape records via
     ``ctx.plan`` (:meth:`MigrationPlan.migrate` / ``put`` / ``supersede``).
     ``ctx.client`` is a :class:`MigrationReadView`: its ``query`` /
-    ``count`` read exactly the named class by default, so a concrete
+    ``count`` / ``get`` read exactly the named class by default, so a concrete
     parent's transform does not see (and re-migrate) its subclasses' rows
     (ADR-0014 Decision 1). Pass ``include_subclasses=True`` to read the
     concrete closure deliberately.

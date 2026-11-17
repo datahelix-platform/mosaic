@@ -564,6 +564,18 @@ class TestMigrationReadView:
         assert {i["id"] for i in page.items} == {"s1", "bd1"}
         assert ctx.client.count("Subject", include_subclasses=True) == 2
 
+    def test_get_is_type_exact_by_default(self, client: MosaicClient) -> None:
+        from mosaic.core.exceptions import EntityNotFoundError
+
+        self._seed(client)
+        ctx = self._ctx(client)
+        with pytest.raises(EntityNotFoundError):
+            ctx.client.get("Subject", "bd1")
+        assert ctx.client.get("Subject", "bd1", include_subclasses=True)[
+            "entity_type"] == "BrainDonor"
+        # The plain client resolves it over the closure.
+        assert client.get("Subject", "bd1")["entity_type"] == "BrainDonor"
+
     def test_other_reads_delegate(self, client: MosaicClient) -> None:
         self._seed(client)
         ctx = self._ctx(client)
