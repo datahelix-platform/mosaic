@@ -240,7 +240,12 @@ class SDKBackend:
         summaries: list[EntityTypeSummary] = []
         for name in self._entity_type_names():
             try:
-                count = client.query(entity_type=name, limit=1).total
+                # Type-exact: a concrete parent's query spans its subclasses
+                # (ADR-0014 Decision 1), which would count each subclass row
+                # twice across the sidebar and disagree with status().
+                count = client.query(
+                    entity_type=name, limit=1, include_subclasses=False
+                ).total
             except Exception:  # noqa: BLE001 — count failure must not kill sidebar
                 count = 0
             cls = registry.get_class(name) if registry is not None else None

@@ -693,12 +693,22 @@ class GraphQLTypeBuilder:
                 entity.computed_fields.append(name)
 
             if entity.closure_subclasses:
-                if ENTITY_TYPE_FIELD in slot_names:
-                    raise ValueError(
-                        f"{class_name}.{ENTITY_TYPE_FIELD}: the slot collides "
-                        f"with the entityType system field a concrete parent "
-                        f"carries (ADR-0014 Decision 1). Rename the slot."
-                    )
+                # Any slot whose GraphQL field (camelCased attribute, or a
+                # reference's resolved edge and its count) would be named
+                # ``entityType`` collides, not just a slot named
+                # ``entity_type``.
+                gql_entity_type = camel_case(ENTITY_TYPE_FIELD)
+                for spec in entity.slots:
+                    names = {spec.slot_name, camel_case(spec.attr_name)}
+                    if spec.resolved_attr:
+                        names.add(camel_case(spec.resolved_attr))
+                    if ENTITY_TYPE_FIELD in names or gql_entity_type in names:
+                        raise ValueError(
+                            f"{class_name}.{spec.slot_name}: the slot "
+                            f"collides with the entityType system field a "
+                            f"concrete parent carries (ADR-0014 Decision 1). "
+                            f"Rename the slot."
+                        )
                 annotations[ENTITY_TYPE_FIELD] = str
                 setattr(
                     cls,

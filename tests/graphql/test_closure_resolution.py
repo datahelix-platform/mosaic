@@ -87,3 +87,48 @@ class TestUnexposedSubclassConsistency:
         )
         fields = {f["name"]: f["type"] for f in data["__type"]["fields"]}
         assert fields["entityType"] == {"kind": "NON_NULL", "ofType": {"name": "String"}}
+
+
+class TestEntityTypeCollisionGuard:
+    """#276 WP5: a concrete parent's slot whose GraphQL name would be
+    ``entityType`` collides with the system field, however it is spelled."""
+
+    _SCHEMA = """\
+id: https://example.org/collide
+name: collide
+prefixes:
+  linkml: https://w3id.org/linkml/
+imports:
+  - linkml:types
+  - hippo_core
+default_range: string
+classes:
+  Process:
+    is_a: Entity
+    attributes:
+      name:
+      {slot}:
+  BankBrain:
+    is_a: Process
+"""
+
+    @pytest.mark.parametrize("slot", ["entity_type", "entityType"])
+    def test_colliding_slot_on_concrete_parent_is_rejected(self, slot):
+        from mosaic.linkml_bridge import SchemaRegistry
+
+        registry = SchemaRegistry.from_yaml(self._SCHEMA.format(slot=slot))
+        with pytest.raises(
+            ValueError,
+            match=rf"Process\.{slot}: the slot collides with the entityType "
+                  r"system field a concrete parent carries",
+        ):
+            GraphQLTypeBuilder(registry).build()
+
+    def test_same_slot_on_a_leaf_is_fine(self):
+        from mosaic.linkml_bridge import SchemaRegistry
+
+        schema = self._SCHEMA.format(slot="entityType").replace(
+            "  BankBrain:\n    is_a: Process\n", ""
+        )
+        builder = GraphQLTypeBuilder(SchemaRegistry.from_yaml(schema)).build()
+        assert "Process" in builder.entities

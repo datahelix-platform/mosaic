@@ -75,8 +75,9 @@
   subclass row reached through the parent renders as the parent type
   (`__typename` names the parent). The subclass set is the same full
   concrete closure the parent's collection lists, so a subclass without
-  its own GraphQL type still gets its rows named. Leaf types are unchanged. A slot named
-  `entity_type` on such a class is a build-time error.
+  its own GraphQL type still gets its rows named. Leaf types are unchanged. A slot whose
+  GraphQL field would be `entityType` (`entity_type`, `entityType`) on such
+  a class is a build-time error.
 - **`include_subclasses` on `MosaicClient.query` / `count`** (default
   `True`; public SDK API per the ADR-0014 2026-11-17 amendment, not exposed
   by the transports). `False` reads exactly the named class's rows — the pre-ADR-0014
@@ -103,6 +104,10 @@
   `ctx.client.query("Subject")` still reads only `Subject` rows and a
   subclass row is never re-migrated as its parent. A transform that wants
   the closure passes `include_subclasses=True` explicitly.
+- **TUI sidebar counts a concrete parent's own rows** (#276). The SDK
+  backend's per-type counts pass `include_subclasses=False`, so a subclass
+  row is counted once (under its class) and the sidebar matches
+  `status()["entity_counts"]`.
 - **By-id lookup through a concrete parent finds subclass rows** (ADR-0014
   amendment 2026-11-17, #276). `MosaicClient.get("Process", id)` returns
   a `BankBrain` row (its `entity_type` names `BankBrain`) instead of
