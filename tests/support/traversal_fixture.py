@@ -9,14 +9,19 @@ both adapters answer the identical questions:
 - a two-hop path whose list is the second hop: ``donor -> samples -> name``;
 - a reverse hop declared on the derived side, as in the certification
   fixture (``Author.books``, ``inverse: author``);
-- a reference ranged on an abstract class (``Sample.protocol``), which the
-  manifest does not expose, so it is not a legal hop;
+- a reference ranged on an abstract class with no concrete kind
+  (``Sample.protocol``): not a family, so not in the manifest and not a
+  legal hop;
 - a reverse hop whose range has a concrete subclass (``Donor.samples`` also
   reaches ``SolidSample`` rows), so members are read under the class that
   holds them, not the declared range;
 - an anchor's subclass rows: since ADR-0014 Decision 1 (#276) a ``Sample``
   anchor also lists ``SolidSample`` rows (``s4``), whose hops are hydrated
-  like any other anchor's.
+  like any other anchor's;
+- a family (ADR-0014 Decisions 2-6, #278): ``Specimen`` is abstract with
+  kinds ``Tissue`` and ``Fluid``. ``Donor.specimens`` is a reverse hop onto
+  it, ``Specimen`` is an anchor, and a kind-only leaf (``organ``) reads as
+  null on the other kind.
 """
 
 from __future__ import annotations
@@ -33,6 +38,8 @@ CLASSES: dict[str, Any] = {
             "name": {"range": "string", "required": True},
             "age_at_death": {"range": "integer"},
             "samples": {"range": "Sample", "multivalued": True, "inverse": "donor"},
+            # A reverse hop onto a family (abstract range with kinds).
+            "specimens": {"range": "Specimen", "multivalued": True, "inverse": "donor"},
         }
     },
     "Sample": {
@@ -41,8 +48,9 @@ CLASSES: dict[str, Any] = {
             "name": {"range": "string", "required": True},
             "donor": {"range": "Donor"},
             "aliquots": {"range": "Aliquot", "multivalued": True},
-            # Ranged on an abstract class: not exposed, so not traversable
-            # (NOT_PREDICATE_FILTERABLE) until ADR-0014 exposes it.
+            # Ranged on an abstract class with no concrete kind: not a
+            # family, so not exposed and not traversable
+            # (NOT_PREDICATE_FILTERABLE).
             "protocol": {"range": "Protocol"},
         }
     },
@@ -50,6 +58,16 @@ CLASSES: dict[str, Any] = {
         "abstract": True,
         "attributes": {"id": {"identifier": True}, "title": {"range": "string"}},
     },
+    "Specimen": {
+        "abstract": True,
+        "attributes": {
+            "id": {"identifier": True},
+            "label": {"range": "string", "required": True},
+            "donor": {"range": "Donor"},
+        },
+    },
+    "Tissue": {"is_a": "Specimen", "attributes": {"organ": {"range": "string"}}},
+    "Fluid": {"is_a": "Specimen", "attributes": {"volume_ml": {"range": "float"}}},
     "SolidSample": {"is_a": "Sample", "attributes": {"mass_mg": {"range": "float"}}},
     "Aliquot": {
         "attributes": {
@@ -101,6 +119,9 @@ def seed(client: Any) -> None:
     put("Sample", {"id": "s2", "name": "S2", "donor": "d2", "aliquots": ["a3"]})
     put("Sample", {"id": "s3", "name": "S3"})
     put("SolidSample", {"id": "s4", "name": "S4", "donor": "d1", "mass_mg": 2.5, "aliquots": ["a4"]})
+    put("Tissue", {"id": "t1", "label": "T1", "donor": "d1", "organ": "brain"})
+    put("Fluid", {"id": "f1", "label": "F1", "donor": "d1", "volume_ml": 2.0})
+    put("Fluid", {"id": "f2", "label": "F2", "donor": "d2", "volume_ml": 1.0})
     put("Author", {"id": "au1", "name": "Le Guin"})
     put("Author", {"id": "au2", "name": "Nobody"})
     put("Book", {"id": "b1", "title": "The Dispossessed", "author": "au1"})
@@ -212,6 +233,31 @@ CASES: list[tuple[str, str, list[dict[str, Any]], list[tuple[str, dict[str, Any]
         "Donor",
         [{"path": ["samples", "name"], "mode": "joinIds"}, {"path": ["samples", "id"], "mode": "count"}],
         [("d1", {"samples.name": ["S1", "S4"], "samples.id": 2}), ("d2", {"samples.name": ["S2"], "samples.id": 1})],
+        None,
+    ),
+    (
+        "reverse hop onto a family",
+        "Donor",
+        [{"path": ["specimens", "label"], "mode": "joinIds"}, {"path": ["specimens", "id"], "mode": "count"}],
+        [("d1", {"specimens.label": ["F1", "T1"], "specimens.id": 2}), ("d2", {"specimens.label": ["F2"], "specimens.id": 1})],
+        None,
+    ),
+    (
+        "kind-only leaf through a family reads null on the other kind",
+        "Donor",
+        [{"path": ["specimens", "organ"], "mode": "explode"}],
+        [("d1", {"specimens.organ": None}), ("d1", {"specimens.organ": "brain"}), ("d2", {"specimens.organ": None})],
+        {"anchor": 2, "rows": 3, "edge": "specimens"},
+    ),
+    (
+        "family anchor with a forward hop",
+        "Specimen",
+        [{"path": ["label"]}, {"path": ["donor", "name"]}],
+        [
+            ("t1", {"label": "T1", "donor.name": "D1"}),
+            ("f1", {"label": "F1", "donor.name": "D1"}),
+            ("f2", {"label": "F2", "donor.name": "D2"}),
+        ],
         None,
     ),
 ]
