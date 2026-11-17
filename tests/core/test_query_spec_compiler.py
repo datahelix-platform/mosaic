@@ -455,7 +455,8 @@ class TestTraversalColumns:
         for row in rows:
             # `data` is trimmed to anchor-owned columns; the envelope stays.
             assert set(row["data"]) == anchor_slots
-            assert row["entity_type"] == anchor
+            # A subclass row (ADR-0014 Decision 1) keeps its concrete type.
+            assert row["entity_type"] in tclient.registry.concrete_closure(anchor)
 
     def test_hydration_is_batched_per_hop_not_per_anchor(self, tclient, monkeypatch):
         calls: list[str] = []

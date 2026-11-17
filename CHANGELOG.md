@@ -28,7 +28,8 @@
   resolution and one `id in [...]` query per concrete class — and reads each
   member under the class that actually holds it, so a reverse hop reaches a
   subclass's rows. It is adapter-agnostic: SQLite and Postgres run the same
-  cases. `asOf` with a reverse hop is refused (`ASOF_REVERSE_HOP_UNSUPPORTED`)
+  cases. An anchor on a concrete parent also lists its subclass rows (ADR-0014
+  Decision 1, #276); their hops hydrate the same way. `asOf` with a reverse hop is refused (`ASOF_REVERSE_HOP_UNSUPPORTED`)
   because as-of reconstruction does not rebuild derived reverse lists;
   forward hops work under `asOf`. The manifest now advertises
   `column_projection: "traversal"` (every `"anchor"` spec is accepted

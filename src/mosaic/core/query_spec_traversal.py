@@ -61,6 +61,10 @@ class _EntityCache:
                 entity_type=etype,
                 where={"field": "id", "op": "in", "value": type_ids},
                 as_of=self._as_of,
+                # Each id is already resolved to its exact class; a concrete
+                # parent's closure (ADR-0014 Decision 1) would only add
+                # tables that hold none of these ids.
+                include_subclasses=False,
             )
             for item in page.items:
                 self._by_id[item["id"]] = item

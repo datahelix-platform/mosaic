@@ -409,11 +409,13 @@ class TestExecuteTraversalColumns:
 
     async def test_to_one_chain(self, traversal_client):
         payload = await _execute(traversal_client, "Sample", [{"path": ["donor", "age_at_death"]}])
-        assert payload["valid"] is True and payload["total"] == 3
+        # `Sample` lists its subclass row s4 too (ADR-0014 Decision 1).
+        assert payload["valid"] is True and payload["total"] == 4
         assert _rows(payload) == [
             ("s1", {"donor.age_at_death": 71}),
             ("s2", {"donor.age_at_death": None}),
             ("s3", {"donor.age_at_death": None}),
+            ("s4", {"donor.age_at_death": 71}),
         ]
         assert "grain" not in payload
 
@@ -430,6 +432,7 @@ class TestExecuteTraversalColumns:
             ("s1", {"aliquots.volume_ul": 2, "aliquots.id": ["a1", "a2"]}),
             ("s2", {"aliquots.volume_ul": 1, "aliquots.id": ["a3"]}),
             ("s3", {"aliquots.volume_ul": 0, "aliquots.id": []}),
+            ("s4", {"aliquots.volume_ul": 1, "aliquots.id": ["a4"]}),
         ]
         assert "grain" not in payload
 
@@ -439,13 +442,14 @@ class TestExecuteTraversalColumns:
         )
         assert payload["valid"] is True
         # `total` still counts anchors; the grain says what a row is.
-        assert payload["total"] == 3
-        assert payload["grain"] == {"anchor": 3, "rows": 4, "edge": "aliquots"}
+        assert payload["total"] == 4
+        assert payload["grain"] == {"anchor": 4, "rows": 5, "edge": "aliquots"}
         assert _rows(payload) == [
             ("s1", {"name": "S1", "aliquots.volume_ul": 10.0}),
             ("s1", {"name": "S1", "aliquots.volume_ul": 20.0}),
             ("s2", {"name": "S2", "aliquots.volume_ul": 5.0}),
             ("s3", {"name": "S3", "aliquots.volume_ul": None}),
+            ("s4", {"name": "S4", "aliquots.volume_ul": 2.0}),
         ]
         assert [i["data"] for i in payload["items"]][:2] == [{"name": "S1"}, {"name": "S1"}]
 
@@ -484,6 +488,7 @@ class TestExecuteTraversalColumns:
             ("s1", {"aliquots.container.kind": ["tube", "plate"]}),
             ("s2", {"aliquots.container.kind": []}),
             ("s3", {"aliquots.container.kind": []}),
+            ("s4", {"aliquots.container.kind": ["tube"]}),
         ]
 
     async def test_pagination_pages_anchors_not_rows(self, traversal_client):
@@ -501,7 +506,7 @@ class TestExecuteTraversalColumns:
                 "limit": 1,
             },
         )
-        assert payload["total"] == 3
+        assert payload["total"] == 4
         assert _rows(payload) == [("s1", {"aliquots.label": "A1"}), ("s1", {"aliquots.label": "A2"})]
         assert payload["grain"] == {"anchor": 1, "rows": 2, "edge": "aliquots"}
 

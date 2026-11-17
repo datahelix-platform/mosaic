@@ -13,7 +13,10 @@ both adapters answer the identical questions:
   manifest does not expose, so it is not a legal hop;
 - a reverse hop whose range has a concrete subclass (``Donor.samples`` also
   reaches ``SolidSample`` rows), so members are read under the class that
-  holds them, not the declared range.
+  holds them, not the declared range;
+- an anchor's subclass rows: since ADR-0014 Decision 1 (#276) a ``Sample``
+  anchor also lists ``SolidSample`` rows (``s4``), whose hops are hydrated
+  like any other anchor's.
 """
 
 from __future__ import annotations
@@ -93,10 +96,11 @@ def seed(client: Any) -> None:
     put("Aliquot", {"id": "a1", "label": "A1", "volume_ul": 10.0, "container": "c1"})
     put("Aliquot", {"id": "a2", "label": "A2", "volume_ul": 20.0, "container": "c2"})
     put("Aliquot", {"id": "a3", "label": "A3", "volume_ul": 5.0})
+    put("Aliquot", {"id": "a4", "label": "A4", "volume_ul": 2.0, "container": "c1"})
     put("Sample", {"id": "s1", "name": "S1", "donor": "d1", "aliquots": ["a1", "a2"]})
     put("Sample", {"id": "s2", "name": "S2", "donor": "d2", "aliquots": ["a3"]})
     put("Sample", {"id": "s3", "name": "S3"})
-    put("SolidSample", {"id": "s4", "name": "S4", "donor": "d1", "mass_mg": 2.5})
+    put("SolidSample", {"id": "s4", "name": "S4", "donor": "d1", "mass_mg": 2.5, "aliquots": ["a4"]})
     put("Author", {"id": "au1", "name": "Le Guin"})
     put("Author", {"id": "au2", "name": "Nobody"})
     put("Book", {"id": "b1", "title": "The Dispossessed", "author": "au1"})
@@ -115,6 +119,8 @@ CASES: list[tuple[str, str, list[dict[str, Any]], list[tuple[str, dict[str, Any]
             ("s1", {"name": "S1", "donor.age_at_death": 71}),
             ("s2", {"name": "S2", "donor.age_at_death": None}),
             ("s3", {"name": "S3", "donor.age_at_death": None}),
+            # A subclass row of the anchor (ADR-0014 Decision 1) hydrates too.
+            ("s4", {"name": "S4", "donor.age_at_death": 71}),
         ],
         None,
     ),
@@ -122,7 +128,8 @@ CASES: list[tuple[str, str, list[dict[str, Any]], list[tuple[str, dict[str, Any]
         "to-many count",
         "Sample",
         [{"path": ["aliquots", "volume_ul"], "mode": "count"}],
-        [("s1", {"aliquots.volume_ul": 2}), ("s2", {"aliquots.volume_ul": 1}), ("s3", {"aliquots.volume_ul": 0})],
+        [("s1", {"aliquots.volume_ul": 2}), ("s2", {"aliquots.volume_ul": 1}), ("s3", {"aliquots.volume_ul": 0}),
+         ("s4", {"aliquots.volume_ul": 1})],
         None,
     ),
     (
@@ -133,6 +140,7 @@ CASES: list[tuple[str, str, list[dict[str, Any]], list[tuple[str, dict[str, Any]
             ("s1", {"aliquots.volume_ul": [10.0, 20.0], "aliquots.id": ["a1", "a2"]}),
             ("s2", {"aliquots.volume_ul": [5.0], "aliquots.id": ["a3"]}),
             ("s3", {"aliquots.volume_ul": [], "aliquots.id": []}),
+            ("s4", {"aliquots.volume_ul": [2.0], "aliquots.id": ["a4"]}),
         ],
         None,
     ),
@@ -146,8 +154,9 @@ CASES: list[tuple[str, str, list[dict[str, Any]], list[tuple[str, dict[str, Any]
             ("s2", {"name": "S2", "aliquots.volume_ul": 5.0, "aliquots.label": "A3"}),
             # No members still yields the anchor's row: explode never filters.
             ("s3", {"name": "S3", "aliquots.volume_ul": None, "aliquots.label": None}),
+            ("s4", {"name": "S4", "aliquots.volume_ul": 2.0, "aliquots.label": "A4"}),
         ],
-        {"anchor": 3, "rows": 4, "edge": "aliquots"},
+        {"anchor": 4, "rows": 5, "edge": "aliquots"},
     ),
     (
         "explode with an anchor-grain column alongside",
@@ -158,8 +167,9 @@ CASES: list[tuple[str, str, list[dict[str, Any]], list[tuple[str, dict[str, Any]
             ("s1", {"aliquots.label": "A2", "donor.samples.name": 2}),
             ("s2", {"aliquots.label": "A3", "donor.samples.name": 1}),
             ("s3", {"aliquots.label": None, "donor.samples.name": 0}),
+            ("s4", {"aliquots.label": "A4", "donor.samples.name": 2}),
         ],
-        {"anchor": 3, "rows": 4, "edge": "aliquots"},
+        {"anchor": 4, "rows": 5, "edge": "aliquots"},
     ),
     (
         "reverse hop (Author.books)",
@@ -185,14 +195,16 @@ CASES: list[tuple[str, str, list[dict[str, Any]], list[tuple[str, dict[str, Any]
             # a3 has no container: the member row stays, its value is null.
             ("s2", {"aliquots.container.kind": None}),
             ("s3", {"aliquots.container.kind": None}),
+            ("s4", {"aliquots.container.kind": "tube"}),
         ],
-        {"anchor": 3, "rows": 4, "edge": "aliquots"},
+        {"anchor": 4, "rows": 5, "edge": "aliquots"},
     ),
     (
         "two hops, list second",
         "Sample",
         [{"path": ["donor", "samples", "name"], "mode": "joinIds"}],
-        [("s1", {"donor.samples.name": ["S1", "S4"]}), ("s2", {"donor.samples.name": ["S2"]}), ("s3", {"donor.samples.name": []})],
+        [("s1", {"donor.samples.name": ["S1", "S4"]}), ("s2", {"donor.samples.name": ["S2"]}), ("s3", {"donor.samples.name": []}),
+         ("s4", {"donor.samples.name": ["S1", "S4"]})],
         None,
     ),
     (
