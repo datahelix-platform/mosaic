@@ -170,7 +170,10 @@ def run_end_to_end_gate(
                 errors=[f"unknown class {cls!r}"],
             )
         records = []
-        for item in client.query(cls).items:
+        # Exactly this class's rows: each populated class is its own bundle
+        # accessor, so a concrete parent must not re-list its subclasses'
+        # rows (ADR-0014 Decision 1).
+        for item in client.query(cls, include_subclasses=False).items:
             rec = dict(item.get("data") or {})
             rec["id"] = item.get("id")
             # query() only returns available rows, so is_available is True.

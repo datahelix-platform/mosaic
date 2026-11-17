@@ -17,6 +17,24 @@ from mosaic.core.types import ProvenanceRecord
 ScoredMatch = namedtuple("ScoredMatch", ["entity_id", "score", "highlights"])
 
 
+def collection_classes(registry: Any, query: "Query") -> list[str]:
+    """Concrete classes whose rows ``query``'s collection spans (ADR-0014).
+
+    ``[query.entity_type]`` unless ``query.include_subclasses`` is set and
+    the class is a concrete parent, in which case its concrete closure
+    (the class itself first). An abstract ``entity_type`` keeps its own
+    name: abstract anchors are ADR-0014 Decisions 2-5 (#228), not this
+    flag. Callers check that the type is non-empty first.
+    """
+    entity_type = query.entity_type
+    if not getattr(query, "include_subclasses", False) or registry is None:
+        return [entity_type]
+    closure = registry.concrete_closure(entity_type)
+    if not closure or closure[0] != entity_type:
+        return [entity_type]
+    return list(closure)
+
+
 class Entity(Protocol):
     """Protocol defining the interface for entities stored in EntityStore."""
 
@@ -39,6 +57,7 @@ class Query:
         where: Optional[Dict[str, Any]] = None,
         order_by: Optional[str] = None,
         order_dir: str = "asc",
+        include_subclasses: bool = False,
     ):
         self.entity_type = entity_type
         self.filters = filters or []
@@ -56,6 +75,15 @@ class Query:
         # provenance-derived, not columns (ADR-0007's pinned constraint).
         self.order_by = order_by
         self.order_dir = order_dir  # "asc" or "desc"
+        # Closure-aware collection (ADR-0014 Decision 1): when set and
+        # ``entity_type`` is a concrete class with concrete subclasses, the
+        # query resolves over ``concrete_class_closure(entity_type)`` — the
+        # subclasses' rows are listed/counted too, each carrying its own
+        # concrete ``entity_type``. Filters, ordering and aggregates still
+        # address the base class's slots. Off by default so storage-level
+        # callers that mean "rows of exactly this class" keep that meaning;
+        # ``QueryService`` (the SDK collection surface) turns it on.
+        self.include_subclasses = include_subclasses
 
 
 # Filter ops recognized by ``normalize_filter`` / adapter predicate builders.

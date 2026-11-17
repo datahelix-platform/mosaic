@@ -101,7 +101,7 @@ from abc import abstractmethod
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 import yaml
 from pydantic import BaseModel
@@ -238,6 +238,48 @@ class MigrationPlan:
         return not self._writes and not self._supersessions
 
 
+class MigrationReadView:
+    """A transform's view of the client: per-class reads by default.
+
+    A concrete parent's ``MosaicClient.query`` / ``count`` resolve over its
+    concrete closure (ADR-0014 Decision 1), so a transform that migrates
+    ``query("Subject")`` as ``Subject`` would also see, and re-migrate,
+    every ``BrainDonor`` row. This view flips the default:
+    :meth:`query`, :meth:`count` and :meth:`get` read exactly the named
+    class unless the caller passes ``include_subclasses=True``. Every other
+    attribute delegates to the wrapped client unchanged.
+    """
+
+    def __init__(self, client: "MosaicClient") -> None:
+        self._client = client
+
+    @property
+    def wrapped(self) -> "MosaicClient":
+        """The underlying client (closure-resolving defaults)."""
+        return self._client
+
+    def query(self, *args: Any, include_subclasses: bool = False, **kwargs: Any):
+        """``MosaicClient.query`` with ``include_subclasses=False`` by default."""
+        return self._client.query(
+            *args, include_subclasses=include_subclasses, **kwargs
+        )
+
+    def count(self, *args: Any, include_subclasses: bool = False, **kwargs: Any):
+        """``MosaicClient.count`` with ``include_subclasses=False`` by default."""
+        return self._client.count(
+            *args, include_subclasses=include_subclasses, **kwargs
+        )
+
+    def get(self, *args: Any, include_subclasses: bool = False, **kwargs: Any):
+        """``MosaicClient.get`` with ``include_subclasses=False`` by default."""
+        return self._client.get(
+            *args, include_subclasses=include_subclasses, **kwargs
+        )
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._client, name)
+
+
 @dataclass
 class MigrationContext:
     """Everything a migration transform receives for one hop.
@@ -245,11 +287,16 @@ class MigrationContext:
     Read old-shape records via ``ctx.client`` (e.g.
     ``ctx.client.query(type).items``) and stage new-shape records via
     ``ctx.plan`` (:meth:`MigrationPlan.migrate` / ``put`` / ``supersede``).
+    ``ctx.client`` is a :class:`MigrationReadView`: its ``query`` /
+    ``count`` / ``get`` read exactly the named class by default, so a concrete
+    parent's transform does not see (and re-migrate) its subclasses' rows
+    (ADR-0014 Decision 1). Pass ``include_subclasses=True`` to read the
+    concrete closure deliberately.
     The transform must **not** write to the client directly — staging
     keeps the dry-run gate ahead of every committed write.
     """
 
-    client: "MosaicClient"
+    client: "MigrationReadView"
     from_version: str
     to_version: str
     plan: MigrationPlan
@@ -417,7 +464,9 @@ class DomainModule(SchemaPackage):
         # transition (no hard delete). The provenance log retains the
         # lineage so a re-provision/restore stays auditable.
         for entity_type in live:
-            for item in client.query(entity_type).items:
+            for item in client.query(
+                entity_type, include_subclasses=False
+            ).items:
                 client.delete(entity_type, item["id"])
 
     def _live_data_types(self, client: "MosaicClient") -> list[str]:
@@ -431,7 +480,7 @@ class DomainModule(SchemaPackage):
         live: list[str] = []
         for entity_type in self.populates_types():
             try:
-                if client.query(entity_type).items:
+                if client.query(entity_type, include_subclasses=False).items:
                     live.append(entity_type)
             except Exception:
                 # A type the client's schema doesn't know (or an empty
@@ -574,7 +623,7 @@ class DomainModule(SchemaPackage):
         """
         plan = MigrationPlan()
         context = MigrationContext(
-            client=client,
+            client=MigrationReadView(client),
             from_version=step.from_version,
             to_version=step.to_version,
             plan=plan,

@@ -17,11 +17,15 @@ Design reference: Document 1 — Brain Bank LinkML Schema Design (PTS-347 /
 doc1-brainbank-linkml-schema). §7 is the load-bearing section; the tests map
 directly to §7.1–§7.8.
 
-Polymorphic query — resolved (PM §7.6 carry-forward):
-    The SQLite adapter targets per-class tables by exact ``entity_type``; a
-    ``query("Subject")`` call reads only the ``Subject`` table. ``BrainDonor``
-    rows live in a separate ``BrainDonor`` table. No polymorphic sweep; no
-    double-migration risk. ``TestQueryDisjoint`` asserts this directly.
+Polymorphic query (PM §7.6 carry-forward; revised by ADR-0014 Decision 1):
+    ``BrainDonor`` rows live in their own ``BrainDonor`` table, but
+    ``query("Subject")`` resolves over Subject's concrete closure, so it lists
+    them too (each item's ``entity_type`` names its class).
+    ``query("Subject", include_subclasses=False)`` reads only the ``Subject``
+    table. A migration transform's ``ctx.client`` defaults to that, so the
+    transforms below call plain ``ctx.client.query("Subject")`` and no
+    subclass row is migrated twice. ``TestQueryDisjoint`` asserts both
+    directly; ``TestMigrationReadView`` pins the transform default.
 
 Stranded-field gate mechanism — doc-correction note (Doc 1 §7.3/§7.7):
     Doc 1 states the gate bites because ``age_value`` and ``age_unit`` are
@@ -74,6 +78,8 @@ from mosaic.core.loaders.bundle import Bundle
 from mosaic.core.loaders.domain_module import (
     DomainModule,
     MigrationContext,
+    MigrationPlan,
+    MigrationReadView,
     MigrationStep,
 )
 from mosaic.core.loaders.exposure import (
@@ -478,21 +484,36 @@ def _standard_bundle() -> Bundle:
 # ---------------------------------------------------------------------------
 
 class TestQueryDisjoint:
-    """query("Subject") does not sweep BrainDonor rows (type-exact per-class tables)."""
+    """Per-class tables stay disjoint; a concrete parent's query spans its
+    closure (ADR-0014 Decision 1) unless ``include_subclasses=False``."""
 
     def test_subject_query_excludes_brain_donors(self, client: MosaicClient) -> None:
         _seed_subject(client, "s1", external_id="VA-001", age=65.3)
         _seed_brain_donor(client, "bd1", external_id="VA-DON-001",
                           brain_bank_id="BB-001", age=72.5)
 
-        subjects = client.query("Subject").items
+        exact = client.query("Subject", include_subclasses=False).items
         donors = client.query("BrainDonor").items
 
-        # Each table contains only its own records — no polymorphic sweep.
-        assert len(subjects) == 1
-        assert subjects[0]["id"] == "s1"
+        # Type-exact read: each table contains only its own records.
+        assert len(exact) == 1
+        assert exact[0]["id"] == "s1"
         assert len(donors) == 1
         assert donors[0]["id"] == "bd1"
+
+    def test_subject_query_lists_brain_donors_over_closure(
+        self, client: MosaicClient
+    ) -> None:
+        _seed_subject(client, "s1", external_id="VA-001", age=65.3)
+        _seed_brain_donor(client, "bd1", external_id="VA-DON-001",
+                          brain_bank_id="BB-001", age=72.5)
+
+        page = client.query("Subject")
+        types = {item["id"]: item["entity_type"] for item in page.items}
+        assert types == {"s1": "Subject", "bd1": "BrainDonor"}
+        assert page.total == 2
+        assert client.count("Subject") == 2
+        assert client.count("Subject", include_subclasses=False) == 1
 
     def test_brain_sample_query_excludes_base_samples(self, client: MosaicClient) -> None:
         client.put("Sample",
@@ -502,13 +523,84 @@ class TestQueryDisjoint:
         _seed_brain_sample(client, "bs1", external_id="BB-SAMP-001",
                            brain_region="prefrontal cortex")
 
-        samples = client.query("Sample").items
+        samples = client.query("Sample", include_subclasses=False).items
         brain_samples = client.query("BrainSample").items
 
         assert len(samples) == 1
         assert samples[0]["id"] == "sa1"
         assert len(brain_samples) == 1
         assert brain_samples[0]["id"] == "bs1"
+
+
+class TestMigrationReadView:
+    """A transform's ``ctx.client`` reads one class at a time by default
+    (ADR-0014 Decision 1): a concrete parent's transform must not see its
+    subclasses' rows unless it asks for the closure."""
+
+    def _ctx(self, client: MosaicClient) -> MigrationContext:
+        return MigrationContext(
+            client=MigrationReadView(client),
+            from_version="1.0.0",
+            to_version="1.1.0",
+            plan=MigrationPlan(),
+        )
+
+    def _seed(self, client: MosaicClient) -> None:
+        _seed_subject(client, "s1", external_id="VA-001", age=65.3)
+        _seed_brain_donor(client, "bd1", external_id="VA-DON-001",
+                          brain_bank_id="BB-001", age=72.5)
+
+    def test_plain_query_and_count_are_type_exact(self, client: MosaicClient) -> None:
+        self._seed(client)
+        ctx = self._ctx(client)
+        assert [i["id"] for i in ctx.client.query("Subject").items] == ["s1"]
+        assert ctx.client.query("Subject").total == 1
+        assert ctx.client.count("Subject") == 1
+
+    def test_explicit_opt_in_gets_the_closure(self, client: MosaicClient) -> None:
+        self._seed(client)
+        ctx = self._ctx(client)
+        page = ctx.client.query("Subject", include_subclasses=True)
+        assert {i["id"] for i in page.items} == {"s1", "bd1"}
+        assert ctx.client.count("Subject", include_subclasses=True) == 2
+
+    def test_get_is_type_exact_by_default(self, client: MosaicClient) -> None:
+        from mosaic.core.exceptions import EntityNotFoundError
+
+        self._seed(client)
+        ctx = self._ctx(client)
+        with pytest.raises(EntityNotFoundError):
+            ctx.client.get("Subject", "bd1")
+        assert ctx.client.get("Subject", "bd1", include_subclasses=True)[
+            "entity_type"] == "BrainDonor"
+        # The plain client resolves it over the closure.
+        assert client.get("Subject", "bd1")["entity_type"] == "BrainDonor"
+
+    def test_other_reads_delegate(self, client: MosaicClient) -> None:
+        self._seed(client)
+        ctx = self._ctx(client)
+        assert ctx.client.get("BrainDonor", "bd1")["id"] == "bd1"
+        assert ctx.client.wrapped is client
+
+    def test_evolve_hands_transforms_the_view(self, client: MosaicClient) -> None:
+        """``DomainModule.evolve`` wraps the client: a transform calling plain
+        ``ctx.client.query("Subject")`` migrates only the Subject row."""
+        self._seed(client)
+        seen: list[set[str]] = []
+
+        def _spy(ctx: MigrationContext) -> None:
+            assert isinstance(ctx.client, MigrationReadView)
+            seen.append({i["id"] for i in ctx.client.query("Subject").items})
+            _subject_v1_0_to_v1_1(ctx)
+
+        class _Spy(_SubjectModule):
+            def migration_steps(self) -> list[MigrationStep]:
+                return [MigrationStep("1.0.0", "1.1.0", _spy)]
+
+        _Spy().evolve(client, "1.0.0", "1.1.0")
+        assert seen == [{"s1"}]
+        # The BrainDonor row was not re-migrated as a Subject.
+        assert client.get("BrainDonor", "bd1")["is_available"] in (True, 1)
 
 
 # ---------------------------------------------------------------------------
@@ -690,7 +782,7 @@ class TestMultiHopUpgradeHappyPath:
         assert "age_at_collection" in (bd1_sup["state_snapshot"] or {}).get("reason", "")
 
         # Only the final live records remain queryable.
-        assert len(client.query("Subject").items) == 1
+        assert len(client.query("Subject", include_subclasses=False).items) == 1
         assert len(client.query("BrainDonor").items) == 1
 
     def test_migration_result_records_three_entries(self, client: MosaicClient) -> None:
@@ -767,7 +859,7 @@ class TestStrandedFieldGateFailure:
         assert any("age_unit" in e for e in exc.value.errors)
 
         # Full rollback: Subjects are still at v1 shape (no age_value migrated).
-        subjects = client.query("Subject").items
+        subjects = client.query("Subject", include_subclasses=False).items
         assert len(subjects) == 2
         for item in subjects:
             assert item["data"].get("age_value") is None, "rollback should undo migration"
