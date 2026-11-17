@@ -68,7 +68,70 @@
   DataHelix certification fixture (1) all declare on the reverse side and
   load unchanged, with zero synthesized slots.
 
+- **`entityType: String!` on a concrete parent's GraphQL type** (ADR-0014
+  Decision 1). Every concrete class with concrete subclasses (`Process`
+  with `BankBrain`, `Person` with `Donor`) gains a non-null
+  `entityType` system field naming the row's concrete class, since a
+  subclass row reached through the parent renders as the parent type
+  (`__typename` names the parent). The subclass set is the same full
+  concrete closure the parent's collection lists, so a subclass without
+  its own GraphQL type still gets its rows named. Leaf types are
+  unchanged. A slot whose GraphQL field would be `entityType`
+  (`entity_type`, `entityType`) on such a class is a build-time error.
+- **`include_subclasses` on `MosaicClient.query` / `count`** (default
+  `True`; public SDK API per the ADR-0014 2026-11-17 amendment, not exposed
+  by the transports). `False` reads exactly the named class's rows — the pre-ADR-0014
+  behaviour, for code that walks one class at a time. The migration gate
+  bundle and domain-module teardown use it.
+
 ### Changed
+
+- **Behaviour change — a concrete parent's collection now includes its
+  subclasses' rows** (ADR-0014 Decision 1, issue #241). `query("Process")`,
+  `count("Process")`, `facet_counts`/`field_range` on `Process`, the GraphQL
+  `processes` list with its `total` and `processesCount`, REST and MCP
+  listings, and a `QuerySpec` anchored on `Process` resolve over
+  `Process`'s concrete closure: **lists, page `total`s and counts on a
+  concrete parent grow by the subclass rows.** Filters, `order_by`, facets
+  and `field_range` address the parent's slots; pagination applies after
+  the union (SQLite `UNION ALL` across the per-class tables, Postgres
+  `entity_type = ANY(...)`). Each SDK item carries its concrete
+  `entity_type` and its full stored data; GraphQL renders it as the parent
+  type with `entityType` naming the subclass. A leaf class's collection,
+  `get`, and search are unchanged. **Migration transforms are unaffected
+  by default:** a transform's `ctx.client` is a `MigrationReadView` whose
+  `query` / `count` default to `include_subclasses=False`, so
+  `ctx.client.query("Subject")` still reads only `Subject` rows and a
+  subclass row is never re-migrated as its parent. A transform that wants
+  the closure passes `include_subclasses=True` explicitly.
+- **SQLite `count_relationship` over a multi-table range is one statement**
+  (#276). A forward edge into an abstract range or concrete parent counts
+  its live edges with one PK-probed `EXISTS` per closure table instead of
+  one `COUNT` query per table; an inverse edge sums its per-table counts in
+  one statement. Same results; `inputsCount` over 500 sources into a 4-leaf
+  range went from 357 ms to 94 ms (`scripts/bench_closure.py`).
+- **TUI sidebar counts a concrete parent's own rows** (#276). The SDK
+  backend's per-type counts pass `include_subclasses=False`, so a subclass
+  row is counted once (under its class) and the sidebar matches
+  `status()["entity_counts"]`.
+- **By-id lookup through a concrete parent finds subclass rows** (ADR-0014
+  amendment 2026-11-17, #276). `MosaicClient.get("Process", id)` returns
+  a `BankBrain` row (its `entity_type` names `BankBrain`) instead of
+  raising not-found, and GraphQL `process(id:)`, REST and the typed client
+  follow; `get` takes `include_subclasses=False` for the type-exact lookup.
+  A leaf class's `get` and an abstract class's are unchanged.
+- **Leaf-only names under a closure edge read as NULL** (ADR-0014
+  amendment 2026-11-17, #276). A nested `where` on an edge whose range
+  spans several classes (an abstract range, or a concrete parent with
+  subclasses), forward or inverse, may name any field or reference edge
+  that some class of the range has. Rows of the other classes read the
+  field as NULL (`is_null` matches them; `not {field: v}` holds) and the
+  edge as having no members (`some`/to-one false, `none` true); a name no
+  class has is still an error. **Behaviour change:** an inverse closure
+  edge (`Person.processes some {site: …}` with `site` only on
+  `BankBrain`) used to reject a subclass-only field; it now answers. On
+  Postgres, an unknown field inside a nested edge's `where` is now an
+  error, as on SQLite (it used to match nothing).
 
 - **CI and the image install from `uv.lock`** (issue #242). Local
   `uv run pytest`, CI and the release image now test the same dependency
@@ -82,6 +145,25 @@
   resolve freely. A new weekly workflow (`tests-unlocked.yml`, schedule and
   manual dispatch only, never on PRs) resolves fresh and runs the suite so
   upstream changes surface before the next lock refresh.
+
+### Fixed
+
+- **Rows lost through concrete parents and forward abstract edges**
+  (issue #241, ADR-0014 Decision 1). Every reference now resolves over the
+  concrete closure of its range class, on SQLite and Postgres:
+  - GraphQL forward references ranged on a concrete parent render a subclass
+    row as the parent type instead of `null` (`Brain.producedBy` →
+    `BankBrain`, `Measurement.person` → `Donor`), and an inverse on a
+    concrete parent lists the same rows its count reports.
+  - Forward edge predicates (to-one nesting and `some`/`none` over
+    relationship-backed slots) match a target row in any table of the
+    range's closure. Into an abstract range, the nested `where` may name a
+    field only some leaves have (`inputs some {hemisphere: L}`); rows of a
+    class without that field read it as absent (null).
+  - `count_relationship` on a forward to-many slot into an abstract range
+    (`Assay.inputs` → `Sample`) counts across the leaves instead of 0.
+  - `neighbors` finds a reverse column edge whose target is a subclass row
+    of the slot's range.
 
 ## v0.15.0 — 2026-10-27 (anchor-owned `columns` projection, inverse edges over abstract ranges, domain classes named like infrastructure, images under datahelix-platform)
 

@@ -46,8 +46,16 @@ class QueryService:
         entity_id: str,
         expand: Optional[str] = None,
         include_unavailable: bool = False,
+        include_subclasses: bool = True,
     ) -> dict[str, Any]:
-        """Get an entity by its ID."""
+        """Get an entity by its ID.
+
+        A concrete parent resolves the id over its concrete closure, like its
+        collection does (ADR-0014 Decision 1, 2026-11-17 amendment):
+        ``get("Process", bb_id)`` returns the ``BankBrain`` row, with its
+        concrete ``entity_type`` and full stored data.
+        ``include_subclasses=False`` keeps the type-exact lookup.
+        """
         if self._storage is None:
             raise EntityNotFoundError(
                 message=f"Entity not found: {entity_id}",
@@ -61,14 +69,18 @@ class QueryService:
             entity = self._storage.read(entity_id)
             if entity is None and hasattr(self._storage, "read_any"):
                 any_entity = self._storage.read_any(entity_id)
-                if any_entity is not None and any_entity.entity_type == entity_type:
+                if any_entity is not None and self._type_accepts(
+                    entity_type, any_entity.entity_type, include_subclasses
+                ):
                     raise EntityNotFoundError(
                         message=f"Entity not found: {entity_id}",
                         entity_type=entity_type,
                         entity_id=entity_id,
                     )
 
-        if entity is None or entity.entity_type != entity_type:
+        if entity is None or not self._type_accepts(
+            entity_type, entity.entity_type, include_subclasses
+        ):
             raise EntityNotFoundError(
                 message=f"Entity not found: {entity_id}",
                 entity_type=entity_type,
@@ -141,6 +153,25 @@ class QueryService:
 
         return result
 
+    def _type_accepts(
+        self, requested: str, actual: str, include_subclasses: bool
+    ) -> bool:
+        """Whether a row of class ``actual`` answers a lookup for
+        ``requested``: the same class, or, with ``include_subclasses``, a
+        class of ``requested``'s concrete closure when ``requested`` is a
+        concrete parent. Abstract classes keep the exact match: abstract
+        anchors are ADR-0014 Decisions 2-5 (#228). The same set
+        ``collection_classes`` lists."""
+        if actual == requested:
+            return True
+        if not include_subclasses:
+            return False
+        registry = getattr(self._storage, "schema_registry", None)
+        if registry is None:
+            return False
+        closure = registry.concrete_closure(requested)
+        return bool(closure) and closure[0] == requested and actual in closure
+
     def _parse_and_validate_expand(self, expand: str) -> Any:
         """Parse and validate an expand path."""
         parser = ExpandPathParser()
@@ -161,12 +192,16 @@ class QueryService:
         where: Optional[dict[str, Any]] = None,
         order_by: Optional[str] = None,
         order_dir: str = "asc",
+        include_subclasses: bool = True,
     ) -> "PaginatedResult":
         """Query entities with filter criteria.
 
         Args:
             entity_type: Restrict the query to one entity type. ``None``
-                queries across all types.
+                queries across all types. A concrete parent resolves over
+                its concrete closure (ADR-0014 Decision 1) unless
+                ``include_subclasses`` is false; items carry their own
+                concrete ``entity_type``.
             filter_mode: How to combine filters — "and" (all must match,
                 default) or "or" (any may match).
             as_of: Optional ISO-8601 transaction-time. When given, results are
@@ -215,6 +250,7 @@ class QueryService:
                 where=where,
                 order_by=order_by,
                 order_dir=order_dir,
+                include_subclasses=include_subclasses,
             )
             page_entities = list(self._storage.find(query))
             total = self._storage.count(query)
@@ -231,6 +267,7 @@ class QueryService:
             filters=filters or [],
             filter_mode=filter_mode,
             where=where,
+            include_subclasses=include_subclasses,
         )
 
         # Pass as_of only when set, so adapters whose find() predates the as-of
@@ -437,6 +474,7 @@ class QueryService:
         filter_mode: str = "and",
         as_of: Optional[str] = None,
         where: Optional[dict[str, Any]] = None,
+        include_subclasses: bool = True,
     ) -> int:
         """Count matching entities without materializing them (ADR-0007).
 
@@ -454,6 +492,7 @@ class QueryService:
             filters=filters or [],
             filter_mode=filter_mode,
             where=where,
+            include_subclasses=include_subclasses,
         )
         if as_of is not None:
             return self._storage.count(query, as_of=as_of)
@@ -484,6 +523,7 @@ class QueryService:
             filters=filters or [],
             filter_mode=filter_mode,
             where=where,
+            include_subclasses=True,
         )
         return list(self._storage.facet_counts(query, field))
 
@@ -507,6 +547,7 @@ class QueryService:
             filters=filters or [],
             filter_mode=filter_mode,
             where=where,
+            include_subclasses=True,
         )
         return tuple(self._storage.field_range(query, field))
 
@@ -776,7 +817,15 @@ class QueryService:
             # Reverse column edges: schema-driven FK queries, one per
             # (class, slot) pair whose target class is on the frontier.
             for cls, slot_name, target in ref_slots:
-                target_ids = by_type.get(target)
+                # The frontier row may be a subclass of the slot's range
+                # (``Brain.produced_by -> Process`` pointing at a
+                # ``BankBrain``): match over the range's concrete closure
+                # (ADR-0014 Decision 1).
+                target_ids = [
+                    tid
+                    for t in (registry.concrete_closure(target) or (target,))
+                    for tid in by_type.get(t, ())
+                ]
                 if not target_ids:
                     continue
                 for entity in self._storage.find(

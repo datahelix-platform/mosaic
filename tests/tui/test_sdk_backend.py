@@ -206,6 +206,47 @@ def test_sdk_list_entity_types_with_counts(seeded_backend):
     assert by_name == {"Project": 1, "Sample": 3}
 
 
+_PARENT_SCHEMA = """\
+id: https://example.org/tui/parent
+name: tui_parent
+prefixes:
+  linkml: https://w3id.org/linkml/
+imports:
+  - linkml:types
+  - hippo_core
+default_range: string
+classes:
+  Procedure:
+    is_a: Entity
+    attributes:
+      name:
+  BankProcedure:
+    is_a: Procedure
+    attributes:
+      site:
+"""
+
+
+def test_sdk_sidebar_counts_concrete_parent_own_rows(tmp_path):
+    """A concrete parent's sidebar count is its own rows (ADR-0014 Decision 1):
+    its subclass rows are counted once, under the subclass, and the
+    sidebar agrees with ``status()["entity_counts"]``."""
+    schema = tmp_path / "parent.yaml"
+    schema.write_text(_PARENT_SCHEMA)
+    backend = SDKBackend(db_path=tmp_path / "p.db", schema_path=schema)
+
+    async def seed():
+        await backend.create_entity("Procedure", {"name": "plain"})
+        await backend.create_entity("BankProcedure", {"name": "b1", "site": "A"})
+        await backend.create_entity("BankProcedure", {"name": "b2", "site": "B"})
+
+    asyncio.run(seed())
+    by_name = {s.name: s.count for s in asyncio.run(backend.list_entity_types())}
+    assert by_name == {"Procedure": 1, "BankProcedure": 2}
+    stats = backend._get_client().status()["entity_counts"]
+    assert {k: stats.get(k, 0) for k in by_name} == by_name
+
+
 def test_sdk_list_entities_pagination(seeded_backend):
     backend, _project_id, sample_ids = seeded_backend
     result = asyncio.run(backend.list_entities("Sample"))

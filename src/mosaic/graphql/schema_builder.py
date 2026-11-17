@@ -122,6 +122,11 @@ COMPUTED_FIELDS: list[tuple[str, Any]] = [
 ]
 
 
+#: System field on a concrete parent's object type naming the row's concrete
+#: class (``entityType`` in GraphQL; ADR-0014 Decision 1).
+ENTITY_TYPE_FIELD = "entity_type"
+
+
 def snake_case(name: str) -> str:
     """``DNASample`` → ``dna_sample`` (same regex as ``default_accessor``)."""
     s1 = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", name)
@@ -223,6 +228,15 @@ class EntityGraphQLInfo:
     #: Generated ``<Class>OrderField`` enum (ADR-0007 increment 3): the
     #: orderable stored columns. Member values are LinkML slot names.
     order_field_enum: Any = None
+    #: Concrete subclasses when this class is a *concrete parent* (ADR-0014
+    #: Decision 1): its collection and every reference ranged on it may
+    #: return their rows, rendered as this type, so the type carries the
+    #: non-null ``entityType`` system field naming each row's class. This
+    #: is the full concrete closure, the same set storage resolves a
+    #: collection over (``collection_classes``), whether or not a subclass
+    #: has its own GraphQL type: an unexposed subclass's rows are still
+    #: listed, so ``entityType`` must still be there to name them.
+    closure_subclasses: list[str] = dc_field(default_factory=list)
 
     def filterable_slot_names(self) -> list[str]:
         """Slot names a list query's ``filters.field`` can match on.
@@ -352,6 +366,13 @@ class GraphQLTypeBuilder:
         for name in entity.computed_fields:
             kwargs[name] = envelope.get(name)
 
+        if entity.closure_subclasses:
+            # The row's concrete class (ADR-0014 Decision 1): a subclass row
+            # reached through a concrete parent renders as the parent type.
+            kwargs[ENTITY_TYPE_FIELD] = str(
+                envelope.get("entity_type") or class_name
+            )
+
         return entity.gql_type(**kwargs)
 
     def input_to_dict(self, class_name: str, data: Any, mode: str) -> dict[str, Any]:
@@ -393,6 +414,14 @@ class GraphQLTypeBuilder:
                 plural_name=model.accessor_name,
                 model=model,
             )
+        for class_name, entity in self.entities.items():
+            # Not filtered by exposure: storage lists every concrete
+            # subclass's rows in this class's collection (ADR-0014
+            # Decision 1), so entityType follows the same closure.
+            entity.closure_subclasses = [
+                c for c in self._registry.concrete_closure(class_name)
+                if c != class_name
+            ]
 
     def _build_enums(self) -> None:
         # Enum membership comes from the type model's slot classification
@@ -662,6 +691,40 @@ class GraphQLTypeBuilder:
                 annotations[name] = annotation
                 setattr(cls, name, None)
                 entity.computed_fields.append(name)
+
+            if entity.closure_subclasses:
+                # Any slot whose GraphQL field (camelCased attribute, or a
+                # reference's resolved edge and its count) would be named
+                # ``entityType`` collides, not just a slot named
+                # ``entity_type``.
+                gql_entity_type = camel_case(ENTITY_TYPE_FIELD)
+                for spec in entity.slots:
+                    names = {spec.slot_name, camel_case(spec.attr_name)}
+                    if spec.resolved_attr:
+                        names.add(camel_case(spec.resolved_attr))
+                    if ENTITY_TYPE_FIELD in names or gql_entity_type in names:
+                        raise ValueError(
+                            f"{class_name}.{spec.slot_name}: the slot "
+                            f"collides with the entityType system field a "
+                            f"concrete parent carries (ADR-0014 Decision 1). "
+                            f"Rename the slot."
+                        )
+                annotations[ENTITY_TYPE_FIELD] = str
+                setattr(
+                    cls,
+                    ENTITY_TYPE_FIELD,
+                    strawberry.field(
+                        default=class_name,
+                        description=(
+                            f"Concrete class of this row: {class_name} or "
+                            f"one of its subclasses "
+                            f"({', '.join(entity.closure_subclasses)}), whose "
+                            f"rows this type also renders (ADR-0014). Query "
+                            f"the subclass's own collection, where it has "
+                            f"one, for its slots."
+                        ),
+                    ),
+                )
 
             cls.__annotations__ = annotations
             entity.gql_type = strawberry.type(

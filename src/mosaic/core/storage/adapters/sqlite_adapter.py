@@ -33,6 +33,7 @@ from mosaic.core.storage import (
     EntityStore,
     Query,
     ScoredMatch,
+    collection_classes,
     escape_like,
     has_relationship_predicate,
     matches_operator,
@@ -2816,7 +2817,9 @@ class SQLiteAdapter(EntityStore):
         if query.entity_type:
             if not self._per_class_table_exists(query.entity_type):
                 return
-            yield from self._find_per_class(query.entity_type, query)
+            yield from self._find_per_class(
+                query.entity_type, query, self._collection_tables(query)
+            )
             return
 
         registry = self.schema_registry
@@ -2872,9 +2875,14 @@ class SQLiteAdapter(EntityStore):
             )
         with self._transaction() as conn:
             prov = self._get_provenance_store(conn)
-            candidates = prov.entities_created_by(
-                as_of, entity_type=query.entity_type
-            )
+            if query.entity_type:
+                candidates = [
+                    pair
+                    for cls in collection_classes(self.schema_registry, query)
+                    for pair in prov.entities_created_by(as_of, entity_type=cls)
+                ]
+            else:
+                candidates = prov.entities_created_by(as_of)
 
             matched: list[SQLiteEntity] = []
             for entity_id, entity_type in candidates:
@@ -2936,14 +2944,26 @@ class SQLiteAdapter(EntityStore):
         return any(checks) if mode == "or" else all(checks)
 
     def _leaf_predicate(
-        self, field: str, op: str, value: Any, params: list[Any], qual: str = ""
+        self,
+        field: str,
+        op: str,
+        value: Any,
+        params: list[Any],
+        qual: str = "",
+        *,
+        absent: bool = False,
     ) -> str:
         """SQL predicate for one ``(field, op, value)`` leaf on a per-class
         typed table, appending its parameters to ``params``. Shared by the
         flat ``filters`` path and the ``where`` tree compiler so operator
         rendering lives once (ADR-0006). ``qual`` scopes the column to a
-        table alias inside relationship EXISTS subqueries (M5a)."""
-        col = f'{qual}"{field}"'
+        table alias inside relationship EXISTS subqueries (M5a).
+
+        ``absent`` renders the column as SQL ``NULL``: the field belongs to
+        another class of a closure edge's range (ADR-0014 Decision 1), so a
+        row of this table has no value for it — exactly what a NULL column
+        means (``is_null`` true, every comparison false)."""
+        col = "NULL" if absent else f'{qual}"{field}"'
         if op == "in":
             if not value:
                 # Empty IN-list: short-circuit to "no rows match" rather
@@ -2968,6 +2988,45 @@ class SQLiteAdapter(EntityStore):
         params.append(self._coerce_for_column(value))
         return f"{col} = ?"
 
+    def _reference_slots(self, entity_type: str) -> dict[str, tuple[str, bool]]:
+        """``{slot: (range_class, multivalued)}`` for ``entity_type``'s
+        reference slots (forward and virtual inverse) — the edges a
+        relationship predicate may name on it."""
+        registry = self.schema_registry
+        refs: dict[str, tuple[str, bool]] = {}
+        if registry is not None:
+            known = set(registry.class_names())
+            for slot in registry.induced_slots(entity_type):
+                if slot.range in known:
+                    refs[slot.name] = (slot.range, bool(slot.multivalued))
+        return refs
+
+    def _closure_arms(
+        self, tables: list[str]
+    ) -> tuple[set[str], dict[str, tuple[frozenset[str], frozenset[str]]]]:
+        """Per-table scope for a nested tree over a multi-table range
+        (ADR-0014 Decision 1, read-as-NULL rule).
+
+        Returns the union of the tables' query columns — the fields the
+        nested tree may name — and, per table, ``(absent_fields,
+        absent_edges)``: the fields and reference edges some *other*
+        closure table has but this one lacks. A row of this table reads an
+        absent field as NULL and an absent edge as having no members. A
+        name no table has stays unknown and raises.
+        """
+        columns = {table: self._valid_query_columns(table) for table in tables}
+        edges = {table: set(self._reference_slots(table)) for table in tables}
+        all_columns: set[str] = set().union(*columns.values())
+        all_edges: set[str] = set().union(*edges.values())
+        arms = {
+            table: (
+                frozenset(all_columns - columns[table]),
+                frozenset(all_edges - edges[table]),
+            )
+            for table in tables
+        }
+        return all_columns, arms
+
     def _reference_edge(
         self, entity_type: str, edge: str, quantifier: Optional[str]
     ) -> tuple[str, bool, Optional[str]]:
@@ -2984,13 +3043,7 @@ class SQLiteAdapter(EntityStore):
         """
         from mosaic.core.exceptions import ValidationError
 
-        registry = self.schema_registry
-        refs: dict[str, tuple[str, bool]] = {}
-        if registry is not None:
-            known = set(registry.class_names())
-            for slot in registry.induced_slots(entity_type):
-                if slot.range in known:
-                    refs[slot.name] = (slot.range, bool(slot.multivalued))
+        refs = self._reference_slots(entity_type)
         if edge not in refs:
             raise ValidationError(
                 message=(
@@ -3030,6 +3083,8 @@ class SQLiteAdapter(EntityStore):
         entity_type: str,
         scope: str = "",
         alias_seq: Optional[list[int]] = None,
+        absent_fields: frozenset[str] = frozenset(),
+        absent_edges: frozenset[str] = frozenset(),
     ) -> str:
         """Compile a normalized ``where`` tree to one SQL predicate.
 
@@ -3041,7 +3096,12 @@ class SQLiteAdapter(EntityStore):
         ``scope`` is the SQL prefix (``'"Table".'`` or ``'alias.'``) of the
         table the current subtree addresses; ``alias_seq`` numbers the
         relationship-EXISTS aliases so nested and self-referential edges
-        (M5a) never collide.
+        (M5a) never collide. ``absent_fields`` are valid fields this table
+        has no column for (another class of a closure edge's range,
+        ADR-0014): their leaves read the value as NULL. ``absent_edges``
+        are the reference edges such a table lacks: the edge has no
+        members there, so a to-one or ``some`` predicate is false and
+        ``none`` is true.
         """
         if alias_seq is None:
             alias_seq = [0]
@@ -3052,7 +3112,8 @@ class SQLiteAdapter(EntityStore):
                     self._tree_predicate(
                         c, valid_columns, params,
                         entity_type=entity_type, scope=scope,
-                        alias_seq=alias_seq,
+                        alias_seq=alias_seq, absent_fields=absent_fields,
+                        absent_edges=absent_edges,
                     )
                     for c in node["and"]
                 )
@@ -3065,7 +3126,8 @@ class SQLiteAdapter(EntityStore):
                     self._tree_predicate(
                         c, valid_columns, params,
                         entity_type=entity_type, scope=scope,
-                        alias_seq=alias_seq,
+                        alias_seq=alias_seq, absent_fields=absent_fields,
+                        absent_edges=absent_edges,
                     )
                     for c in node["or"]
                 )
@@ -3075,6 +3137,7 @@ class SQLiteAdapter(EntityStore):
             return "NOT " + self._tree_predicate(
                 node["not"], valid_columns, params,
                 entity_type=entity_type, scope=scope, alias_seq=alias_seq,
+                absent_fields=absent_fields, absent_edges=absent_edges,
             )
         if "edge" in node:
             # Relationship predicate (ADR-0006 M5a/M5b). To-one: a
@@ -3088,6 +3151,11 @@ class SQLiteAdapter(EntityStore):
             # queries and hydration see them.
             edge = node["edge"]
             quantifier = node.get("quantifier")
+            if edge in absent_edges:
+                # Another class of a closure edge's range has this edge;
+                # this table's rows have no members on it (ADR-0014
+                # Decision 1, read-as-NULL).
+                return "1" if quantifier == "none" else "0"
             target, multivalued, inverse_of = self._reference_edge(
                 entity_type, edge, quantifier
             )
@@ -3120,6 +3188,15 @@ class SQLiteAdapter(EntityStore):
                     f"AND {alias}.is_available = 1 AND {sub})"
                 )
                 return exists if quantifier == "some" else f"NOT {exists}"
+            tables = self._closure_tables(target)
+            if tables != [target]:
+                # Range is abstract or a concrete parent (ADR-0014
+                # Decision 1, #241): the referenced row may live in any
+                # table of the range's concrete closure.
+                return self._forward_closure_predicate(
+                    node, edge, tables, multivalued, quantifier, outer,
+                    params, alias_seq=alias_seq,
+                )
             if not multivalued:
                 sub = self._tree_predicate(
                     node["where"], target_columns, params,
@@ -3163,9 +3240,74 @@ class SQLiteAdapter(EntityStore):
         # True) includes. Forcing every leaf to TRUE/FALSE keeps the tree
         # boolean end to end (ADR-0006's mirror-consistency rule).
         leaf = self._leaf_predicate(
-            field, node["op"], node["value"], params, qual=scope
+            field, node["op"], node["value"], params, qual=scope,
+            absent=field in absent_fields,
         )
         return f"COALESCE(({leaf}), 0)"
+
+    def _forward_closure_predicate(
+        self,
+        node: dict[str, Any],
+        edge: str,
+        tables: list[str],
+        multivalued: bool,
+        quantifier: Optional[str],
+        outer: str,
+        params: list[Any],
+        *,
+        alias_seq: list[int],
+    ) -> str:
+        """Forward edge whose range spans several tables (ADR-0014 Decision 1).
+
+        The range is abstract (``Assay.inputs -> Sample``) or a concrete
+        parent (``Brain.produced_by -> Process`` with ``BankBrain``), so the
+        referenced row may live in any table of its concrete closure: the
+        edge holds when one correlated EXISTS per table holds (to-one and
+        ``some``), and ``none`` is the negation. Each EXISTS is keyed on the
+        table's primary key, so it stays an index probe.
+
+        The nested tree may name any field or reference edge some table of
+        the closure has; a table without it reads the field as NULL and the
+        edge as memberless (:meth:`_closure_arms`), so a leaf-only field
+        (``Brain.hemisphere`` under ``Sample``) matches only rows of the
+        classes that carry it. A name no table has is rejected as unknown.
+        With no table at all, the edge holds nowhere.
+        """
+        if not tables:
+            return "1" if quantifier == "none" else "0"
+        union, arms = self._closure_arms(tables)
+        # The slot name is a schema identifier; inlined as a quoted literal
+        # (as ``_inverse_match`` does) so callers' positional params keep
+        # their order.
+        rel_type = edge.replace("'", "''")
+        clauses = []
+        for table in tables:
+            alias_seq[0] += 1
+            alias = f"rel{alias_seq[0]}"
+            absent_fields, absent_edges = arms[table]
+            sub = self._tree_predicate(
+                node["where"], union, params,
+                entity_type=table, scope=f"{alias}.", alias_seq=alias_seq,
+                absent_fields=absent_fields, absent_edges=absent_edges,
+            )
+            if not multivalued:
+                clauses.append(
+                    f'EXISTS (SELECT 1 FROM "{table}" {alias} '
+                    f'WHERE {alias}."id" = {outer}"{edge}" '
+                    f"AND {alias}.is_available = 1 AND {sub})"
+                )
+            else:
+                link = f"{alias}l"
+                clauses.append(
+                    f"EXISTS (SELECT 1 FROM relationships {link} "
+                    f'JOIN "{table}" {alias} ON {alias}."id" = {link}.target_id '
+                    f'WHERE {link}.source_id = {outer}"id" '
+                    f"AND {link}.relationship_type = '{rel_type}' "
+                    f"AND {link}.is_available = 1 "
+                    f"AND {alias}.is_available = 1 AND {sub})"
+                )
+        some = "(" + " OR ".join(clauses) + ")"
+        return f"NOT {some}" if quantifier == "none" else some
 
     def _inverse_closure_predicate(
         self,
@@ -3182,24 +3324,25 @@ class SQLiteAdapter(EntityStore):
 
         The hit may live in any concrete table of the range's closure, so
         ``some`` is an OR of one correlated EXISTS per table and ``none``
-        its negation. The nested tree may only name fields every table in
-        the closure owns (the range's own slots); a subclass-only field is
-        rejected rather than silently matching a subset of tables. With no
-        table at all, ``some`` is false and ``none`` true.
+        its negation. The nested tree follows the forward rule (ADR-0014
+        Decision 1, read-as-NULL): it may name any field or reference edge
+        some table of the closure has, and a table lacking it reads the
+        field as NULL and the edge as memberless (:meth:`_closure_arms`).
+        A name no table has is rejected. With no table at all, ``some`` is
+        false and ``none`` true.
         """
         if not tables:
             return "0" if quantifier == "some" else "1"
-        shared: Optional[set[str]] = None
-        for table in tables:
-            cols = self._valid_query_columns(table)
-            shared = set(cols) if shared is None else shared & set(cols)
+        union, arms = self._closure_arms(tables)
         clauses = []
         for table in tables:
             alias_seq[0] += 1
             alias = f"rel{alias_seq[0]}"
+            absent_fields, absent_edges = arms[table]
             sub = self._tree_predicate(
-                node["where"], shared or set(), params,
+                node["where"], union, params,
                 entity_type=table, scope=f"{alias}.", alias_seq=alias_seq,
+                absent_fields=absent_fields, absent_edges=absent_edges,
             )
             match = self._inverse_match(inv, alias, f'{outer}"id"')
             clauses.append(
@@ -3281,33 +3424,112 @@ class SQLiteAdapter(EntityStore):
             f'"{order_by}" {direction}, "id" ASC'
         )
 
+    def _closure_tables(self, class_name: str) -> list[str]:
+        """Existing per-class tables of ``class_name``'s concrete closure
+        (issue #224, ADR-0014 Decision 1): the class itself when concrete,
+        then its concrete descendants. ``[]`` for an abstract class with no
+        concrete descendant."""
+        registry = self.schema_registry
+        if registry is None:
+            return [class_name] if self._per_class_table_exists(class_name) else []
+        return [
+            t for t in registry.concrete_closure(class_name)
+            if self._per_class_table_exists(t)
+        ]
+
+    def _collection_tables(self, query: Query) -> list[str]:
+        """Tables ``query``'s collection reads: its own class's table, plus
+        its subclasses' when ``query.include_subclasses`` (ADR-0014)."""
+        return [
+            t for t in collection_classes(self.schema_registry, query)
+            if self._per_class_table_exists(t)
+        ]
+
+    #: Discriminator / ordering columns the closure source adds; never slots.
+    _CLOSURE_TYPE_COL = "__mosaic_entity_type"
+    _CLOSURE_ORDER_COLS = ("__mosaic_table_ord", "__mosaic_rowid")
+
+    def _collection_source(
+        self, entity_type: str, tables: list[str]
+    ) -> tuple[str, list[str]]:
+        """``(FROM item, column names)`` for a collection over ``tables``.
+
+        One table: the per-class table itself, as before. Several (a
+        concrete parent's closure, ADR-0014 Decision 1): a ``UNION ALL``
+        derived table aliased as ``entity_type``, so predicates compiled
+        against ``"<entity_type>".<col>`` (edge EXISTS correlate on that
+        scope) need no change. Its columns are the ordered union of every
+        table's columns, NULL-padded, plus each row's concrete class
+        (:attr:`_CLOSURE_TYPE_COL`) and a table-then-rowid order.
+        """
+        if tables == [entity_type]:
+            return f'"{entity_type}"', self._per_class_columns(entity_type)
+        per_table = {t: self._per_class_columns(t) for t in tables}
+        columns: list[str] = []
+        for t in tables:
+            for c in per_table[t]:
+                if c not in columns:
+                    columns.append(c)
+        tord, rord = self._CLOSURE_ORDER_COLS
+        selects = []
+        for i, t in enumerate(tables):
+            have = set(per_table[t])
+            parts = [
+                f'"{c}"' if c in have else f'NULL AS "{c}"' for c in columns
+            ]
+            type_literal = t.replace("'", "''")
+            parts.append(f"'{type_literal}' AS \"{self._CLOSURE_TYPE_COL}\"")
+            parts.append(f'{i} AS "{tord}"')
+            parts.append(f'rowid AS "{rord}"')
+            selects.append(f'SELECT {", ".join(parts)} FROM "{t}"')
+        return (
+            "(" + " UNION ALL ".join(selects) + f') AS "{entity_type}"',
+            columns,
+        )
+
     def _find_per_class(
-        self, entity_type: str, query: Query
+        self,
+        entity_type: str,
+        query: Query,
+        tables: Optional[list[str]] = None,
     ) -> Iterator[SQLiteEntity]:
-        """Query a single per-class typed table.
+        """Query a single per-class typed table — or, for a concrete parent
+        queried with ``include_subclasses``, its concrete closure
+        (``tables``; ADR-0014 Decision 1).
 
         Filters become column-level predicates; ``data`` for the
         returned :class:`SQLiteEntity` is reconstructed from the typed
         row. ``version`` is derived from ``ProvenanceRecord`` (see
-        ``_compute_version``).
+        ``_compute_version``). Over a closure, filters and ordering address
+        the base class's columns (``valid_columns``), pagination applies
+        after the union, and each row keeps its concrete ``entity_type``
+        and its full stored data.
         """
+        tables = tables or [entity_type]
+        closure = tables != [entity_type]
+        source, columns = self._collection_source(entity_type, tables)
         slot_columns = [
-            c for c in self._per_class_columns(entity_type)
+            c for c in columns
             if c not in {"id", "is_available", "superseded_by"}
         ]
         select_cols = ['"id"', '"is_available"', '"superseded_by"'] + [
             f'"{c}"' for c in slot_columns
         ]
+        if closure:
+            select_cols.append(f'"{self._CLOSURE_TYPE_COL}"')
         params: list[Any] = []
-        valid_columns = set(slot_columns) | {"id", "is_available"}
+        valid_columns = self._valid_query_columns(entity_type)
         predicate = self._query_predicate(entity_type, query, valid_columns, params)
         if predicate is None:
             return
-        sql = (
-            f"SELECT {', '.join(select_cols)} FROM \"{entity_type}\" "
-            f"WHERE {predicate}"
-        )
-        sql += self._order_clause(query, valid_columns)
+        sql = f"SELECT {', '.join(select_cols)} FROM {source} WHERE {predicate}"
+        order = self._order_clause(query, valid_columns)
+        if closure and not order:
+            # Deterministic paging across the union: table, then rowid.
+            order = " ORDER BY " + ", ".join(
+                f'"{c}"' for c in self._CLOSURE_ORDER_COLS
+            )
+        sql += order
 
         # `is not None`, not truthiness: LIMIT 0 must return zero rows, not
         # fall through to "no limit" (issue #130).
@@ -3317,6 +3539,9 @@ class SQLiteAdapter(EntityStore):
                 sql += f" OFFSET {query.offset}"
         elif query.offset:
             sql += f" LIMIT -1 OFFSET {query.offset}"
+
+        def row_type(row: sqlite3.Row) -> str:
+            return row[self._CLOSURE_TYPE_COL] if closure else entity_type
 
         with self._transaction() as conn:
             cursor = conn.cursor()
@@ -3338,21 +3563,28 @@ class SQLiteAdapter(EntityStore):
                     r["entity_id"]: int(r["c"]) for r in cursor.fetchall()
                 }
 
-            mv_refs_map = self._hydrate_derived_refs_batch(
-                conn, entity_type, row_ids
-            )
+            # Derived slots (multivalued refs, inverses) are per class:
+            # hydrate each concrete class present with its own slots.
+            ids_by_type: dict[str, list[str]] = {}
+            for r in rows:
+                ids_by_type.setdefault(row_type(r), []).append(r["id"])
+            mv_refs_map: dict[str, dict[str, list[str]]] = {}
+            for cls, ids in ids_by_type.items():
+                mv_refs_map.update(
+                    self._hydrate_derived_refs_batch(conn, cls, ids)
+                )
 
-        boolean_cols = (
-            self.schema_registry.boolean_slot_names(entity_type)
-            if self.schema_registry is not None
-            else set()
-        )
-        string_cols = (
-            self.schema_registry.string_slot_names(entity_type)
-            if self.schema_registry is not None
-            else set()
-        )
+        decode_sets: dict[str, tuple[set[str], set[str]]] = {}
+        registry = self.schema_registry
+        for cls in ids_by_type:
+            decode_sets[cls] = (
+                (registry.boolean_slot_names(cls), registry.string_slot_names(cls))
+                if registry is not None
+                else (set(), set())
+            )
         for row in rows:
+            cls = row_type(row)
+            boolean_cols, string_cols = decode_sets[cls]
             data = {
                 c: self._decode_column_value(
                     row[c],
@@ -3365,7 +3597,7 @@ class SQLiteAdapter(EntityStore):
             data.update(mv_refs_map.get(row["id"], {}))
             yield SQLiteEntity(
                 id=row["id"],
-                entity_type=entity_type,
+                entity_type=cls,
                 is_available=bool(row["is_available"]),
                 version=version_map.get(row["id"], 1),
                 data=data,
@@ -3398,6 +3630,7 @@ class SQLiteAdapter(EntityStore):
                 filters=query.filters,
                 filter_mode=query.filter_mode,
                 where=query.where,
+                include_subclasses=getattr(query, "include_subclasses", False),
             )
             return sum(1 for _ in self._find_as_of(unpaged, as_of))
 
@@ -3412,6 +3645,11 @@ class SQLiteAdapter(EntityStore):
         for class_name in class_names:
             if not self._per_class_table_exists(class_name):
                 continue
+            # A typed count spans the same closure ``find`` lists (ADR-0014).
+            source, _ = self._collection_source(
+                class_name,
+                self._collection_tables(query) if query.entity_type else [class_name],
+            )
             params: list[Any] = []
             predicate = self._query_predicate(
                 class_name, query, self._valid_query_columns(class_name), params
@@ -3421,7 +3659,7 @@ class SQLiteAdapter(EntityStore):
             with self._transaction() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
-                    f'SELECT COUNT(*) AS c FROM "{class_name}" '
+                    f"SELECT COUNT(*) AS c FROM {source} "
                     f"WHERE {predicate}",
                     params,
                 )
@@ -3448,11 +3686,14 @@ class SQLiteAdapter(EntityStore):
         )
         if predicate is None:
             return []
+        source, _ = self._collection_source(
+            entity_type, self._collection_tables(query)
+        )
         with self._transaction() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 f'SELECT "{field}" AS value, COUNT(*) AS c '
-                f'FROM "{entity_type}" '
+                f"FROM {source} "
                 f'WHERE {predicate} AND "{field}" IS NOT NULL '
                 f'GROUP BY "{field}" '
                 f'ORDER BY c DESC, "{field}" ASC',
@@ -3476,11 +3717,14 @@ class SQLiteAdapter(EntityStore):
         )
         if predicate is None:
             return (None, None)
+        source, _ = self._collection_source(
+            entity_type, self._collection_tables(query)
+        )
         with self._transaction() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 f'SELECT MIN("{field}") AS lo, MAX("{field}") AS hi '
-                f'FROM "{entity_type}" WHERE {predicate}',
+                f"FROM {source} WHERE {predicate}",
                 params,
             )
             row = cursor.fetchone()
@@ -3510,27 +3754,41 @@ class SQLiteAdapter(EntityStore):
             tables = self._inverse_tables(inv)
             if not tables:
                 return 0
+            # One statement: a scalar COUNT per closure table, summed.
+            parts = [
+                f'(SELECT COUNT(*) FROM "{table}" tgt '
+                f"WHERE {self._inverse_match(inv, 'tgt', '?')} "
+                "AND tgt.is_available = 1)"
+                for table in tables
+            ]
             with self._transaction() as conn:
                 cursor = conn.cursor()
-                total = 0
-                for table in tables:
-                    cursor.execute(
-                        f'SELECT COUNT(*) AS c FROM "{table}" tgt '
-                        f"WHERE {self._inverse_match(inv, 'tgt', '?')} "
-                        "AND tgt.is_available = 1",
-                        (entity_id,),
-                    )
-                    total += int(cursor.fetchone()["c"])
-                return total
-        if not self._per_class_table_exists(target):
+                cursor.execute(
+                    f"SELECT {' + '.join(parts)} AS c",
+                    tuple(entity_id for _ in tables),
+                )
+                return int(cursor.fetchone()["c"])
+        # Forward edge: the target may live in any table of the range's
+        # concrete closure — abstract ``Sample``'s leaves, or a concrete
+        # parent's subclasses (ADR-0014 Decision 1, #241).
+        tables = self._closure_tables(target)
+        if not tables:
             return 0
+        # One statement over the source's edges: each available edge counts
+        # when its target is an available row of some closure table, probed
+        # by primary key (ids are unique across tables, so OR never double
+        # counts). Cost follows the source's edge count, not table sizes.
+        live_target = " OR ".join(
+            f'EXISTS (SELECT 1 FROM "{table}" tgt '
+            f'WHERE tgt."id" = rel.target_id AND tgt.is_available = 1)'
+            for table in tables
+        )
         with self._transaction() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                f'SELECT COUNT(*) AS c FROM relationships rel '
-                f'JOIN "{target}" tgt ON tgt."id" = rel.target_id '
-                f"WHERE rel.source_id = ? AND rel.relationship_type = ? "
-                f"AND rel.is_available = 1 AND tgt.is_available = 1",
+                "SELECT COUNT(*) AS c FROM relationships rel "
+                "WHERE rel.source_id = ? AND rel.relationship_type = ? "
+                f"AND rel.is_available = 1 AND ({live_target})",
                 (entity_id, edge),
             )
             return int(cursor.fetchone()["c"])
