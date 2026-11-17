@@ -301,6 +301,11 @@ drift apart. Concretely:
   `RelatedCondition` in a `QuerySpec`, `donors(where: {samples: {some: {...}}})` in GraphQL.
 - **Counts**: `client.count_relationship("Donor", donor_id, "samples")` and GraphQL's
   `samplesCount`.
+- **Columns**: a `QuerySpec` column path may follow it as a hop — `{"path": ["samples",
+  "name"], "mode": "joinIds"}` on a `Donor` anchor — like any to-many reference (it needs a
+  `mode`: `count`, `joinIds` or `explode`). It cannot be followed under `asOf`
+  (`ASOF_REVERSE_HOP_UNSUPPORTED`): as-of reconstruction rebuilds stored slots, not derived
+  reverse lists.
 - **Writes ignore it.** A payload that carries `samples` (for example a `get`-then-`put`
   round-trip) is accepted and the key dropped; it never reaches storage or the provenance
   log. GraphQL Create/Update inputs omit it and OpenAPI marks it `readOnly`. Change the

@@ -11,8 +11,11 @@ unconditionally before ever calling :func:`compile_query_spec` — see its
 docstring for why that ordering is load-bearing, not just tidy.
 
 Compiles ONLY to ``client.query()``'s ``where``/``order_by``/``as_of``
-shape, plus ``fields`` — the anchor-owned ``columns`` selection (issue #215)
-that ``MosaicClient.query(fields=...)`` projects. No ``facet_counts``/
+shape, plus the ``columns`` selection: ``fields`` when every column is
+anchor-owned (issue #215, ``MosaicClient.query(fields=...)`` projects it), or
+a :class:`TraversalProjection` when any column follows a reference (issue
+#236), which :func:`mosaic.core.query_spec_traversal.project_traversal`
+hydrates after the anchor page is read. No ``facet_counts``/
 ``field_range``/``search`` compilation here — ``QuerySpec`` (ADR-0035) has no
 representation for those yet.
 """
@@ -23,6 +26,7 @@ from dataclasses import dataclass
 from typing import Any, Optional
 
 from mosaic.core.query_spec import (
+    ColumnSpec,
     CriteriaGroup,
     Criterion,
     FieldCondition,
@@ -30,6 +34,60 @@ from mosaic.core.query_spec import (
     RelatedCondition,
 )
 from mosaic.core.schema_typing import EntityCapability
+
+
+@dataclass(frozen=True)
+class Hop:
+    """One reference hop of a traversal column, resolved against the
+    manifest: the slot on the class the hop leaves, and whether it is
+    to-many. The class it reaches is deliberately not used to read rows —
+    a member is fetched by its id under whatever concrete class actually
+    holds it (a subclass of the range, or, after ADR-0014, any class in its
+    closure)."""
+
+    slot: str
+    to_many: bool
+
+
+@dataclass(frozen=True)
+class TraversalColumn:
+    """One compiled ``columns`` entry (issue #236). ``hops`` is empty for an
+    anchor-owned column; ``mode`` is set iff exactly one hop is to-many."""
+
+    key: str
+    hops: tuple[Hop, ...]
+    leaf: str
+    mode: Optional[str] = None
+
+    @property
+    def many_at(self) -> Optional[int]:
+        """Index of the to-many hop, if any."""
+        for i, hop in enumerate(self.hops):
+            if hop.to_many:
+                return i
+        return None
+
+    @property
+    def link(self) -> Optional[tuple[str, ...]]:
+        """The path up to and including the to-many hop: what an
+        ``explode`` repeats rows over, shared by every column through it."""
+        at = self.many_at
+        return None if at is None else tuple(h.slot for h in self.hops[: at + 1])
+
+
+@dataclass(frozen=True)
+class TraversalProjection:
+    """The ``columns`` selection when any column follows a reference."""
+
+    columns: tuple[TraversalColumn, ...]
+    #: Anchor-owned column slots: each row's ``data`` is trimmed to these
+    #: (possibly none), exactly as the anchor-only projection trims it.
+    anchor_fields: tuple[str, ...]
+
+    @property
+    def explode(self) -> Optional[TraversalColumn]:
+        """The first exploded column (the validator allows one link)."""
+        return next((c for c in self.columns if c.mode == "explode"), None)
 
 
 @dataclass(frozen=True)
@@ -41,8 +99,12 @@ class CompiledQuery:
     as_of: Optional[str]
     order_by: Optional[str]
     order_dir: str
-    #: Anchor slots to keep in each envelope's ``data``; ``None`` = full envelopes.
+    #: Anchor slots to keep in each envelope's ``data``; ``None`` = full
+    #: envelopes. Always ``None`` when ``traversal`` is set: the hop slots
+    #: must be read before the projection trims ``data``.
     fields: Optional[tuple[str, ...]] = None
+    #: Set when any column follows a reference (issue #236).
+    traversal: Optional[TraversalProjection] = None
 
 
 def _compile_field_condition(cond: FieldCondition) -> dict[str, Any]:
@@ -106,6 +168,18 @@ def _compile_criteria(
     return compiled[0] if len(compiled) == 1 else {mode.lower(): compiled}
 
 
+def _compile_column(
+    col: ColumnSpec, anchor: EntityCapability, manifest: dict[str, EntityCapability]
+) -> TraversalColumn:
+    entity = anchor
+    hops: list[Hop] = []
+    for name in col.path[:-1]:
+        slot = entity.fields_by_name[name].slot
+        hops.append(Hop(slot=name, to_many=slot.multivalued))
+        entity = manifest[slot.target_class]
+    return TraversalColumn(key=col.key, hops=tuple(hops), leaf=col.path[-1], mode=col.mode)
+
+
 def compile_query_spec(
     spec: QuerySpec, manifest: dict[str, EntityCapability]
 ) -> CompiledQuery:
@@ -120,6 +194,13 @@ def compile_query_spec(
     anchor = manifest[spec.anchor]
     where = _compile_criteria(spec.criteria, spec.mode, anchor, manifest)
     sort = spec.sort[0] if spec.sort else None
+    anchor_fields = tuple(dict.fromkeys(c.slot for c in spec.columns if not c.is_traversal))
+    traversal = None
+    if any(c.is_traversal for c in spec.columns):
+        traversal = TraversalProjection(
+            columns=tuple(_compile_column(c, anchor, manifest) for c in spec.columns),
+            anchor_fields=anchor_fields,
+        )
     return CompiledQuery(
         entity_type=spec.anchor,
         where=where,
@@ -127,5 +208,6 @@ def compile_query_spec(
         order_by=sort.slot if sort else None,
         order_dir=sort.direction if sort else "asc",
         # Order-preserving dedupe: a repeated column is one column.
-        fields=tuple(dict.fromkeys(c.slot for c in spec.columns)) or None,
+        fields=None if traversal else (anchor_fields or None),
+        traversal=traversal,
     )

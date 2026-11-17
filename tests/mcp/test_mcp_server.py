@@ -133,23 +133,25 @@ class TestConstructQuerySpecPrompt:
             assert "samples over 5ml" in text
 
     async def test_columns_guidance_matches_what_is_actually_implemented(self, hippo_client):
-        # The prompt must teach the real, current behaviour (issue #215):
-        # anchor-owned slots are accepted; a traversal is not. Both statements
-        # must stay true at every commit, because the chat panel round-trips
-        # every spec through this parser.
+        # The prompt must teach the real, current behaviour (issues #215,
+        # #236): anchor slots and 1-2-hop paths, with the to-many choice.
+        # Every statement must stay true at every commit, because the chat
+        # panel round-trips every spec through this parser.
         async with Client(create_mcp_server(hippo_client)) as client:
             result = await client.get_prompt("construct_query_spec", {})
             text = result.messages[0].content.text
-            assert "ANCHOR slots only" in text
-            assert "COLUMNS_NOT_SUPPORTED" in text
-            assert "omit a traversal" in text.lower()
+            assert "anchor slots only" not in text.lower()
+            assert '"traversal"' in text
+            for word in ('"count"', '"joinIds"', '"explode"', "At most 2 hops", "COLUMNS_NOT_SUPPORTED", "grain"):
+                assert word in text
 
     async def test_capabilities_advertise_column_projection(self, hippo_client):
         # ADR-0029: a client tells a projecting deployment from a
         # non-projecting one by reading the manifest, not by probing.
+        # "traversal" (issue #236) is a strict superset of "anchor".
         server = create_mcp_server(hippo_client)
         payload = await _read_json(server, "mosaic://capabilities")
-        assert payload and all(e["column_projection"] == "anchor" for e in payload.values())
+        assert payload and all(e["column_projection"] == "traversal" for e in payload.values())
 
 
 class TestRealMount:
