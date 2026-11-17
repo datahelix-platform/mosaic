@@ -94,10 +94,12 @@
   `entity_type = ANY(...)`). Each SDK item carries its concrete
   `entity_type` and its full stored data; GraphQL renders it as the parent
   type with `entityType` naming the subclass. A leaf class's collection,
-  `get`, and search are unchanged. **Migration transforms that read old
-  rows with `ctx.client.query(type)` must pass `include_subclasses=False`**,
-  or a concrete parent's transform also sees (and would re-migrate) its
-  subclasses' rows.
+  `get`, and search are unchanged. **Migration transforms are unaffected
+  by default:** a transform's `ctx.client` is a `MigrationReadView` whose
+  `query` / `count` default to `include_subclasses=False`, so
+  `ctx.client.query("Subject")` still reads only `Subject` rows and a
+  subclass row is never re-migrated as its parent. A transform that wants
+  the closure passes `include_subclasses=True` explicitly.
 
 - **CI and the image install from `uv.lock`** (issue #242). Local
   `uv run pytest`, CI and the release image now test the same dependency

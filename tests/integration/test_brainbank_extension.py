@@ -22,8 +22,10 @@ Polymorphic query (PM §7.6 carry-forward; revised by ADR-0014 Decision 1):
     ``query("Subject")`` resolves over Subject's concrete closure, so it lists
     them too (each item's ``entity_type`` names its class).
     ``query("Subject", include_subclasses=False)`` reads only the ``Subject``
-    table; the migration transforms below use it so no subclass row is
-    migrated twice. ``TestQueryDisjoint`` asserts both directly.
+    table. A migration transform's ``ctx.client`` defaults to that, so the
+    transforms below call plain ``ctx.client.query("Subject")`` and no
+    subclass row is migrated twice. ``TestQueryDisjoint`` asserts both
+    directly; ``TestMigrationReadView`` pins the transform default.
 
 Stranded-field gate mechanism — doc-correction note (Doc 1 §7.3/§7.7):
     Doc 1 states the gate bites because ``age_value`` and ``age_unit`` are
@@ -76,6 +78,8 @@ from mosaic.core.loaders.bundle import Bundle
 from mosaic.core.loaders.domain_module import (
     DomainModule,
     MigrationContext,
+    MigrationPlan,
+    MigrationReadView,
     MigrationStep,
 )
 from mosaic.core.loaders.exposure import (
@@ -228,7 +232,7 @@ class _CorePackage(SchemaPackage):
 
 def _subject_v1_0_to_v1_1(ctx: MigrationContext) -> None:
     """Carry-forward Subject records to v1.1.0 (adds cohort_id, collection_site)."""
-    for item in ctx.client.query("Subject", include_subclasses=False).items:
+    for item in ctx.client.query("Subject").items:
         old = item.get("data") or {}
         new = {
             "external_id":        old.get("external_id"),
@@ -245,7 +249,7 @@ def _subject_v1_0_to_v1_1(ctx: MigrationContext) -> None:
 
 def _subject_v1_1_to_v2_0(ctx: MigrationContext) -> None:
     """Breaking: rename age_at_collection → age_value + age_unit (years)."""
-    for item in ctx.client.query("Subject", include_subclasses=False).items:
+    for item in ctx.client.query("Subject").items:
         old = item.get("data") or {}
         age = old.get("age_at_collection")
         new = {
@@ -309,7 +313,7 @@ def _coerce_bool(v: object) -> bool | None:
 
 def _brainbank_v1_to_v2(ctx: MigrationContext) -> None:
     """Complementary step: migrate BrainDonor age_at_collection → age_value + age_unit."""
-    for item in ctx.client.query("BrainDonor", include_subclasses=False).items:
+    for item in ctx.client.query("BrainDonor").items:
         old = item.get("data") or {}
         age = old.get("age_at_collection")
         new = {
@@ -526,6 +530,65 @@ class TestQueryDisjoint:
         assert samples[0]["id"] == "sa1"
         assert len(brain_samples) == 1
         assert brain_samples[0]["id"] == "bs1"
+
+
+class TestMigrationReadView:
+    """A transform's ``ctx.client`` reads one class at a time by default
+    (ADR-0014 Decision 1): a concrete parent's transform must not see its
+    subclasses' rows unless it asks for the closure."""
+
+    def _ctx(self, client: MosaicClient) -> MigrationContext:
+        return MigrationContext(
+            client=MigrationReadView(client),
+            from_version="1.0.0",
+            to_version="1.1.0",
+            plan=MigrationPlan(),
+        )
+
+    def _seed(self, client: MosaicClient) -> None:
+        _seed_subject(client, "s1", external_id="VA-001", age=65.3)
+        _seed_brain_donor(client, "bd1", external_id="VA-DON-001",
+                          brain_bank_id="BB-001", age=72.5)
+
+    def test_plain_query_and_count_are_type_exact(self, client: MosaicClient) -> None:
+        self._seed(client)
+        ctx = self._ctx(client)
+        assert [i["id"] for i in ctx.client.query("Subject").items] == ["s1"]
+        assert ctx.client.query("Subject").total == 1
+        assert ctx.client.count("Subject") == 1
+
+    def test_explicit_opt_in_gets_the_closure(self, client: MosaicClient) -> None:
+        self._seed(client)
+        ctx = self._ctx(client)
+        page = ctx.client.query("Subject", include_subclasses=True)
+        assert {i["id"] for i in page.items} == {"s1", "bd1"}
+        assert ctx.client.count("Subject", include_subclasses=True) == 2
+
+    def test_other_reads_delegate(self, client: MosaicClient) -> None:
+        self._seed(client)
+        ctx = self._ctx(client)
+        assert ctx.client.get("BrainDonor", "bd1")["id"] == "bd1"
+        assert ctx.client.wrapped is client
+
+    def test_evolve_hands_transforms_the_view(self, client: MosaicClient) -> None:
+        """``DomainModule.evolve`` wraps the client: a transform calling plain
+        ``ctx.client.query("Subject")`` migrates only the Subject row."""
+        self._seed(client)
+        seen: list[set[str]] = []
+
+        def _spy(ctx: MigrationContext) -> None:
+            assert isinstance(ctx.client, MigrationReadView)
+            seen.append({i["id"] for i in ctx.client.query("Subject").items})
+            _subject_v1_0_to_v1_1(ctx)
+
+        class _Spy(_SubjectModule):
+            def migration_steps(self) -> list[MigrationStep]:
+                return [MigrationStep("1.0.0", "1.1.0", _spy)]
+
+        _Spy().evolve(client, "1.0.0", "1.1.0")
+        assert seen == [{"s1"}]
+        # The BrainDonor row was not re-migrated as a Subject.
+        assert client.get("BrainDonor", "bd1")["is_available"] in (True, 1)
 
 
 # ---------------------------------------------------------------------------
