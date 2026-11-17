@@ -99,6 +99,19 @@
   or a concrete parent's transform also sees (and would re-migrate) its
   subclasses' rows.
 
+- **CI and the image install from `uv.lock`** (issue #242). Local
+  `uv run pytest`, CI and the release image now test the same dependency
+  versions; before, CI and the image resolved unlocked (linkml-runtime 1.12)
+  while the lock pinned 1.10. The lock is refreshed to linkml /
+  linkml-runtime 1.12.1. CI runs `uv sync --locked` with the extras each job
+  used before (`dev,graphql,mcp`; `dev,postgres`); the Dockerfile installs
+  `uv export --locked` output for `graphql,postgres,mcp`, then the project
+  with `--no-deps`. Both fail if `uv.lock` is stale against `pyproject.toml`.
+  `pyproject.toml` ranges are unchanged, so library installs downstream still
+  resolve freely. A new weekly workflow (`tests-unlocked.yml`, schedule and
+  manual dispatch only, never on PRs) resolves fresh and runs the suite so
+  upstream changes surface before the next lock refresh.
+
 ### Fixed
 
 - **Rows lost through concrete parents and forward abstract edges**
