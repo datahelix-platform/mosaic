@@ -214,3 +214,8 @@ mosaic#204") moves from *engineering* to *release + schema authoring*; it does n
 > single-valued *forward* slot — reopening, and reversing for import-layered schemas, the first
 > sub-question above. **ADR-0013** lifts the multivalued-forward deferral, so Decision item 2's
 > load-time rejection goes. Everything else here stands.
+
+> **Implemented (#231).** Decision item 2's rejection is removed. Which side of an `inverse` pair is
+> virtual now follows ADR-0013's 2026-11-10 pair rule (`linkml_bridge.is_virtual_inverse`) instead of
+> "multivalued + `inverse`", so the Consequences' carve-out of ADR-0002 reads "the *virtual* side of
+> an `inverse` pair", not "a multivalued reference slot with `inverse`".

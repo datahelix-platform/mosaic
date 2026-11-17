@@ -1770,12 +1770,27 @@ class PostgresAdapter(EntityStore):
         for slot_name, inv in inverse.items():
             # entity_type over the range's concrete closure: an abstract
             # range (``Sample``) stores no rows under its own name (#224).
-            cur.execute(
-                "SELECT id, data->>%s AS fk FROM entities "
-                "WHERE entity_type = ANY(%s) AND data->>%s = ANY(%s) "
-                "AND is_available = TRUE ORDER BY id",
-                (inv.forward_slot, list(inv.tables), inv.forward_slot, list(entity_ids)),
-            )
+            if getattr(inv, "forward_multivalued", False):
+                # Reverse of a relationships-backed forward slot (ADR-0013):
+                # join the link table on ``target_id``, scoped to the
+                # forward slot, back to the source documents.
+                cur.execute(
+                    "SELECT DISTINCT src.id AS id, rel.target_id AS fk "
+                    "FROM relationships rel JOIN entities src "
+                    "ON src.id = rel.source_id "
+                    "WHERE rel.target_id = ANY(%s) "
+                    "AND rel.relationship_type = %s AND rel.is_available = TRUE "
+                    "AND src.entity_type = ANY(%s) AND src.is_available = TRUE "
+                    "ORDER BY src.id",
+                    (list(entity_ids), inv.forward_slot, list(inv.tables)),
+                )
+            else:
+                cur.execute(
+                    "SELECT id, data->>%s AS fk FROM entities "
+                    "WHERE entity_type = ANY(%s) AND data->>%s = ANY(%s) "
+                    "AND is_available = TRUE ORDER BY id",
+                    (inv.forward_slot, list(inv.tables), inv.forward_slot, list(entity_ids)),
+                )
             for row in cur.fetchall():
                 out.setdefault(row["fk"], {}).setdefault(slot_name, []).append(
                     row["id"]
@@ -2099,15 +2114,32 @@ class PostgresAdapter(EntityStore):
                 # keyed on that key, `none` its NOT EXISTS complement. No
                 # link table. Placeholder render order: forward key →
                 # target type → subtree.
-                params.append(inverse_of)
-                params.append(list(self._inverse_slots(entity_type)[edge].tables))
+                inv = self._inverse_slots(entity_type)[edge]
+                if getattr(inv, "forward_multivalued", False):
+                    # Reverse of a multivalued forward slot (ADR-0013): the
+                    # edge is an available ADR-0002 relationship row from
+                    # the target document to this entity, scoped to the
+                    # forward slot. Placeholder render order:
+                    # relationship_type → target types → subtree.
+                    params.append(inverse_of)
+                    match = (
+                        f"EXISTS (SELECT 1 FROM relationships {alias}l "
+                        f"WHERE {alias}l.source_id = {alias}.id "
+                        f"AND {alias}l.target_id = {outer}id "
+                        f"AND {alias}l.relationship_type = %s "
+                        f"AND {alias}l.is_available = TRUE)"
+                    )
+                else:
+                    params.append(inverse_of)
+                    match = f"{alias}.data->>%s = {outer}id"
+                params.append(list(inv.tables))
                 sub = self._tree_predicate(
                     node["where"], target, params,
                     scope=f"{alias}.", alias_seq=alias_seq,
                 )
                 exists = (
                     f"EXISTS (SELECT 1 FROM entities {alias} "
-                    f"WHERE {alias}.data->>%s = {outer}id "
+                    f"WHERE {match} "
                     f"AND {alias}.entity_type = ANY(%s) "
                     f"AND {alias}.is_available = TRUE AND {sub})"
                 )
@@ -2664,18 +2696,29 @@ class PostgresAdapter(EntityStore):
         if inverse_of is not None:
             # Virtual inverse slot (ADR-0011): count the available target
             # documents whose forward FK key points at this entity.
+            # A multivalued forward slot (ADR-0013) counts the available
+            # source documents holding an available relationship row to it.
+            inv = self._inverse_slots(entity_type)[edge]
             with self._transaction() as conn:
                 cur = conn.cursor()
-                cur.execute(
-                    "SELECT COUNT(*) AS c FROM entities tgt "
-                    "WHERE tgt.entity_type = ANY(%s) AND tgt.data->>%s = %s "
-                    "AND tgt.is_available = TRUE",
-                    (
-                        list(self._inverse_slots(entity_type)[edge].tables),
-                        inverse_of,
-                        entity_id,
-                    ),
-                )
+                if getattr(inv, "forward_multivalued", False):
+                    cur.execute(
+                        "SELECT COUNT(*) AS c FROM entities tgt "
+                        "WHERE tgt.entity_type = ANY(%s) "
+                        "AND tgt.is_available = TRUE AND EXISTS ("
+                        "SELECT 1 FROM relationships rel "
+                        "WHERE rel.source_id = tgt.id AND rel.target_id = %s "
+                        "AND rel.relationship_type = %s "
+                        "AND rel.is_available = TRUE)",
+                        (list(inv.tables), entity_id, inverse_of),
+                    )
+                else:
+                    cur.execute(
+                        "SELECT COUNT(*) AS c FROM entities tgt "
+                        "WHERE tgt.entity_type = ANY(%s) AND tgt.data->>%s = %s "
+                        "AND tgt.is_available = TRUE",
+                        (list(inv.tables), inverse_of, entity_id),
+                    )
                 return int(cur.fetchone()["c"])
         sql = (
             "SELECT COUNT(*) AS c FROM relationships rel "

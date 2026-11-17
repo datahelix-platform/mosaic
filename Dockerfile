@@ -18,13 +18,26 @@
 # resolve inside the mount. Absolute --config/--schema-dir/--db-path flags
 # work regardless of the workdir, so existing deployments that mount config
 # elsewhere (e.g. the certification stack's /app/hippo.yaml) are unaffected.
+#
+# Dependencies install from uv.lock (mosaic#242), so the image runs the same
+# versions as CI and `uv run pytest`: `uv export --locked` writes the locked,
+# hash-pinned requirements for the image's extras, pip installs them, then the
+# project itself goes in with --no-deps. `--locked` fails the build if uv.lock
+# is out of date with pyproject.toml.
+
+FROM ghcr.io/astral-sh/uv:0.12.9 AS uv
 
 FROM python:3.12-slim AS builder
 
 WORKDIR /build
-COPY pyproject.toml README.md ./
+COPY --from=uv /uv /usr/local/bin/uv
+COPY pyproject.toml uv.lock README.md ./
 COPY src/ ./src/
-RUN pip install --no-cache-dir --prefix=/install ".[graphql,postgres,mcp]"
+RUN uv export --locked --no-dev --no-emit-project \
+        --extra graphql --extra postgres --extra mcp \
+        -o requirements.lock.txt \
+    && pip install --no-cache-dir --prefix=/install -r requirements.lock.txt \
+    && pip install --no-cache-dir --prefix=/install --no-deps .
 
 FROM python:3.12-slim
 
