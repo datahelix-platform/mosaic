@@ -2215,7 +2215,9 @@ class PostgresAdapter(EntityStore):
                 f"AND {alias}.is_available = TRUE AND {sub})"
             )
             return exists if quantifier == "some" else f"NOT {exists}"
-        if scope:
+        if scope or self._is_family(entity_type):
+            # Nested under an edge, or on a family's own collection (#228):
+            # a name no class of the closure has is a typo, not a NULL.
             self._check_closure_field(entity_type, node["field"])
         # COALESCE to two-valued logic: a missing key makes the extracted
         # text SQL NULL, and `NOT NULL` is NULL — which would silently
@@ -2634,12 +2636,25 @@ class PostgresAdapter(EntityStore):
         slots (multivalued slots store JSON arrays — no scalar order) plus
         ``id``. Mirrors the SQLite adapter's typed-column set."""
         registry = self.schema_registry
-        slots = (
-            set(registry.slot_base_ranges(entity_type))
-            if registry is not None
-            else set()
-        )
+        if registry is None:
+            return {"id"}
+        slots = set(registry.slot_base_ranges(entity_type))
+        if self._is_family(entity_type):
+            # A family (ADR-0014 Decision 3, #228) orders and aggregates on
+            # any field one of its kinds has; the others read it as NULL.
+            for kind in registry.concrete_closure(entity_type):
+                slots |= set(registry.slot_base_ranges(kind))
         return slots | {"id"}
+
+    def _is_family(self, entity_type: Optional[str]) -> bool:
+        """An abstract class with concrete descendants (ADR-0014 Decision 3)."""
+        registry = self.schema_registry
+        if registry is None or not entity_type:
+            return False
+        cls = registry.schema_view.get_class(entity_type)
+        return bool(
+            cls is not None and cls.abstract and registry.concrete_closure(entity_type)
+        )
 
     def _order_clause(self, query: Query, params: list[Any]) -> str:
         """SQL ORDER BY for ``query.order_by`` (ADR-0007): stable ``id``

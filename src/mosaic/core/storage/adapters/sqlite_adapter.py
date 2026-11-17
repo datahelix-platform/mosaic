@@ -2815,11 +2815,10 @@ class SQLiteAdapter(EntityStore):
             yield from self._find_as_of(query, as_of)
             return
         if query.entity_type:
-            if not self._per_class_table_exists(query.entity_type):
+            tables = self._collection_tables(query)
+            if not tables:
                 return
-            yield from self._find_per_class(
-                query.entity_type, query, self._collection_tables(query)
-            )
+            yield from self._find_per_class(query.entity_type, query, tables)
             return
 
         registry = self.schema_registry
@@ -3607,7 +3606,20 @@ class SQLiteAdapter(EntityStore):
     def _valid_query_columns(self, entity_type: str) -> set[str]:
         """Columns filters/ordering/aggregation may address on a per-class
         table — the slot columns plus ``id``/``is_available`` (identical to
-        the set ``_find_per_class`` validates against, by construction)."""
+        the set ``_find_per_class`` validates against, by construction).
+
+        A family (abstract class, ADR-0014 Decision 3, #228) has no table
+        of its own: its columns are those of any table of its concrete
+        closure. Its collection source NULL-pads a column a kind's table
+        lacks, so a kind-only field reads as NULL for the other kinds —
+        the read-as-NULL rule of the 2026-11-17 amendment, applied to the
+        family's own collection as it is to closure edges."""
+        if not self._per_class_table_exists(entity_type):
+            tables = self._closure_tables(entity_type)
+            if tables:
+                return set.union(
+                    *(self._valid_query_columns(t) for t in tables)
+                )
         slot_columns = {
             c for c in self._per_class_columns(entity_type)
             if c not in {"id", "is_available", "superseded_by"}
@@ -3643,7 +3655,11 @@ class SQLiteAdapter(EntityStore):
 
         total = 0
         for class_name in class_names:
-            if not self._per_class_table_exists(class_name):
+            exists = (
+                bool(self._collection_tables(query)) if query.entity_type
+                else self._per_class_table_exists(class_name)
+            )
+            if not exists:
                 continue
             # A typed count spans the same closure ``find`` lists (ADR-0014).
             source, _ = self._collection_source(
@@ -3678,7 +3694,7 @@ class SQLiteAdapter(EntityStore):
         entity_type, valid_columns = self._require_aggregate_field(
             query, field, surface="facet_counts"
         )
-        if not self._per_class_table_exists(entity_type):
+        if not self._collection_tables(query):
             return []
         params: list[Any] = []
         predicate = self._query_predicate(
@@ -3709,7 +3725,7 @@ class SQLiteAdapter(EntityStore):
         entity_type, valid_columns = self._require_aggregate_field(
             query, field, surface="field_range"
         )
-        if not self._per_class_table_exists(entity_type):
+        if not self._collection_tables(query):
             return (None, None)
         params: list[Any] = []
         predicate = self._query_predicate(

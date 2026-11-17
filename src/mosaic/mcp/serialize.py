@@ -14,7 +14,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from mosaic.core.schema_typing import EntityCapability, EntityTypeModel, SlotModel
+from mosaic.core.schema_typing import (
+    EntityCapability,
+    EntityTypeModel,
+    FamilyTypeModel,
+    SlotModel,
+)
 
 
 def slot_model_to_dict(slot: SlotModel) -> dict[str, Any]:
@@ -39,12 +44,17 @@ def slot_model_to_dict(slot: SlotModel) -> dict[str, Any]:
 
 
 def entity_type_model_to_dict(entity: EntityTypeModel) -> dict[str, Any]:
-    return {
+    out: dict[str, Any] = {
         "name": entity.class_name,
         "accessor_name": entity.accessor_name,
         "description": entity.description,
         "fields": [slot_model_to_dict(f) for f in entity.fields],
     }
+    if isinstance(entity, FamilyTypeModel):
+        # A family (ADR-0014 Decision 4, #228): its fields are the ones
+        # every kind shares, as on hippoSchema.
+        out.update(abstract=True, parent=entity.parent, kinds=list(entity.kinds))
+    return out
 
 
 #: What ``QuerySpec.columns`` can name on this deployment (ADR-0029 honest
@@ -64,6 +74,10 @@ def entity_capability_to_dict(entity: EntityCapability) -> dict[str, Any]:
         "accessor_name": entity.accessor_name,
         "description": entity.description,
         "search_available": entity.search_available,
+        "abstract": entity.abstract,
+        "parent": entity.parent,
+        "kinds": list(entity.kinds),
+        "anchor": entity.anchor,
         "fields": [
             {
                 **slot_model_to_dict(f.slot),
@@ -73,6 +87,7 @@ def entity_capability_to_dict(entity: EntityCapability) -> dict[str, Any]:
                 "aggregatable": f.aggregatable,
                 "range_queryable": f.range_queryable,
                 "searchable": f.searchable,
+                "only_kinds": list(f.kinds),
             }
             for f in entity.fields
         ],

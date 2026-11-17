@@ -21,17 +21,24 @@ def collection_classes(registry: Any, query: "Query") -> list[str]:
     """Concrete classes whose rows ``query``'s collection spans (ADR-0014).
 
     ``[query.entity_type]`` unless ``query.include_subclasses`` is set and
-    the class is a concrete parent, in which case its concrete closure
-    (the class itself first). An abstract ``entity_type`` keeps its own
-    name: abstract anchors are ADR-0014 Decisions 2-5 (#228), not this
-    flag. Callers check that the type is non-empty first.
+    the class has concrete descendants: a concrete parent's closure (the
+    class itself first), or an abstract family's kinds (ADR-0014 Decision
+    3, #228). ``include_subclasses=False`` on a family names a class with
+    no rows, so it reads nothing — exactly what a one-class-at-a-time
+    migration transform should see. Callers check that the type is
+    non-empty first.
     """
     entity_type = query.entity_type
-    if not getattr(query, "include_subclasses", False) or registry is None:
+    if registry is None:
+        return [entity_type]
+    if not getattr(query, "include_subclasses", False):
         return [entity_type]
     closure = registry.concrete_closure(entity_type)
-    if not closure or closure[0] != entity_type:
+    if not closure:
         return [entity_type]
+    # A concrete parent's closure starts with the class itself; a family's
+    # (abstract anchor, ADR-0014 Decision 3, #228) is only its kinds, since
+    # it has no rows of its own.
     return list(closure)
 
 

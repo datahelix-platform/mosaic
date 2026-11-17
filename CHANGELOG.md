@@ -37,6 +37,39 @@
   to-many choice. The aggregate tools keep rejecting `columns`; GraphQL is
   unaffected.
 
+- **Families: abstract classes as GraphQL interfaces and read-only anchors**
+  (issue #228, ADR-0014 Decisions 2–6). An abstract class with exposed
+  concrete kinds (`Sample` with `Brain`, `Blood`, …) is a *family*:
+  - **One GraphQL interface per family**, implemented by its kinds, carrying
+    the fields every kind stores alike (references included: `Sample.donor`,
+    `Sample.producedBy`). A reference ranged on the family resolves to it and
+    returns each row as its own kind (`__typename` names the leaf), so
+    `donor { samples { __typename sampleId ... on Brain { hemisphere } } }`
+    works. Interfaces nest (`Sample` extends `NamedThing`).
+  - **Read-only family collections** with the entity surface: `samples`
+    (typed `where`, `orderBy`, paging), `sample(id:)`, `samplesCount`,
+    `samplesFacetCounts`, `samplesFieldRange`, `searchSamples` (over the
+    kinds' FTS indexes). No create/update inputs (Decision 6). SDK:
+    `query`/`count`/`get`/`search` on a family span its kinds;
+    `include_subclasses=False` reads nothing (a family has no rows of its
+    own), so migration transforms see no family rows unless they opt in.
+  - **Kind-only fields read as NULL** on a family's collection, as under a
+    closure edge (the 2026-11-17 D1 rule): `samples(where: {orientation:
+    {eq: Coronal}})` filters across the kinds that have `orientation`; a name
+    no kind has is still rejected. Both adapters.
+  - **The capability manifest carries the hierarchy** (Decision 4): every
+    entry has `abstract`, `parent` and `kinds`; families are listed; a
+    reference into a family is `predicate: true`; a family field only some
+    kinds have names them in `only_kinds`. `mosaic://capabilities`,
+    `hippoSchema` / `hippoEntityType` (`abstract`, `parent`, `kinds`) and the
+    `construct-query-spec` prompt (one new item) expose it. QuerySpec may
+    anchor on a family and filter through edges into one.
+  - **Opt-outs** (Decision 5), new class annotations: `hippo_anchor: false`
+    removes a family's collection (and QuerySpec anchoring on any class) but
+    keeps its interface; `hippo_manifest: false` hides a class from the
+    planner-facing manifest only. Brain bank's root `NamedThing` (86 kinds)
+    is the expected user of `hippo_anchor: false`.
+
 - **Reverse edges over multivalued (relationship-row) forward slots**
   (issue #231, ADR-0013 and its 2026-11-10 amendment). ADR-0011 rejected an
   `inverse` whose forward slot is multivalued at load; that rejection is
@@ -118,6 +151,16 @@
   bundle and domain-module teardown use it.
 
 ### Changed
+
+- **GraphQL: references into a family drop their raw-id fallback**
+  (issue #228). A reference ranged on an abstract class with an exposed kind
+  used to keep a raw `<slot>Id` / `<slot>Ids` field and warn at build time;
+  it is now the resolved edge to the family's interface, like every other
+  reference (ADR-0005 edge-only). **Breaking for clients selecting those raw
+  fields** — 95 on brain bank (e.g. `Donor.samplesIds`, `Assay.inputsIds`,
+  `Dataset.producedById`): select the edge's `id` instead. An abstract target
+  with *no* exposed kind keeps the raw id and the warning. GraphQL also gains
+  one accessor per family (`samples`, `namedThings`, …).
 
 - **Behaviour change — a concrete parent's collection now includes its
   subclasses' rows** (ADR-0014 Decision 1, issue #241). `query("Process")`,
