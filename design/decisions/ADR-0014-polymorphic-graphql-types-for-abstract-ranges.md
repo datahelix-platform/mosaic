@@ -239,3 +239,11 @@ parent:
   one class at a time. The transports do not expose it. A migration transform's `ctx.client`
   (`MigrationReadView`) defaults it to `False`, so a concrete parent's transform never re-migrates
   its subclasses' rows unless it opts in with `include_subclasses=True`.
+- **Amended 2026-11-17 (#276 review): one closure for storage and GraphQL.** A concrete parent's
+  collection resolves over its full concrete closure (`SchemaRegistry.concrete_closure`), and the
+  GraphQL builder gives the parent's type `entityType` from that same closure, not only from
+  subclasses that have their own GraphQL type. A row of a subclass without a GraphQL type is
+  still a row of the parent: it is listed and counted through the parent, and `entityType` names
+  its class. Today no concrete subclass of an exposed class can be unexposed; this rule is fixed
+  now so that Decision 5's `hippo_anchor: false` opt-out hides the subclass's own accessor without
+  hiding its rows from the parent or dropping `entityType`.

@@ -228,11 +228,15 @@ class EntityGraphQLInfo:
     #: Generated ``<Class>OrderField`` enum (ADR-0007 increment 3): the
     #: orderable stored columns. Member values are LinkML slot names.
     order_field_enum: Any = None
-    #: Exposed concrete subclasses when this class is a *concrete parent*
-    #: (ADR-0014 Decision 1): its collection and every reference ranged on
-    #: it may return their rows, rendered as this type, so the type carries
-    #: the non-null ``entityType`` system field naming each row's class.
-    exposed_subclasses: list[str] = dc_field(default_factory=list)
+    #: Concrete subclasses when this class is a *concrete parent* (ADR-0014
+    #: Decision 1): its collection and every reference ranged on it may
+    #: return their rows, rendered as this type, so the type carries the
+    #: non-null ``entityType`` system field naming each row's class. This
+    #: is the full concrete closure, the same set storage resolves a
+    #: collection over (``collection_classes``), whether or not a subclass
+    #: has its own GraphQL type: an unexposed subclass's rows are still
+    #: listed, so ``entityType`` must still be there to name them.
+    closure_subclasses: list[str] = dc_field(default_factory=list)
 
     def filterable_slot_names(self) -> list[str]:
         """Slot names a list query's ``filters.field`` can match on.
@@ -362,7 +366,7 @@ class GraphQLTypeBuilder:
         for name in entity.computed_fields:
             kwargs[name] = envelope.get(name)
 
-        if entity.exposed_subclasses:
+        if entity.closure_subclasses:
             # The row's concrete class (ADR-0014 Decision 1): a subclass row
             # reached through a concrete parent renders as the parent type.
             kwargs[ENTITY_TYPE_FIELD] = str(
@@ -411,9 +415,12 @@ class GraphQLTypeBuilder:
                 model=model,
             )
         for class_name, entity in self.entities.items():
-            entity.exposed_subclasses = [
+            # Not filtered by exposure: storage lists every concrete
+            # subclass's rows in this class's collection (ADR-0014
+            # Decision 1), so entityType follows the same closure.
+            entity.closure_subclasses = [
                 c for c in self._registry.concrete_closure(class_name)
-                if c != class_name and c in self.entities
+                if c != class_name
             ]
 
     def _build_enums(self) -> None:
@@ -685,7 +692,7 @@ class GraphQLTypeBuilder:
                 setattr(cls, name, None)
                 entity.computed_fields.append(name)
 
-            if entity.exposed_subclasses:
+            if entity.closure_subclasses:
                 if ENTITY_TYPE_FIELD in slot_names:
                     raise ValueError(
                         f"{class_name}.{ENTITY_TYPE_FIELD}: the slot collides "
@@ -701,9 +708,10 @@ class GraphQLTypeBuilder:
                         description=(
                             f"Concrete class of this row: {class_name} or "
                             f"one of its subclasses "
-                            f"({', '.join(entity.exposed_subclasses)}), whose "
+                            f"({', '.join(entity.closure_subclasses)}), whose "
                             f"rows this type also renders (ADR-0014). Query "
-                            f"the subclass's own collection for its slots."
+                            f"the subclass's own collection, where it has "
+                            f"one, for its slots."
                         ),
                     ),
                 )

@@ -69,11 +69,13 @@
   load unchanged, with zero synthesized slots.
 
 - **`entityType: String!` on a concrete parent's GraphQL type** (ADR-0014
-  Decision 1). Every concrete class with exposed concrete subclasses
-  (`Process` with `BankBrain`, `Person` with `Donor`) gains a non-null
+  Decision 1). Every concrete class with concrete subclasses (`Process`
+  with `BankBrain`, `Person` with `Donor`) gains a non-null
   `entityType` system field naming the row's concrete class, since a
   subclass row reached through the parent renders as the parent type
-  (`__typename` names the parent). Leaf types are unchanged. A slot named
+  (`__typename` names the parent). The subclass set is the same full
+  concrete closure the parent's collection lists, so a subclass without
+  its own GraphQL type still gets its rows named. Leaf types are unchanged. A slot named
   `entity_type` on such a class is a build-time error.
 - **`include_subclasses` on `MosaicClient.query` / `count`** (default
   `True`; public SDK API per the ADR-0014 2026-11-17 amendment, not exposed
