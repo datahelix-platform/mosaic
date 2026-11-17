@@ -153,15 +153,22 @@ class QueryService:
 
         return result
 
+    def _is_family(self, entity_type: str) -> bool:
+        """An abstract class with concrete descendants (ADR-0014 Decision 3)."""
+        registry = getattr(self._storage, "schema_registry", None)
+        if registry is None:
+            return False
+        cls = registry.schema_view.get_class(entity_type)
+        return bool(cls is not None and cls.abstract and registry.concrete_closure(entity_type))
+
     def _type_accepts(
         self, requested: str, actual: str, include_subclasses: bool
     ) -> bool:
         """Whether a row of class ``actual`` answers a lookup for
         ``requested``: the same class, or, with ``include_subclasses``, a
-        class of ``requested``'s concrete closure when ``requested`` is a
-        concrete parent. Abstract classes keep the exact match: abstract
-        anchors are ADR-0014 Decisions 2-5 (#228). The same set
-        ``collection_classes`` lists."""
+        class of ``requested``'s concrete closure: a concrete parent's, or
+        an abstract family's kinds (ADR-0014 Decision 3, #228). The same
+        set ``collection_classes`` lists."""
         if actual == requested:
             return True
         if not include_subclasses:
@@ -169,8 +176,7 @@ class QueryService:
         registry = getattr(self._storage, "schema_registry", None)
         if registry is None:
             return False
-        closure = registry.concrete_closure(requested)
-        return bool(closure) and closure[0] == requested and actual in closure
+        return actual in registry.concrete_closure(requested)
 
     def _parse_and_validate_expand(self, expand: str) -> Any:
         """Parse and validate an expand path."""
@@ -1062,7 +1068,18 @@ class QueryService:
         if self._storage is None or self._schema_manager is None:
             return empty
 
-        fts_tables = self._schema_manager.get_fts_tables_for_entity_type(entity_type)
+        # A family (abstract class, ADR-0014 Decision 3, #228) searches the
+        # FTS indexes of its kinds; any other class, its own.
+        family = self._is_family(entity_type)
+        search_classes = (
+            list(self._storage.schema_registry.concrete_closure(entity_type))
+            if family else [entity_type]
+        )
+        fts_tables = [
+            (cls, fts_meta)
+            for cls in search_classes
+            for fts_meta in self._schema_manager.get_fts_tables_for_entity_type(cls)
+        ]
         if not fts_tables:
             return empty
 
@@ -1070,11 +1087,11 @@ class QueryService:
         # fields; score desc, first-seen order as the stable tiebreak.
         best_scores: dict[str, float] = {}
         first_seen: dict[str, int] = {}
-        for fts_meta in fts_tables:
+        for search_class, fts_meta in fts_tables:
             for field_meta in fts_meta.fields:
                 matches = self._storage.search(
                     query=query,
-                    entity_type=entity_type,
+                    entity_type=search_class,
                     field_name=field_meta.field_name,
                     limit=self.SEARCH_HIT_BUDGET,
                 )
@@ -1099,6 +1116,7 @@ class QueryService:
             filters=filters or [],
             filter_mode=filter_mode,
             where=tree,
+            include_subclasses=family,
         )
 
         if order_by is not None:

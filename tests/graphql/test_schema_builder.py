@@ -353,19 +353,39 @@ classes:
 class TestEdgeOnlyReferenceEmission:
     """ADR-0005: references emit only the resolved edge; the raw id is hidden.
 
-    The two cases that can't produce an edge are handled explicitly — a
-    non-exposed (abstract/polymorphic) target keeps a raw id as an interim; a
-    resolved-name collision is a build-time error (no silent raw-id fallback).
+    An abstract target with an exposed concrete kind is a family and resolves
+    to its interface (ADR-0014 Decision 2). The two cases that still can't
+    produce an edge are handled explicitly — a target with NO exposed kind
+    keeps a raw id and warns; a resolved-name collision is a build-time
+    error (no silent raw-id fallback).
     """
 
-    def test_abstract_target_retains_raw_id_and_warns(self):
+    def test_abstract_target_with_exposed_kind_resolves_to_interface(self):
+        import warnings
+
         registry = SchemaRegistry.from_yaml(EDGE_ONLY_POLYMORPHIC_SCHEMA)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")  # no raw-id fallback warning
+            sdl = str(build_graphql_schema(registry))
+        item = _block(sdl, "type Item")
+        assert "container: Container" in item
+        assert "containerId" not in item
+        assert "interface Container" in sdl
+        assert re.search(r"type Box implements Container", sdl)
+
+    def test_abstract_target_without_exposed_kind_retains_raw_id_and_warns(self):
+        registry = SchemaRegistry.from_yaml(
+            EDGE_ONLY_POLYMORPHIC_SCHEMA.replace(
+                "  Box:\n    is_a: Container\n", ""
+            )
+        )
         with pytest.warns(UserWarning, match="no generated GraphQL type"):
             sdl = str(build_graphql_schema(registry))
         item = _block(sdl, "type Item")
-        # Unresolvable (abstract) target → raw id retained (interim), no edge.
+        # No kind to resolve to → raw id retained, no edge, no interface.
         assert "containerId: ID" in item
         assert "container: Container" not in item
+        assert "interface Container" not in sdl
 
     def test_resolved_name_collision_is_build_error(self):
         registry = SchemaRegistry.from_yaml(EDGE_ONLY_COLLISION_SCHEMA)

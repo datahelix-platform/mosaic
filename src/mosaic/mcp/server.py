@@ -98,6 +98,7 @@ from mosaic.core.query_spec_compiler import compile_query_spec
 from mosaic.core.schema_typing import (
     EntityCapability,
     build_capability_manifest,
+    build_family_model,
     build_type_model,
 )
 from mosaic.mcp.serialize import entity_capability_to_dict, entity_type_model_to_dict
@@ -148,7 +149,13 @@ def create_mcp_server(hippo_client: MosaicClient) -> MCPServer:
 
     type_model = build_type_model(registry)
     capability_manifest = build_capability_manifest(registry)
-    schema_payload = {name: entity_type_model_to_dict(e) for name, e in type_model.items()}
+    # Entities plus families (ADR-0014 Decision 4), as hippoSchema lists them.
+    schema_payload = {
+        name: entity_type_model_to_dict(e)
+        for name, e in {
+            **type_model, **build_family_model(registry, type_model)
+        }.items()
+    }
     capabilities_payload = {
         name: entity_capability_to_dict(e) for name, e in capability_manifest.items()
     }
@@ -791,6 +798,15 @@ Samples whose donor is this Donor). Use it as a RelatedCondition edge \
 exactly like any other reference -- "the donors of those samples" is \
 anchor Donor + edge samples, never a client-side fan-out over sample ids. \
 It is read-only/derived and is never a filter target for a FieldCondition.
+
+12. An entity with `abstract: true` is a FAMILY: its `kinds` list the \
+concrete types it covers (e.g. Sample's kinds Brain, Blood, DNA, ...), and \
+its rows are those kinds' rows. Anchor on the family when the question is \
+about the whole family ("which donors have any sample"), on a kind when it \
+names one ("brain samples" = anchor Brain; across a family, a criterion on \
+its type-designator field, e.g. `category`, if the schema has one and the \
+data fills it). A family field with a non-empty \
+`only_kinds` exists only on those kinds; on the others it reads as null.
 
 Workflow: call validate_query_spec first if you want to check a draft \
 without running it; call execute_query_spec once you're ready to fetch \

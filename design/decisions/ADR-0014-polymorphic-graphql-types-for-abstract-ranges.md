@@ -256,3 +256,35 @@ parent:
   `ctx.client.get` defaults to it. A leaf still does not answer for its parent's or a sibling's
   row, and an abstract class keeps the exact match until abstract anchors land (Decisions 2–5,
   #228).
+- **Implementation notes 2026-11-17 (#228, Decisions 2–6; for ratification in review).** Where
+  the text above left a choice open or the 2026-11-17 amendments changed its premise:
+  - *Which classes are families.* One rule, `schema_typing.build_family_model`, used by GraphQL
+    and the manifest alike: an abstract, non-infrastructure class with at least one exposed
+    concrete descendant. On brain bank that is ten families, `NamedThing` (86 kinds) included.
+  - *What the interface carries.* "The slots induced on the abstract class" is read as the
+    fields every kind stores alike — same name, kind, range, cardinality, target and enum. A slot
+    a kind narrows differently (brain bank's `format`: `SolidSampleFormat` vs.
+    `LiquidSampleFormat`) has no single GraphQL type and is on no interface; query the kind.
+    Shared references are on the interface (`Sample.donor`, `Sample.producedBy`, counts for
+    multivalued ones), so a shared field never needs a fragment. A family interface extends its
+    nearest family ancestor's; a kind implements its most specific families.
+  - *Kind-only fields on the anchor read as NULL.* Decision 3 said a subclass-only slot is
+    `UNKNOWN_SLOT` on the abstract anchor; the D1 amendment made the same case read-as-NULL under
+    a closure edge. The anchor now follows D1, so one rule holds everywhere: a field some kind has
+    filters, orders and facets on the family (`samples(where: {orientation: {eq: Coronal}})`),
+    reading NULL for kinds without it; a name no kind has stays unknown. It is in the family's
+    GraphQL filter input and order enum, and in the manifest with `only_kinds` naming its kinds,
+    so QuerySpec `RelatedCondition`s into a family accept it too (closing the "until #228" gap in
+    the D1 amendment). It is not an interface field: select it with `... on <Kind>`.
+  - *`include_subclasses` on a family.* `False` names a class with no rows, so it reads nothing
+    (list, count, `get`); a migration transform's view therefore sees no family rows unless it
+    opts in, which is the D2 rule.
+  - *By-id lookup.* `get("Sample", id)` / `sample(id:)` returns the kind's row (the D3 rule,
+    extended to families).
+  - *Search.* `search{Plural}` on a family ranks over its kinds' FTS indexes; `search_available`
+    is true when any kind has a searchable slot.
+  - *`hippo_anchor: false` on a concrete class* removes only QuerySpec anchoring, as Decision 5
+    says; the "one closure" amendment above anticipates it hiding the class's own accessor. The
+    implementation follows Decision 5's text — to be settled in review.
+  - *Accessor collisions.* A family accessor that collides with another class's is not generated
+    (build-time warning naming `hippo_accessor`); the interface is unaffected.
