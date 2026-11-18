@@ -301,7 +301,8 @@ parent:
   2. *Kind-only fields on a family's own collection read as NULL:* **accepted.** The D1 rule now
      applies everywhere and supersedes Decision 3's original `UNKNOWN_SLOT` for a subclass-only
      slot on the abstract anchor; a name no kind has (a misspelling) is still rejected. A
-     projected row's `data` does not yet carry the NULL ([#281](https://github.com/datahelix-platform/mosaic/issues/281)).
+     projected row's `data` carries the NULL too ([#281](https://github.com/datahelix-platform/mosaic/issues/281),
+     fixed in #283).
   3. *`hippo_anchor: false` on a concrete class:* **Decision 5 as written.** It removes only
      `QuerySpec` anchoring; the class's accessor stays. The "one closure" amendment's contrary
      clause is corrected in place (see its 2026-11-17 correction).

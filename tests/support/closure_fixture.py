@@ -197,6 +197,32 @@ class ClosureSDKCases:
         bb1 = next(i for i in client.query("Process").items if i["id"] == "bb1")
         assert bb1["data"]["site"] == "A"
 
+    def test_family_anchor_projection_reads_kind_only_field_as_null(self, client):
+        # #281: on a family anchor, a requested kind-only slot reads as NULL
+        # in each row's `data`, the same as under QuerySpec `columns`.
+        from mosaic.core.query_spec import parse_query_spec, validate_query_spec
+        from mosaic.core.query_spec_compiler import compile_query_spec
+        from mosaic.core.schema_typing import build_capability_manifest
+
+        registry = client.registry or client._storage.schema_registry
+        manifest = build_capability_manifest(registry)
+        spec = parse_query_spec({"v": 1, "anchor": "Sample", "mode": "AND", "criteria": [],
+                                 "columns": [{"path": ["label"]}, {"path": ["hemisphere"]}]})
+        assert validate_query_spec(spec, manifest).valid
+        compiled = compile_query_spec(spec, manifest)
+        page = client.query(compiled.entity_type, where=compiled.where,
+                            fields=list(compiled.fields))
+        by_id = {i["id"]: i["data"] for i in page.items}
+        assert by_id == {
+            "bl1": {"label": "blood", "hemisphere": None},
+            "br1": {"label": "brain", "hemisphere": "L"},
+        }
+        # A name the family doesn't know stays absent; no `fields`, no fill.
+        page = client.query("Sample", fields=["label", "no_such_slot"])
+        assert all(set(i["data"]) == {"label"} for i in page.items)
+        bl1 = next(i for i in client.query("Sample").items if i["id"] == "bl1")
+        assert "hemisphere" not in bl1["data"]
+
     def test_include_subclasses_false_keeps_type_exact_rows(self, client):
         assert _ids(client, "Process") == {"pr1", "bb1"}
         exact = client.query("Process", include_subclasses=False)

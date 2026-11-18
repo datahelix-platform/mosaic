@@ -169,6 +169,25 @@ Implementation is datahelix#113 item M6 (issue to file in this repo). Until it l
 re-validation turns any planner output carrying such `columns` into an error turn, which is the
 honest behaviour and stays.
 
+> **Shipped:** issue #236 — `columns` paths of 1–2 hops validated hop by hop
+> (`UNKNOWN_SLOT` / `NOT_A_REFERENCE` / `NOT_PREDICATE_FILTERABLE` at `$.columns[i].path[j]`),
+> hydrated server-side by `core/query_spec_traversal.py` (batched per hop; each member read
+> under the concrete class that holds it, not the hop's declared range), returned per item as
+> `columns: {"<dot.joined.path>": value}` with `grain: {anchor, rows, edge}` when a column
+> explodes, and advertised as `column_projection: "traversal"`. The note above left four points
+> open; the implementation follows Aperture's shipped flattener (`web/src/data/selection.ts`) on
+> each, and they are flagged on the PR for ratification:
+> 1. **`joinIds` returns the members' leaf values** (a JSON list), as Aperture's flattener does,
+>    not the members' ids regardless of leaf; `["books", "id"]` is the id list.
+> 2. **The one-`explode` cap is per link**, as Aperture enforces it: several columns through the
+>    same to-many link may all explode (one row per member, not a product); a second *link* is
+>    `COLUMNS_NOT_SUPPORTED`. A `count`/`joinIds` column alongside keeps its own mode, per anchor.
+> 3. **At most one to-many hop per path** (Aperture's invariant); a second is
+>    `COLUMNS_NOT_SUPPORTED` naming it.
+> 4. **`asOf` with a reverse (`inverse_of`) hop is refused** (`ASOF_REVERSE_HOP_UNSUPPORTED`):
+>    as-of reconstruction does not rebuild derived reverse lists on either adapter, so the hop
+>    would read as empty. Forward hops reconstruct and are allowed under `asOf`.
+
 
 - A fourth transport exists with the same trust boundary (or lack thereof) as REST/GraphQL today
   — this ADR does not change or improve on the current no-authn/authz state, it only constrains
