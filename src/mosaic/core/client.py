@@ -916,13 +916,50 @@ class MosaicClient:
         if fields is None:
             return page
         keep = set(fields)
+        # A family anchor (ADR-0014 Decision 3) reads a requested slot its
+        # row's kind lacks — or leaves unset — as NULL, the same way its
+        # filters, ordering, facets and QuerySpec ``columns`` do (2026-11-17
+        # ratification, #281). Names the family doesn't know stay absent.
+        null_fill = [f for f in dict.fromkeys(fields) if f in self._family_slot_names(entity_type)]
         page.items = [
-            {**item, "data": {k: v for k, v in item.get("data", {}).items() if k in keep}}
+            {
+                **item,
+                "data": {
+                    **{f: None for f in null_fill},
+                    **{k: v for k, v in item.get("data", {}).items() if k in keep},
+                },
+            }
             if isinstance(item, dict)
             else item
             for item in page.items
         ]
         return page
+
+    def _family_slot_names(self, entity_type: Optional[str]) -> frozenset[str]:
+        """Slot names addressable on ``entity_type``'s own collection when
+        it is a family anchor (shared and kind-only fields, ADR-0014
+        Decisions 3-5); empty for a concrete class or a schemaless client.
+        Uses the client's registry, else the storage adapter's.
+        Memoised per registry object."""
+        registry = self._registry or getattr(self._storage, "schema_registry", None)
+        if entity_type is None or registry is None:
+            return frozenset()
+        cache = getattr(self, "_family_slots_cache", None)
+        if cache is None or cache[0] is not registry:
+            from mosaic.core.schema_typing import build_family_model
+
+            families = build_family_model(registry)
+            cache = (
+                registry,
+                {
+                    name: frozenset(
+                        [s.name for s in fam.fields] + [s.name for s in fam.kind_fields]
+                    )
+                    for name, fam in families.items()
+                },
+            )
+            self._family_slots_cache = cache
+        return cache[1].get(entity_type, frozenset())
 
     def count(
         self,

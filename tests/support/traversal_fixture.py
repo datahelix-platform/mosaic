@@ -252,11 +252,11 @@ CASES: list[tuple[str, str, list[dict[str, Any]], list[tuple[str, dict[str, Any]
     (
         "family anchor with a forward hop",
         "Specimen",
-        [{"path": ["label"]}, {"path": ["donor", "name"]}],
+        [{"path": ["label"]}, {"path": ["organ"]}, {"path": ["donor", "name"]}],
         [
-            ("t1", {"label": "T1", "donor.name": "D1"}),
-            ("f1", {"label": "F1", "donor.name": "D1"}),
-            ("f2", {"label": "F2", "donor.name": "D2"}),
+            ("t1", {"label": "T1", "organ": "brain", "donor.name": "D1"}),
+            ("f1", {"label": "F1", "organ": None, "donor.name": "D1"}),
+            ("f2", {"label": "F2", "organ": None, "donor.name": "D2"}),
         ],
         None,
     ),

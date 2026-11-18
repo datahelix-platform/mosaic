@@ -173,13 +173,16 @@ def project_traversal(
     """
     cache = _EntityCache(client, as_of)
     _prefetch(cache, items, projection.columns)
-    keep = set(projection.anchor_fields)
     exploded = projection.explode
     link = exploded.link if exploded else None
 
     rows: list[dict[str, Any]] = []
     for anchor in items:
-        base = {**anchor, "data": {k: v for k, v in (anchor.get("data") or {}).items() if k in keep}}
+        # Anchor-owned columns are validated slots of the anchor, so each
+        # reads as NULL when the row leaves it unset or its kind lacks it
+        # (a family anchor, ADR-0014 / #281) — the same value `columns` shows.
+        data = anchor.get("data") or {}
+        base = {**anchor, "data": {k: data.get(k) for k in projection.anchor_fields}}
         fixed = {
             c.key: _anchor_grain_value(cache, anchor, c)
             for c in projection.columns
