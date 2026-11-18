@@ -224,6 +224,15 @@
 
 ### Fixed
 
+- **Family anchors: a requested kind-only field reads as `null` in `data`**
+  (issue #281, ADR-0014 Decision 3, 2026-11-17 ratification). With
+  `MosaicClient.query(<family>, fields=[...])`, and in `execute_query_spec`
+  items whether or not a column traverses, a requested slot that a row's
+  kind lacks (or leaves unset) now appears in that row's `data` as `null`.
+  Before, it was absent, while the same row's `columns` showed `null`.
+  Names the family doesn't know stay absent. A read without `fields` still
+  returns the row's stored slots only.
+
 - **Rows lost through concrete parents and forward abstract edges**
   (issue #241, ADR-0014 Decision 1). Every reference now resolves over the
   concrete closure of its range class, on SQLite and Postgres:
