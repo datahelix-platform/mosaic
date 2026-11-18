@@ -247,6 +247,11 @@ parent:
   its class. Today no concrete subclass of an exposed class can be unexposed; this rule is fixed
   now so that Decision 5's `hippo_anchor: false` opt-out hides the subclass's own accessor without
   hiding its rows from the parent or dropping `entityType`.
+  - **Corrected 2026-11-17 (labadorf, #278 review, choice 3):** the clause above about
+    `hippo_anchor: false` hiding a subclass's own accessor is wrong. Decision 5 stands as
+    written: on a concrete class, `hippo_anchor: false` removes only `QuerySpec` anchoring, and
+    the class's accessor and write surface stay. The rest of this amendment (one closure for the
+    parent's collection and `entityType`) is unaffected.
 - **Amended 2026-11-17 (labadorf, #276 review, ruling D3 = (a)): by-id lookup through a concrete
   parent is closure-aware.** Decision 1's "accessor" covers the single get as well as the list:
   `MosaicClient.get("Process", id)` (and so GraphQL `process(id:)`, REST and the typed client)
@@ -288,3 +293,19 @@ parent:
     implementation follows Decision 5's text — to be settled in review.
   - *Accessor collisions.* A family accessor that collides with another class's is not generated
     (build-time warning naming `hippo_accessor`); the interface is unaffected.
+- **Ratified 2026-11-17 (labadorf, [#278](https://github.com/datahelix-platform/mosaic/pull/278)
+  review, "Choices to ratify").** The implementation notes above are settled as follows:
+  1. *What a family interface carries:* **accepted as implemented.** Only slots every kind stores
+     alike are interface fields; a slot narrowed differently per kind (brain bank's `format`)
+     stays off the interface and is reached through the kind's own type.
+  2. *Kind-only fields on a family's own collection read as NULL:* **accepted.** The D1 rule now
+     applies everywhere and supersedes Decision 3's original `UNKNOWN_SLOT` for a subclass-only
+     slot on the abstract anchor; a name no kind has (a misspelling) is still rejected. A
+     projected row's `data` carries the NULL too ([#281](https://github.com/datahelix-platform/mosaic/issues/281),
+     fixed in #283).
+  3. *`hippo_anchor: false` on a concrete class:* **Decision 5 as written.** It removes only
+     `QuerySpec` anchoring; the class's accessor stays. The "one closure" amendment's contrary
+     clause is corrected in place (see its 2026-11-17 correction).
+  4. *Accessor collisions:* **accepted for now.** A colliding family accessor is not generated
+     and the build warns; before 1.0 the warning becomes a build error (tracked in
+     [#280](https://github.com/datahelix-platform/mosaic/issues/280), under the 1.0 API freeze, #104).
