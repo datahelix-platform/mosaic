@@ -1,6 +1,6 @@
 # Bibliography Worked Example
 
-A complete Hippo example using a citation-graph domain. Exercises every major
+A complete Mosaic example using a citation-graph domain. Exercises every major
 SDK feature: polymorphism, full-text search, validators, supersession, and
 provenance history.
 
@@ -9,16 +9,16 @@ provenance history.
 | File | Purpose |
 |---|---|
 | `schemas/bibliography.yaml` | LinkML schema (Author, Publication hierarchy, Citation, Authorship) |
-| `config.json` | Hippo configuration pointing at SQLite and the validators file |
+| `config.json` | Mosaic configuration pointing at SQLite and the validators file |
 | `validators.yaml` | CEL validator: DOI format check on JournalArticle |
 | `sdk_example.py` | Python script — runs the complete demo end-to-end |
-| `rest_example.md` | Equivalent operations as `curl` snippets against `hippo serve` |
+| `rest_example.md` | Equivalent operations as `curl` snippets against `mosaic serve` |
 | `provenance_example.md` | How to walk the PROV-O provenance chain after supersession |
 
 ## Schema overview
 
 ```
-Entity (abstract, hippo_core)
+Entity (abstract, mosaic_core)
 ├── Author            name*, orcid (indexed), email
 ├── Publication (abstract)
 │   ├── JournalArticle  title* (fts5), year, doi (indexed), journal, volume, pages
@@ -38,7 +38,7 @@ the results. See `sdk_example.py §7 — Polymorphic queries`.
 ## Prerequisites
 
 ```bash
-pip install hippo-sdk          # production install
+pip install datahelix-mosaic          # production install
 # or for development:
 pip install -e ../../           # install from source tree
 ```
@@ -50,12 +50,12 @@ cd examples/bibliography
 python sdk_example.py
 ```
 
-The script creates a fresh SQLite database at `./data/hippo.db` on every run.
+The script creates a fresh SQLite database at `./data/mosaic.db` on every run.
 
 Expected output:
 
 ```
-=== Hippo Bibliography Example ===
+=== Mosaic Bibliography Example ===
 
 Created authors: 4d04f383…, 5a860923…, e1f0d5d4…
 
@@ -95,15 +95,15 @@ Preprint still in DB (include_unavailable=True): id=e941d21b…
 
 ## Browse it in the TUI
 
-Once `sdk_example.py` has seeded `./data/hippo.db`, you can explore the same
+Once `sdk_example.py` has seeded `./data/mosaic.db`, you can explore the same
 data interactively:
 
 ```bash
-pip install -e '../../[tui]'   # or `pip install hippo[tui]`
-hippo tui                      # auto-detects config.json in this directory
+pip install -e '../../[tui]'   # or `pip install datahelix-mosaic[tui]`
+mosaic tui                      # auto-detects config.json in this directory
 ```
 
-`hippo tui` reads `config.json`, so it opens the example database and schema
+`mosaic tui` reads `config.json`, so it opens the example database and schema
 with no flags. Browse the entity types, follow Authorship and Citation
 relationships, inspect the preprint → article supersession in the provenance
 view, and full-text search for `transformer` on the Query screen. See
@@ -111,11 +111,11 @@ view, and full-text search for `transformer` on the Query screen. See
 
 ## Validate the schema
 
-`linkml-validate` cannot resolve the bundled `hippo_core` import without
-a custom importmap, so schema validation runs via Hippo's own loader:
+`linkml-validate` cannot resolve the bundled `mosaic_core` import without
+a custom importmap, so schema validation runs via Mosaic's own loader:
 
 ```python
-from hippo.linkml_bridge import SchemaRegistry
+from mosaic.linkml_bridge import SchemaRegistry
 registry = SchemaRegistry.from_path("./schemas")
 print("Classes:", sorted(registry.schema_view.all_classes().keys()))
 # → ['Author', 'Authorship', 'Citation', 'ConferencePaper', 'Entity',
@@ -131,17 +131,17 @@ schema is structurally invalid (bad `is_a`, unresolved ranges, etc.).
 ### Client initialisation
 
 ```python
-from hippo.linkml_bridge import SchemaRegistry
-from hippo.core.client import HippoClient
-from hippo.core.storage.adapters.sqlite_adapter import SQLiteAdapter
-from hippo.core.pipeline import ValidationPipeline
-from hippo.core.validators.write_validator import CELWriteValidator
+from mosaic.linkml_bridge import SchemaRegistry
+from mosaic.core.client import MosaicClient
+from mosaic.core.storage.adapters.sqlite_adapter import SQLiteAdapter
+from mosaic.core.pipeline import ValidationPipeline
+from mosaic.core.validators.write_validator import CELWriteValidator
 
 registry = SchemaRegistry.from_path("./schemas")
-storage  = SQLiteAdapter("./data/hippo.db", schema_registry=registry)
+storage  = SQLiteAdapter("./data/mosaic.db", schema_registry=registry)
 pipeline = ValidationPipeline()
 pipeline.add_validator(CELWriteValidator(validators_path="./validators.yaml"))
-client   = HippoClient(storage=storage, registry=registry, pipeline=pipeline)
+client   = MosaicClient(storage=storage, registry=registry, pipeline=pipeline)
 ```
 
 ### Polymorphic queries

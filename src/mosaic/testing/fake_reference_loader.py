@@ -88,10 +88,10 @@ class FakeReferenceLoader(ReferenceLoader):
 
     def schema_fragment(self) -> dict:
         return {
-            "id": "https://example.org/hippo/fake",
+            "id": "https://example.org/mosaic/fake",
             "name": "fake",
             "default_prefix": "fake",
-            "prefixes": {"fake": "https://example.org/hippo/fake/"},
+            "prefixes": {"fake": "https://example.org/mosaic/fake/"},
             "classes": {
                 "FakeTerm": {
                     "is_a": "Entity",
@@ -194,10 +194,10 @@ class RichParamsLoader(ReferenceLoader):
 
     def schema_fragment(self) -> dict:
         return {
-            "id": "https://example.org/hippo/rich",
+            "id": "https://example.org/mosaic/rich",
             "name": "rich",
             "default_prefix": "rich",
-            "prefixes": {"rich": "https://example.org/hippo/rich/"},
+            "prefixes": {"rich": "https://example.org/mosaic/rich/"},
             "classes": {
                 "RichTerm": {
                     "is_a": "Entity",
@@ -263,10 +263,10 @@ class BareReferenceLoader(ReferenceLoader):
 
     def schema_fragment(self) -> dict:
         return {
-            "id": "https://example.org/hippo/bare",
+            "id": "https://example.org/mosaic/bare",
             "name": "bare",
             "default_prefix": "bare",
-            "prefixes": {"bare": "https://example.org/hippo/bare/"},
+            "prefixes": {"bare": "https://example.org/mosaic/bare/"},
             "classes": {
                 "BareTerm": {
                     "is_a": "Entity",
@@ -322,11 +322,11 @@ class FakeSchemaPackage(SchemaPackage):
 
     def schema_fragment(self) -> dict:
         return {
-            "id": "https://example.org/hippo/fake_schema",
+            "id": "https://example.org/mosaic/fake_schema",
             "name": "fake_schema",
             "default_prefix": "fake_schema",
             "prefixes": {
-                "fake_schema": "https://example.org/hippo/fake_schema/"
+                "fake_schema": "https://example.org/mosaic/fake_schema/"
             },
             "classes": {
                 "FakeSchemaTerm": {
@@ -376,10 +376,10 @@ def _fake_cache_path() -> None:
     from linkml_runtime.utils.schemaview import SchemaView
     import importlib.resources
 
-    hippo_core_path = importlib.resources.files("mosaic.schemas").joinpath(
-        "hippo_core.yaml"
+    mosaic_core_path = importlib.resources.files("mosaic.schemas").joinpath(
+        "mosaic_core.yaml"
     )
-    registry = SchemaRegistry(SchemaView(str(hippo_core_path)))
+    registry = SchemaRegistry(SchemaView(str(mosaic_core_path)))
     storage = SQLiteAdapter(":memory:", schema_registry=registry)
     client = MosaicClient(storage=storage, registry=registry)
     typer.echo(str(client.cache_dir_for("fake")))

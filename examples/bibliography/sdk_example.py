@@ -1,7 +1,7 @@
-"""Bibliography worked example for the Hippo SDK.
+"""Bibliography worked example for the Mosaic SDK.
 
 Demonstrates:
-  - Client initialisation (SchemaRegistry + SQLiteAdapter + HippoClient)
+  - Client initialisation (SchemaRegistry + SQLiteAdapter + MosaicClient)
   - create / get / update
   - Polymorphic queries (Publication hierarchy)
   - Full-text search across abstract Publication titles
@@ -10,10 +10,10 @@ Demonstrates:
 
 Run from the examples/bibliography/ directory:
 
-    pip install hippo-sdk          # or `pip install -e ../../` for dev
+    pip install datahelix-mosaic          # or `pip install -e ../../` for dev
     python sdk_example.py
 
-The script creates a fresh SQLite database at ./data/hippo.db each run
+The script creates a fresh SQLite database at ./data/mosaic.db each run
 (the data/ directory is created if it does not exist).
 """
 
@@ -26,20 +26,20 @@ from pathlib import Path
 # 1. Initialise the client
 # ---------------------------------------------------------------------------
 # Use SchemaRegistry.from_path() to load the schema — it handles the
-# bundled hippo_core importmap so user schemas can say `imports: [hippo_core]`
-# without shipping a copy of hippo_core.yaml.
+# bundled mosaic_core importmap so user schemas can say `imports: [mosaic_core]`
+# without shipping a copy of mosaic_core.yaml.
 
-from hippo.linkml_bridge import SchemaRegistry
-from hippo.core.client import HippoClient
-from hippo.core.storage.adapters.sqlite_adapter import SQLiteAdapter
-from hippo.core.pipeline import ValidationPipeline
-from hippo.core.validators.write_validator import CELWriteValidator
+from mosaic.linkml_bridge import SchemaRegistry
+from mosaic.core.client import MosaicClient
+from mosaic.core.storage.adapters.sqlite_adapter import SQLiteAdapter
+from mosaic.core.pipeline import ValidationPipeline
+from mosaic.core.validators.write_validator import CELWriteValidator
 
 HERE = Path(__file__).parent
 DATA_DIR = HERE / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
-DB_PATH = DATA_DIR / "hippo.db"
+DB_PATH = DATA_DIR / "mosaic.db"
 DB_PATH.unlink(missing_ok=True)  # fresh DB each run
 
 registry = SchemaRegistry.from_path(HERE / "schemas")
@@ -51,9 +51,9 @@ pipeline.add_validator(
     CELWriteValidator(validators_path=str(HERE / "validators.yaml"))
 )
 
-client = HippoClient(storage=storage, registry=registry, pipeline=pipeline)
+client = MosaicClient(storage=storage, registry=registry, pipeline=pipeline)
 
-print("=== Hippo Bibliography Example ===\n")
+print("=== Mosaic Bibliography Example ===\n")
 
 # ---------------------------------------------------------------------------
 # 2. Authors
@@ -191,7 +191,7 @@ print(f"Total publications: {len(all_publications)}")
 # ---------------------------------------------------------------------------
 # 8. Full-text search (FTS5) across titles
 # ---------------------------------------------------------------------------
-# FTS search requires the schema to declare `hippo_search: fts5` on the field
+# FTS search requires the schema to declare `mosaic_search: fts5` on the field
 # and the underlying FTS tables to exist. The SQLiteAdapter creates them
 # automatically from the schema annotations.
 

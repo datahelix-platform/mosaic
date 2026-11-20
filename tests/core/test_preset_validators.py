@@ -23,7 +23,7 @@ class TestRefCheckPreset:
     def test_valid_reference_passes(self):
         """Valid reference passes validation."""
         config = PresetConfig(
-            preset_type="hippo:ref_check",
+            preset_type="mosaic:ref_check",
             config={"fields": [{"field": "owner", "entity_type": "User"}]},
         )
 
@@ -45,7 +45,7 @@ class TestRefCheckPreset:
     def test_invalid_reference_fails(self):
         """Invalid reference fails validation."""
         config = PresetConfig(
-            preset_type="hippo:ref_check",
+            preset_type="mosaic:ref_check",
             config={"fields": [{"field": "owner", "entity_type": "User"}]},
         )
 
@@ -69,7 +69,7 @@ class TestRefCheckPreset:
     def test_reference_with_nested_object(self):
         """Nested object reference is validated."""
         config = PresetConfig(
-            preset_type="hippo:ref_check",
+            preset_type="mosaic:ref_check",
             config={"fields": [{"field": "owner", "entity_type": "User"}]},
         )
 
@@ -94,7 +94,7 @@ class TestCountConstraintPreset:
     def test_valid_count_passes(self):
         """Valid count passes validation."""
         config = PresetConfig(
-            preset_type="hippo:count_constraint",
+            preset_type="mosaic:count_constraint",
             config={"fields": [{"field": "items", "max_count": 5}]},
         )
 
@@ -113,7 +113,7 @@ class TestCountConstraintPreset:
     def test_exceeds_count_fails(self):
         """Exceeding count fails validation."""
         config = PresetConfig(
-            preset_type="hippo:count_constraint",
+            preset_type="mosaic:count_constraint",
             config={"fields": [{"field": "items", "max_count": 5}]},
         )
 
@@ -134,7 +134,7 @@ class TestCountConstraintPreset:
     def test_empty_collection_passes(self):
         """Empty collection passes validation."""
         config = PresetConfig(
-            preset_type="hippo:count_constraint",
+            preset_type="mosaic:count_constraint",
             config={"fields": [{"field": "items", "max_count": 5}]},
         )
 
@@ -156,7 +156,7 @@ class TestImmutableFieldPreset:
     def test_field_not_modified_passes(self):
         """Unmodified field passes validation."""
         config = PresetConfig(
-            preset_type="hippo:immutable_field",
+            preset_type="mosaic:immutable_field",
             config={"fields": [{"field": "id"}]},
         )
 
@@ -175,7 +175,7 @@ class TestImmutableFieldPreset:
     def test_field_modified_fails(self):
         """Modified immutable field fails validation."""
         config = PresetConfig(
-            preset_type="hippo:immutable_field",
+            preset_type="mosaic:immutable_field",
             config={"fields": [{"field": "id"}]},
         )
 
@@ -199,7 +199,7 @@ class TestFieldRequiredIfPreset:
     def test_condition_met_field_present_passes(self):
         """Condition met with field present passes validation."""
         config = PresetConfig(
-            preset_type="hippo:field_required_if",
+            preset_type="mosaic:field_required_if",
             config={
                 "fields": [
                     {
@@ -225,7 +225,7 @@ class TestFieldRequiredIfPreset:
     def test_condition_met_field_missing_fails(self):
         """Condition met with field missing fails validation."""
         config = PresetConfig(
-            preset_type="hippo:field_required_if",
+            preset_type="mosaic:field_required_if",
             config={
                 "fields": [
                     {
@@ -253,7 +253,7 @@ class TestFieldRequiredIfPreset:
     def test_condition_not_met_passes(self):
         """Condition not met passes validation."""
         config = PresetConfig(
-            preset_type="hippo:field_required_if",
+            preset_type="mosaic:field_required_if",
             config={
                 "fields": [
                     {
@@ -283,7 +283,7 @@ class TestNoSelfRefPreset:
     def test_no_self_reference_passes(self):
         """No self-reference passes validation."""
         config = PresetConfig(
-            preset_type="hippo:no_self_ref",
+            preset_type="mosaic:no_self_ref",
             config={"fields": [{"field": "parent"}]},
         )
 
@@ -301,7 +301,7 @@ class TestNoSelfRefPreset:
     def test_self_reference_fails(self):
         """Self-reference fails validation."""
         config = PresetConfig(
-            preset_type="hippo:no_self_ref",
+            preset_type="mosaic:no_self_ref",
             config={"fields": [{"field": "parent"}]},
         )
 
@@ -321,7 +321,7 @@ class TestNoSelfRefPreset:
     def test_self_reference_in_list_fails(self):
         """Self-reference in list fails validation."""
         config = PresetConfig(
-            preset_type="hippo:no_self_ref",
+            preset_type="mosaic:no_self_ref",
             config={"fields": [{"field": "children"}]},
         )
 
@@ -341,7 +341,7 @@ class TestNoSelfRefPreset:
     def test_no_id_passes(self):
         """Operation without ID passes validation."""
         config = PresetConfig(
-            preset_type="hippo:no_self_ref",
+            preset_type="mosaic:no_self_ref",
             config={"fields": [{"field": "parent"}]},
         )
 

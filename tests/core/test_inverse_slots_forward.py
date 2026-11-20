@@ -34,7 +34,7 @@ prefixes:
   linkml: https://w3id.org/linkml/
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 default_range: string
 classes:
   Donor:
@@ -153,7 +153,7 @@ class TestRecognition:
         _write_layered(tmp_path)
         (tmp_path / "top.yaml").write_text(
             PERSON_YAML.replace("id: https://example.org/person\nname: person", "id: https://example.org/top\nname: top")
-            .replace("  - hippo_core\n", "  - hippo_core\n  - person\n  - tissue\n")
+            .replace("  - mosaic_core\n", "  - mosaic_core\n  - person\n  - tissue\n")
         )
         reg = SchemaRegistry.from_path(tmp_path / "top.yaml")
         sv = reg.schema_view
@@ -289,7 +289,7 @@ prefixes:
   linkml: https://w3id.org/linkml/
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 default_range: string
 classes:
 """

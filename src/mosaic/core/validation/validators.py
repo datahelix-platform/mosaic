@@ -292,11 +292,10 @@ class WriteValidator(ABC):
         ...
 
 
-# ``mosaic.write_validators`` is canonical; the legacy ``hippo.*`` spelling
-# is still resolved during the ADR-0004 deprecation window (dedup by
-# entry-point name, mosaic wins on collision).
-ENTRY_POINT_GROUPS = ("mosaic.write_validators", "hippo.write_validators")
-#: Canonical group name (kept for backwards compatibility).
+# Only ``mosaic.write_validators`` is read; the legacy ``hippo.*`` group was
+# removed by ADR-0015.
+ENTRY_POINT_GROUPS = ("mosaic.write_validators",)
+#: Canonical group name.
 ENTRY_POINT_GROUP = ENTRY_POINT_GROUPS[0]
 
 
@@ -304,7 +303,7 @@ class ValidatorRegistry:
     """Registry for discovering and managing write validators via entry points.
 
     Discovers validators registered via the 'mosaic.write_validators' entry
-    point group (or the legacy 'hippo.write_validators' spelling) and orders
+    point group and orders
     them by priority (highest first).
     """
 

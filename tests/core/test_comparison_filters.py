@@ -22,13 +22,13 @@ from mosaic.linkml_bridge import SchemaRegistry
 FUTURE = "2999-01-01T00:00:00+00:00"
 
 SCHEMA = """
-id: https://example.org/hippo/test_comparison_filters
+id: https://example.org/mosaic/test_comparison_filters
 name: test_comparison_filters
 prefixes:
   linkml: https://w3id.org/linkml/
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 default_range: string
 
 types:

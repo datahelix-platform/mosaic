@@ -163,7 +163,7 @@ class TemporalRecord(BaseModel):
 class Operation(str, Enum):
     """Kind of operation recorded on a ProvenanceRecord.
 
-    Mirrors the ``Operation`` enum declared in ``hippo_core.yaml`` (sec9 §9.6).
+    Mirrors the ``Operation`` enum declared in ``mosaic_core.yaml`` (sec9 §9.6).
     The canonical source is the LinkML declaration; this mirror exists so
     Python callers can pass enum values without going through the registry.
     """
@@ -186,7 +186,7 @@ class ProvenanceRecord(BaseModel):
 
     In-memory representation returned by ``ProvenanceStore.record()``.
     Corresponds 1:1 with the ``ProvenanceRecord`` class declared in
-    ``hippo_core.yaml``.
+    ``mosaic_core.yaml``.
     """
 
     id: Optional[str] = Field(

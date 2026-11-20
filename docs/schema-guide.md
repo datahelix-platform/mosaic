@@ -312,7 +312,7 @@ drift apart. Concretely:
   relationship by writing the forward side (`Sample.donor`).
 - Introspection lists it as a relationship (`MosaicClient.schema_references()`), and the
   typed surfaces — the MCP `mosaic://schema` / `mosaic://capabilities` resources and GraphQL's
-  `hippoSchema` query — report it with `inverse_of: "donor"` so tools can tell a derived
+  `mosaicSchema` query — report it with `inverse_of: "donor"` so tools can tell a derived
   reverse edge from a stored reference.
 
 Rules, checked when the schema loads (a violation is a `SchemaError`):
@@ -386,12 +386,12 @@ Mark an attribute for full-text search:
   notes:
     range: string
     annotations:
-      hippo_search: fts5
+      mosaic_search: fts5
 
   description:
     range: string
     annotations:
-      hippo_search: fts5
+      mosaic_search: fts5
 ```
 
 Query via `MosaicClient.search()` or the REST API:
@@ -407,12 +407,12 @@ Speed up exact lookups on frequently-queried attributes:
   diagnosis:
     range: string
     annotations:
-      hippo_index: true              # adds a B-tree index
+      mosaic_index: true              # adds a B-tree index
 
   batch_id:
     range: string
     annotations:
-      hippo_index_partial: true      # index only non-null values (smaller index)
+      mosaic_index_partial: true      # index only non-null values (smaller index)
 ```
 
 ### Unique Constraints
@@ -622,7 +622,7 @@ classes:
         required: true
         identifier: true
         annotations:
-          hippo_index: true
+          mosaic_index: true
       sex:
         range: SexType
         required: true
@@ -632,12 +632,12 @@ classes:
         range: string
         required: true
         annotations:
-          hippo_index: true
-          hippo_search: fts5
+          mosaic_index: true
+          mosaic_search: fts5
       notes:
         range: string
         annotations:
-          hippo_search: fts5
+          mosaic_search: fts5
 
   Sample:
     description: "A tissue sample from a donor"
@@ -650,7 +650,7 @@ classes:
         range: Donor
         required: true
         annotations:
-          hippo_index: true
+          mosaic_index: true
       tissue:
         range: TissueRegion
         required: true
@@ -667,7 +667,7 @@ classes:
         range: Sample
         required: true
         annotations:
-          hippo_index: true
+          mosaic_index: true
       assay:
         range: AssayType
         required: true
@@ -771,5 +771,5 @@ classes:
 **Forgetting `identifier: true` on the primary key attribute**
 Just naming an attribute `id` or `external_id` does not make it an identifier. You must explicitly set `identifier: true`.
 
-**Not adding `hippo_index` annotation on reference attributes**
-Queries filtering on reference attributes (like `donor`) will be slow without an index. Add `hippo_index: true` annotation to any attribute you filter on frequently.
+**Not adding `mosaic_index` annotation on reference attributes**
+Queries filtering on reference attributes (like `donor`) will be slow without an index. Add `mosaic_index: true` annotation to any attribute you filter on frequently.

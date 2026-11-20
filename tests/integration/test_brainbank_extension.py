@@ -49,9 +49,9 @@ DDL scope note:
     ``age_at_collection`` as an optional slot so v1-shape records are
     readable; the migration transforms read it and produce the v2 shape.
 
-hippo_unique note (resolved, PTS-348):
+mosaic_unique note (resolved, PTS-348):
     ``Subject.external_id`` and ``BrainDonor.brain_bank_id`` carry
-    ``hippo_unique`` (Document 1 / PTS-347). Two defects once blocked this on
+    ``mosaic_unique`` (Document 1 / PTS-347). Two defects once blocked this on
     the migration path: the DDL generator emitted a *non-partial* unique index
     (a superseded predecessor permanently held the key), and ``_run_hop``
     created the new record while the old was still live (two live rows, same
@@ -107,27 +107,27 @@ from mosaic.linkml_bridge import SchemaRegistry, _bundled_importmap
 
 def _build_merged_registry() -> SchemaRegistry:
     overlay: dict[str, Any] = {
-        "id": "https://example.org/hippo/test_brainbank",
+        "id": "https://example.org/mosaic/test_brainbank",
         "name": "test_brainbank",
         "prefixes": {
             "linkml": "https://w3id.org/linkml/",
-            "hippo": "https://w3id.org/hippo/",
+            "mosaic": "https://w3id.org/datahelix/mosaic/",
         },
-        "imports": ["linkml:types", "hippo_core"],
+        "imports": ["linkml:types", "mosaic_core"],
         "default_range": "string",
         "classes": {
             # --- base: subject module ---
             "Subject": {
                 "is_a": "Entity",
-                "annotations": {"hippo_accessor": "subjects"},
+                "annotations": {"mosaic_accessor": "subjects"},
                 "attributes": {
                     "external_id": {
                         "range": "string",
                         "required": True,
-                        # hippo_unique (Document 1 / PTS-347): a migration
+                        # mosaic_unique (Document 1 / PTS-347): a migration
                         # target — proves the create-before-supersede window
                         # no longer collides on the partial unique index.
-                        "annotations": {"hippo_unique": True},
+                        "annotations": {"mosaic_unique": True},
                     },
                     "species": {"range": "string", "required": True},
                     "biological_sex": {"range": "string"},
@@ -144,15 +144,15 @@ def _build_merged_registry() -> SchemaRegistry:
             # --- extension: brainbank module — BrainDonor ---
             "BrainDonor": {
                 "is_a": "Subject",
-                "annotations": {"hippo_accessor": "brain_donors"},
+                "annotations": {"mosaic_accessor": "brain_donors"},
                 "attributes": {
                     "brain_bank_id": {
                         "range": "string",
                         "required": True,
-                        # hippo_unique (Document 1 / PTS-347): a migration
+                        # mosaic_unique (Document 1 / PTS-347): a migration
                         # target — proves the create-before-supersede window
                         # no longer collides on the partial unique index.
-                        "annotations": {"hippo_unique": True},
+                        "annotations": {"mosaic_unique": True},
                     },
                     "post_mortem_interval_hours": {"range": "float"},
                     # neuropathology_confirmed: range: boolean — re-enabled by
@@ -168,12 +168,12 @@ def _build_merged_registry() -> SchemaRegistry:
             # --- base: tissue module ---
             "Sample": {
                 "is_a": "Entity",
-                "annotations": {"hippo_accessor": "samples"},
+                "annotations": {"mosaic_accessor": "samples"},
                 "attributes": {
                     "external_id": {
                         "range": "string",
                         "required": True,
-                        "annotations": {"hippo_index": True},
+                        "annotations": {"mosaic_index": True},
                     },
                     "tissue_type": {"range": "string", "required": True},
                     "tissue_region": {"range": "string"},
@@ -182,12 +182,12 @@ def _build_merged_registry() -> SchemaRegistry:
             # --- extension: brainbank module — BrainSample ---
             "BrainSample": {
                 "is_a": "Sample",
-                "annotations": {"hippo_accessor": "brain_samples"},
+                "annotations": {"mosaic_accessor": "brain_samples"},
                 "attributes": {
                     "brain_region": {
                         "range": "string",
                         "required": True,
-                        "annotations": {"hippo_index": True},
+                        "annotations": {"mosaic_index": True},
                     },
                     "hemisphere": {"range": "string"},
                     "post_mortem_interval_hours": {"range": "float"},

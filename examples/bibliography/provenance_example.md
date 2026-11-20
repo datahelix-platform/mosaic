@@ -1,14 +1,14 @@
 # Provenance Walk — Preprint → Journal Article Supersession
 
-This document walks through the PROV-O-aligned provenance chain that Hippo
+This document walks through the PROV-O-aligned provenance chain that Mosaic
 records when an arXiv preprint is superseded by its published journal article.
 Run `sdk_example.py` first to populate the database, then execute the
 snippets below.
 
 ## Background: ProvenanceRecord shape
 
-Each write operation produces one `ProvenanceRecord` stored in Hippo's audit
-log. The fields (defined in `hippo_core.yaml`) align with PROV-O predicates:
+Each write operation produces one `ProvenanceRecord` stored in Mosaic's audit
+log. The fields (defined in `mosaic_core.yaml`) align with PROV-O predicates:
 
 | Field              | PROV-O predicate           | Description                          |
 |--------------------|----------------------------|--------------------------------------|
@@ -37,14 +37,14 @@ log. The fields (defined in `hippo_core.yaml`) align with PROV-O predicates:
 from pathlib import Path
 import json
 
-from hippo.linkml_bridge import SchemaRegistry
-from hippo.core.client import HippoClient
-from hippo.core.storage.adapters.sqlite_adapter import SQLiteAdapter
+from mosaic.linkml_bridge import SchemaRegistry
+from mosaic.core.client import MosaicClient
+from mosaic.core.storage.adapters.sqlite_adapter import SQLiteAdapter
 
 HERE = Path(".")
 registry = SchemaRegistry.from_path(HERE / "schemas")
-storage  = SQLiteAdapter(str(HERE / "data" / "hippo.db"), schema_registry=registry)
-client   = HippoClient(storage=storage, registry=registry)
+storage  = SQLiteAdapter(str(HERE / "data" / "mosaic.db"), schema_registry=registry)
+client   = MosaicClient(storage=storage, registry=registry)
 
 # --- List all preprints to find the superseded one ---
 all_preprints = client.query("Preprint").items

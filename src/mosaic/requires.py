@@ -21,7 +21,7 @@ The v1 check compares the pin's RHS against ``importlib.metadata.version
 (<package>)``. That works for pins of the form ``mosaic-reference-fma==3.3``
 where the package version *is* the load-bearing version. Spec §2.14 step 5
 ultimately wants pins to be matched against the **data version slug**
-recorded in ``hippo_meta.reference_versions`` at install time (e.g.,
+recorded in ``mosaic_meta.reference_versions`` at install time (e.g.,
 ``mus_musculus.GRCm39.115``); that table is not populated yet because the
 full reference-install lifecycle has not landed. Until it does, schemas
 should pin against the pip version their loader publishes. The v2 surface
@@ -47,11 +47,10 @@ V1_RANGE_REJECT_MESSAGE = (
 )
 
 # Pip packages distributing a reference loader follow this convention
-# (``mosaic-reference-<name>`` going forward; the legacy
-# ``hippo-reference-<name>`` prefix remains recognized for the ADR-0004
-# deprecation window). The matching short name is what
+# (``mosaic-reference-<name>``; the legacy ``hippo-reference-<name>`` prefix
+# is no longer recognized — ADR-0015). The matching short name is what
 # ``mosaic reference install`` accepts.
-_LOADER_PACKAGE_PREFIXES = ("mosaic-reference-", "hippo-reference-")
+_LOADER_PACKAGE_PREFIXES = ("mosaic-reference-",)
 
 # Tokens that introduce a non-exact-match comparator. ``==`` is the only
 # accepted operator. ``<=`` and ``!=`` are not in the spec's enumeration
@@ -82,9 +81,8 @@ class RequirePin:
     def short_name(self) -> str:
         """Name accepted by ``mosaic reference install``.
 
-        Strips the ``mosaic-reference-`` convention prefix (or its legacy
-        ``hippo-reference-`` spelling) if present; otherwise returns the
-        package name unchanged.
+        Strips the ``mosaic-reference-`` convention prefix if present;
+        otherwise returns the package name unchanged.
         """
         for prefix in _LOADER_PACKAGE_PREFIXES:
             if self.package_name.startswith(prefix):

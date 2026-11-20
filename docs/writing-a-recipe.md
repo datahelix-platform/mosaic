@@ -32,7 +32,7 @@ name: scrnaseq
 version: 1.2.0
 description: Single-cell RNA-seq metadata schema fragment for Mosaic.
 created_at: "2026-05-27T14:00:00Z"
-hippo_version: ">=0.3,<1.0"
+mosaic_version: ">=0.3,<1.0"
 license: CC-BY-4.0
 source: https://zenodo.org/record/12345
 
@@ -42,7 +42,7 @@ author:
   organization: Broad Institute
 ```
 
-Required fields are `id`, `name`, `version`, `created_at`, and `hippo_version`. All others are optional but strongly recommended for any recipe you intend to share.
+Required fields are `id`, `name`, `version`, `created_at`, and `mosaic_version`. All others are optional but strongly recommended for any recipe you intend to share.
 
 ### Field notes
 
@@ -52,7 +52,7 @@ Required fields are `id`, `name`, `version`, `created_at`, and `hippo_version`. 
 | `name` | yes | Short, filesystem-safe slug. Becomes the `default_prefix` of the schema fragment — all classes and slots your schema contributes are namespaced under this prefix. Must not collide with any prefix already installed in the target instance. |
 | `version` | yes | Opaque version slug. SemVer (e.g. `1.2.0`) is strongly recommended. |
 | `created_at` | yes | ISO 8601 UTC timestamp (e.g. `"2026-05-27T14:00:00Z"`). |
-| `hippo_version` | yes | PEP 440 version specifier. Import fails with `RecipeVersionIncompatibleError` if the running Mosaic version does not satisfy this constraint. |
+| `mosaic_version` | yes | PEP 440 version specifier. Import fails with `RecipeVersionIncompatibleError` if the running Mosaic version does not satisfy this constraint. |
 | `description` | no | One paragraph, human-readable. |
 | `license` | no | SPDX identifier (e.g. `CC-BY-4.0`, `MIT`). |
 | `source` | no | Author-declared canonical origin URI — typically a Zenodo DOI URL. Metadata only; Mosaic never fetches from this field. |
@@ -65,12 +65,12 @@ Required fields are `id`, `name`, `version`, `created_at`, and `hippo_version`. 
 `schema.yaml` is a standard [LinkML](https://linkml.io/) schema document. Keep it focused on what your recipe contributes — do not redeclare classes or slots from an upstream recipe or from Mosaic's own core schema.
 
 ```yaml
-id: https://example.org/hippo/scrnaseq
+id: https://example.org/mosaic/scrnaseq
 name: scrnaseq
 default_prefix: scrnaseq
 prefixes:
   linkml: https://w3id.org/linkml/
-  scrnaseq: https://example.org/hippo/scrnaseq/
+  scrnaseq: https://example.org/mosaic/scrnaseq/
 
 imports:
   - linkml:types
@@ -170,7 +170,7 @@ Example output:
 id:           org.broad.scrnaseq
 name:         scrnaseq
 version:      1.2.0
-hippo:        >=0.3,<1.0
+mosaic:       >=0.3,<1.0
 created_at:   2026-05-27T14:00:00Z
 digest:       sha256:f3a8c9b...
 classes:      3
@@ -203,10 +203,10 @@ The exported `recipe.yaml` contains stubs you must replace before publishing:
 id: TODO.set.this       # ← replace with your reverse-DNS id
 name: TODO-set-name     # ← replace with a short slug
 version: 0.0.0          # ← replace with your version
-hippo_version: ">=0.3"  # ← adjust compatibility range
+mosaic_version: ">=0.3"  # ← adjust compatibility range
 ```
 
-To declare a parent lineage on the export, pass the `id` of an already-installed recipe with `--parent`. Until `mosaic recipe list` ships in Phase 4, find installed recipe ids by reading `hippo_meta.installed_recipes` directly from the database:
+To declare a parent lineage on the export, pass the `id` of an already-installed recipe with `--parent`. Until `mosaic recipe list` ships in Phase 4, find installed recipe ids by reading `mosaic_meta.installed_recipes` directly from the database:
 
 ```bash
 mosaic recipe export --parent org.broad.base-omics --out ./my-recipe/

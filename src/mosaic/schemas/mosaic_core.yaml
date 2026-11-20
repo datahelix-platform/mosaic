@@ -1,23 +1,23 @@
-id: https://w3id.org/hippo/hippo_core
-name: hippo_core
-title: Hippo Core Schema — Primitives
+id: https://w3id.org/datahelix/mosaic/mosaic_core
+name: mosaic_core
+title: Mosaic Core Schema — Primitives
 description: >-
-  Hippo's built-in classes and enums declared as a LinkML schema. Every
-  user schema imports `hippo_core`; every domain class uses `is_a: Entity`.
-  `hippo_core` carries no domain knowledge — it is the minimal set of
+  Mosaic's built-in classes and enums declared as a LinkML schema. Every
+  user schema imports `mosaic_core`; every domain class uses `is_a: Entity`.
+  `mosaic_core` carries no domain knowledge — it is the minimal set of
   primitives the rest of the system needs to operate.
 
-  See sec9 §9.5 of the Hippo design spec for the design rationale and
-  `design/reference_hippo_core.md` for the per-class reference.
+  See sec9 §9.5 of the Mosaic design spec for the design rationale and
+  `design/reference_mosaic_core.md` for the per-class reference.
 
 license: https://creativecommons.org/publicdomain/zero/1.0/
 version: 0.6.0
 
 prefixes:
   linkml: https://w3id.org/linkml/
-  hippo: https://w3id.org/hippo/
+  mosaic: https://w3id.org/datahelix/mosaic/
   prov: http://www.w3.org/ns/prov#
-default_prefix: hippo
+default_prefix: mosaic
 default_range: string
 
 imports:
@@ -67,11 +67,11 @@ classes:
     is_a: Entity
     class_uri: prov:Activity
     annotations:
-      hippo_append_only: true
+      mosaic_append_only: true
     description: >-
       Atomic audit record of an operation on an entity. `is_a: Entity` so
       it participates in the usual identity model (UUID id, lifecycle),
-      but annotated `hippo_append_only: true` — adapters MUST reject
+      but annotated `mosaic_append_only: true` — adapters MUST reject
       UPDATE and DELETE on the backing table; only INSERT is permitted.
 
       PROV-O alignment: each instance is a `prov:Activity` at the atomic
@@ -97,7 +97,7 @@ classes:
           (relational adapters) or the user-schema entity by label (Neo4j).
         slot_uri: prov:wasGeneratedBy
         annotations:
-          hippo_index: true
+          mosaic_index: true
       entity_type:
         range: string
         required: false
@@ -110,7 +110,7 @@ classes:
         required: true
         description: Kind of operation. See the `Operation` enum.
         annotations:
-          hippo_index: true
+          mosaic_index: true
       actor_id:
         range: string
         required: true
@@ -119,7 +119,7 @@ classes:
           the identity model (sec9 §9.5) to an agent — a user-schema
           `User`/`Service` class, a `Process` (for autonomous execution),
           or a system entity. Deployments that need rich actor modeling
-          define their own agent classes; hippo_core prescribes only the
+          define their own agent classes; mosaic_core prescribes only the
           reference.
         slot_uri: prov:wasAssociatedWith
       timestamp:
@@ -129,7 +129,7 @@ classes:
           UTC wall-clock time at which the operation completed.
         slot_uri: prov:endedAtTime
         annotations:
-          hippo_index: true
+          mosaic_index: true
       schema_version:
         range: string
         required: true
@@ -152,7 +152,7 @@ classes:
           runs) from their atomic members. Null when the operation is not
           inside any Process.
         annotations:
-          hippo_index: true
+          mosaic_index: true
       patch:
         range: string
         required: false
@@ -173,7 +173,7 @@ classes:
     is_a: Entity
     class_uri: prov:Activity
     annotations:
-      hippo_accessor: processes
+      mosaic_accessor: processes
     description: >-
       Composite activity — a grouping of atomic `ProvenanceRecord` entries
       under one logical execution. Reference-data loads, schema migrations,
@@ -208,13 +208,13 @@ classes:
           `pipeline_run`, `schema_migration`, `manual_edit`). Not a closed
           enum — deployments categorize freely.
         annotations:
-          hippo_index: true
+          mosaic_index: true
       started_at:
         range: datetime
         required: true
         description: UTC wall-clock time at which the process began.
         annotations:
-          hippo_index: true
+          mosaic_index: true
       ended_at:
         range: datetime
         required: false
@@ -226,7 +226,7 @@ classes:
         required: true
         description: >-
           UUID of the entity responsible for initiating this process.
-          Resolvable via `HippoClient.resolve_type(uuid)` per sec9 §9.5's
+          Resolvable via `MosaicClient.resolve_type(uuid)` per sec9 §9.5's
           identity model.
 
   Validator:
@@ -245,9 +245,9 @@ classes:
   ReferenceLoader:
     description: >-
       Metadata for a reference-data loader plugin. Instances are contributed
-      by plugins registered under the `hippo.reference_loaders` entry point.
+      by plugins registered under the `mosaic.reference_loaders` entry point.
 
-      Plugin registration contract (Decision 9.5.E): Hippo merges
+      Plugin registration contract (Decision 9.5.E): Mosaic merges
       `schema_fragment` into the live SchemaView at plugin registration, then
       validates the ReferenceLoader instance against the merged view so
       `entity_type` references resolve. Either failure aborts registration
@@ -255,10 +255,10 @@ classes:
       see fragment or instance validation errors at runtime.
 
       `entity_type` semantics (Decision 9.5.F): the slot is declarative —
-      used for provenance recording and discoverability only. Hippo does NOT
+      used for provenance recording and discoverability only. Mosaic does NOT
       drive runtime data-ingestion order from it. The loader's own code owns
       ingestion order (e.g., insert Substance rows before Reaction rows for
-      FK satisfaction). See `design/reference_hippo_core.md` for the full
+      FK satisfaction). See `design/reference_mosaic_core.md` for the full
       developer contract.
     attributes:
       name:
@@ -283,7 +283,7 @@ classes:
         required: false
         description: >-
           URL, file path, or other locator identifying the origin of the
-          reference data. Recorded in provenance; not interpreted by Hippo.
+          reference data. Recorded in provenance; not interpreted by Mosaic.
       schema_fragment:
         range: string
         required: false
@@ -308,12 +308,12 @@ classes:
       captured by normal provenance.
 
       Slots ranged against ExternalReference may additionally carry the
-      `hippo_external_xref` annotation to opt into reverse-lookup
+      `mosaic_external_xref` annotation to opt into reverse-lookup
       behavior: a global `(system, value)` uniqueness constraint among
-      available entities and `HippoClient.find_by_xref(system, value)` /
+      available entities and `MosaicClient.find_by_xref(system, value)` /
       `GET /xref/{system}/{value}` lookups, served by an
       annotation-driven side-index table maintained on every write. See
-      issue #48 and `design/reference_hippo_ext.md`.
+      issue #48 and `design/reference_mosaic_ext.md`.
 
       Replaces the deprecated `ExternalID` entity pattern (see the
       ExternalID class note).
@@ -324,7 +324,7 @@ classes:
         description: >-
           Stable name of the external system that owns the identifier
           (e.g., "STARLIMS", "HALO", "DONOR_DB"). Controlled by
-          deployers; not validated against an enum by hippo_core.
+          deployers; not validated against an enum by mosaic_core.
       value:
         range: string
         required: true
@@ -347,15 +347,15 @@ classes:
     description: >-
       DEPRECATED (since 0.6.0, issue #48): use the `ExternalReference`
       value type on a domain slot (optionally annotated
-      `hippo_external_xref` for reverse lookup) instead. ExternalID
+      `mosaic_external_xref` for reverse lookup) instead. ExternalID
       remains for backward compatibility only and will be removed from
-      hippo_core in a future major release; the SDK methods
+      mosaic_core in a future major release; the SDK methods
       (`register_external_id`, `get_by_external_id`,
       `list_external_ids`, mapping-level `supersede`) and the
       `/external-ids` REST endpoints emit DeprecationWarning /
       are marked deprecated in OpenAPI.
 
-      A stable cross-system identifier linking a Hippo entity to an ID
+      A stable cross-system identifier linking a Mosaic entity to an ID
       managed by an external source system (e.g., STARLIMS barcode, HALO
       sample ID, Donor DB donor number). Lifecycle-tracked: each
       ExternalID instance is created, superseded, and retired via the
@@ -381,19 +381,19 @@ classes:
         description: >-
           The identifier string as it appears in the source system.
         annotations:
-          hippo_index: true
+          mosaic_index: true
       source_system:
         range: string
         required: true
         description: >-
           Stable name of the originating system (e.g., "STARLIMS",
           "HALO", "DONOR_DB"). Controlled by deployers; not validated
-          against an enum by hippo_core.
+          against an enum by mosaic_core.
       entity:
         range: Entity
         required: true
         description: >-
-          The Hippo entity this external ID belongs to. UUID reference;
+          The Mosaic entity this external ID belongs to. UUID reference;
           resolves via `_entity_registry` in relational adapters
           (Phase 2, PR 2.4).
       is_active:

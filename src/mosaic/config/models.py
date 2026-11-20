@@ -47,6 +47,3 @@ class MosaicConfig(BaseModel):
             return Path(v)
         return v
 
-
-# Deprecated alias (ADR-0004): the config model was renamed with the component.
-HippoConfig = MosaicConfig  # deprecated

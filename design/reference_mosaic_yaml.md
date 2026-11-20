@@ -1,9 +1,9 @@
-## Reference: `hippo.yaml` Configuration Schema
+## Reference: `mosaic.yaml` Configuration Schema
 
 **Document status:** Draft v0.1
 **Depends on:** sec2_architecture.md
 
-This document is the authoritative reference for all valid fields in `hippo.yaml`.
+This document is the authoritative reference for all valid fields in `mosaic.yaml`.
 All top-level sections are optional unless marked required. Unknown keys at any level
 produce a `ConfigError` at startup — no silently-ignored config.
 
@@ -12,7 +12,7 @@ produce a `ConfigError` at startup — no silently-ignored config.
 ### Complete Annotated Reference
 
 ```yaml
-# hippo.yaml
+# mosaic.yaml
 
 # ---------------------------------------------------------------------------
 # adapter (required)
@@ -22,7 +22,7 @@ adapter:
   type: sqlite            # required — "sqlite" | "postgres" (future) | "dynamodb" (future)
 
   sqlite:                 # required when type = sqlite
-    path: ./hippo.db      # required — file path or ":memory:" for in-memory (testing only)
+    path: ./mosaic.db      # required — file path or ":memory:" for in-memory (testing only)
     synchronous: NORMAL   # optional — "NORMAL" | "FULL" | "OFF"; default: NORMAL
                           # NORMAL: safe for most deployments; FULL: strictest durability
 
@@ -33,21 +33,21 @@ adapter:
   #   port: 5432            # optional; default: 5432
   #   database: hippo       # required
   #   user: hippo           # required
-  #   password: "${HIPPO_DB_PASSWORD}"  # env var substitution supported (see §Config Env Vars)
+  #   password: "${MOSAIC_DB_PASSWORD}"  # env var substitution supported (see §Config Env Vars)
   #   pool_size: 5          # optional; default: 5
   #   pool_timeout: 30      # optional; seconds; default: 30
   #   ssl: false            # optional; default: false
   #
   # dynamodb:
   #   region: us-east-1     # required
-  #   table_prefix: hippo_  # optional; default: "hippo_"
+  #   table_prefix: hippo_  # optional; default: "mosaic_"
 
 # ---------------------------------------------------------------------------
 # schema (required)
 # Path to the entity schema definition file (LinkML format).
 # ---------------------------------------------------------------------------
 schema:
-  path: ./schema.yaml     # required — relative to hippo.yaml location or absolute
+  path: ./schema.yaml     # required — relative to mosaic.yaml location or absolute
 
 # ---------------------------------------------------------------------------
 # validators (optional)
@@ -59,7 +59,7 @@ validators:
 
 # ---------------------------------------------------------------------------
 # server (optional)
-# REST API server settings. Only used when running `hippo serve`.
+# REST API server settings. Only used when running `mosaic serve`.
 # ---------------------------------------------------------------------------
 server:
   host: 127.0.0.1         # optional; default: 127.0.0.1
@@ -114,8 +114,8 @@ String config values support `${VAR_NAME}` and `${VAR_NAME:-default}` substituti
 adapter:
   type: postgres
   postgres:
-    password: "${HIPPO_DB_PASSWORD}"           # fails at startup if unset
-    host: "${HIPPO_DB_HOST:-localhost}"        # defaults to "localhost" if unset
+    password: "${MOSAIC_DB_PASSWORD}"           # fails at startup if unset
+    host: "${MOSAIC_DB_HOST:-localhost}"        # defaults to "localhost" if unset
 ```
 
 Substitution is performed at load time before type validation. Substitution is supported
@@ -132,7 +132,7 @@ in v0.1.
 adapter:
   type: sqlite
   sqlite:
-    path: ./hippo.db
+    path: ./mosaic.db
 schema:
   path: ./schema.yaml
 ```
@@ -143,7 +143,7 @@ schema:
 adapter:
   type: sqlite
   sqlite:
-    path: ./hippo.db
+    path: ./mosaic.db
 schema:
   path: ./schema.yaml
 validators:
@@ -184,9 +184,9 @@ logging:
 
 ### Config Loading Behaviour
 
-- Config file path defaults to `./hippo.yaml` in the current working directory
-- Override with `HIPPO_CONFIG=/path/to/hippo.yaml` environment variable
-- `HIPPO_CONFIG` takes precedence over the default path; it also takes precedence over
+- Config file path defaults to `./mosaic.yaml` in the current working directory
+- Override with `MOSAIC_CONFIG=/path/to/mosaic.yaml` environment variable
+- `MOSAIC_CONFIG` takes precedence over the default path; it also takes precedence over
   `--config` CLI flag if both are set (CLI flag is the lowest priority)
 - All relative paths in the config file are resolved relative to the config file's
   directory, not the current working directory

@@ -9,7 +9,7 @@ import yaml
 
 def get_config_dir() -> Path:
     """Get the Mosaic configuration directory."""
-    data_dir = Path.home() / ".hippo" / "data"
+    data_dir = Path.home() / ".mosaic" / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
     return data_dir
 

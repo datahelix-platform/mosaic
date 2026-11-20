@@ -64,7 +64,7 @@ class TestConfigurableDepthLimit:
         from fastapi import FastAPI
 
         app = FastAPI()
-        app.state.hippo_client = hippo_client
+        app.state.mosaic_client = hippo_client
         router = create_graphql_router(hippo_client, max_query_depth=3)
         app.include_router(router, prefix="/graphql")
 
@@ -83,7 +83,7 @@ class TestConfigurableDepthLimit:
         from mosaic.serve import create_default_app
 
         app = create_default_app(
-            hippo_client=hippo_client, graphql=True, graphql_max_query_depth=3
+            mosaic_client=hippo_client, graphql=True, graphql_max_query_depth=3
         )
         with TestClient(app) as api:
             rejected = api.post(

@@ -10,7 +10,7 @@ from starlette.responses import JSONResponse, Response
 from mosaic.core.context import current_actor
 
 
-ACTOR_HEADER = "x-hippo-actor"
+ACTOR_HEADER = "x-datahelix-actor"
 ACTOR_PREFIX = "actor:"
 
 
@@ -43,7 +43,7 @@ class AuthMiddleware(ABC):
 
 
 class PassThroughAuthMiddleware:
-    """Pass-through authentication middleware that extracts actor from X-Mosaic-Actor header.
+    """Pass-through authentication middleware that extracts actor from X-DataHelix-Actor header.
 
     Header format: "actor:<identifier>"
 
@@ -72,7 +72,7 @@ class PassThroughAuthMiddleware:
         elif not raw_header.startswith(ACTOR_PREFIX):
             response = JSONResponse(
                 status_code=401,
-                content={"error": "Invalid X-Mosaic-Actor header format"},
+                content={"error": "Invalid X-DataHelix-Actor header format"},
             )
             await response(scope, receive, send)
             return
@@ -81,7 +81,7 @@ class PassThroughAuthMiddleware:
             if not actor_id or not actor_id.strip():
                 response = JSONResponse(
                     status_code=401,
-                    content={"error": "Empty actor identifier in X-Mosaic-Actor header"},
+                    content={"error": "Empty actor identifier in X-DataHelix-Actor header"},
                 )
                 await response(scope, receive, send)
                 return

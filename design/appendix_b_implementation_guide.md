@@ -19,7 +19,7 @@ responsibilities, key invariants, and test strategy.
 | YAML parsing | `pyyaml` | Config and schema file parsing |
 | CLI | `typer` | CLI framework |
 | REST framework | `fastapi` | REST transport; auto-generates OpenAPI docs |
-| ASGI server | `uvicorn` | ASGI server for `hippo serve` |
+| ASGI server | `uvicorn` | ASGI server for `mosaic serve` |
 | CEL evaluation | `cel-python` | Config-driven validator conditions |
 | SQLite | stdlib `sqlite3` | Core storage; no ORM |
 | Testing | `pytest` | Test framework; in-memory SQLite for integration tests |
@@ -31,10 +31,10 @@ responsibilities, key invariants, and test strategy.
 
 ```
 hippo/
-├── __init__.py                 # Public exports: HippoClient, HippoConfig
+├── __init__.py                 # Public exports: MosaicClient, MosaicConfig
 │
 ├── core/
-│   ├── client.py               # HippoClient — all business logic; no I/O except via adapters
+│   ├── client.py               # MosaicClient — all business logic; no I/O except via adapters
 │   ├── types.py                # Shared types: Filter, PaginatedResult, ScoredMatch,
 │   │                           #   WriteOperation, ValidationResult, ProvenanceRecord, IngestResult
 │   ├── errors.py               # Full error hierarchy (see §B.3)
@@ -47,12 +47,12 @@ hippo/
 │   └── types.py                # SchemaConfig, EntityTypeConfig, FieldConfig, RelationshipConfig
 │
 ├── config/
-│   ├── loader.py               # Load hippo.yaml → HippoConfig (Pydantic model); env var substitution
-│   └── types.py                # HippoConfig, AdapterConfig, ServerConfig, LoggingConfig, etc.
+│   ├── loader.py               # Load mosaic.yaml → MosaicConfig (Pydantic model); env var substitution
+│   └── types.py                # MosaicConfig, AdapterConfig, ServerConfig, LoggingConfig, etc.
 │
 ├── adapters/
 │   ├── base.py                 # EntityStore ABC, ExternalSourceAdapter ABC
-│   ├── registry.py             # Adapter discovery via hippo.storage_adapters entry points
+│   ├── registry.py             # Adapter discovery via mosaic.storage_adapters entry points
 │   └── sqlite/
 │       ├── __init__.py
 │       ├── store.py            # EntityStore implementation for SQLite
@@ -72,10 +72,10 @@ hippo/
 │
 ├── reference/
 │   ├── base.py                 # ReferenceLoader ABC, LoadResult
-│   └── registry.py             # ReferenceLoader discovery via hippo.reference_loaders entry points
+│   └── registry.py             # ReferenceLoader discovery via mosaic.reference_loaders entry points
 │
 ├── rest/
-│   ├── app.py                  # FastAPI app factory: create_app(client: HippoClient)
+│   ├── app.py                  # FastAPI app factory: create_app(client: MosaicClient)
 │   ├── auth.py                 # AuthMiddleware ABC + pass-through stub
 │   ├── dependencies.py         # FastAPI dependency injection (get_client, get_actor, etc.)
 │   └── routers/
@@ -101,64 +101,64 @@ hippo/
 
 ### B.3 Error Hierarchy
 
-All Hippo exceptions inherit from `HippoError`. Callers should catch the most specific
-subclass available; catch `HippoError` only as a last resort.
+All Hippo exceptions inherit from `MosaicError`. Callers should catch the most specific
+subclass available; catch `MosaicError` only as a last resort.
 
 ```python
-class HippoError(Exception):
+class MosaicError(Exception):
     """Base class for all Hippo errors."""
 
 # ── Configuration errors (startup time) ──────────────────────────────────────
 
-class ConfigError(HippoError):
+class ConfigError(MosaicError):
     """Invalid or missing configuration. Raised at startup."""
 
-class SchemaError(HippoError):
+class SchemaError(MosaicError):
     """Schema file is invalid, references unknown types, or contains cycles."""
 
-class MigrationError(HippoError):
+class MigrationError(MosaicError):
     """Migration cannot be applied (e.g. destructive change attempted)."""
 
-class SearchCapabilityError(HippoError):
+class SearchCapabilityError(MosaicError):
     """Schema declares a search mode not supported by the active adapter."""
 
 # ── Runtime errors (request time) ────────────────────────────────────────────
 
-class ValidationError(HippoError):
+class ValidationError(MosaicError):
     """Write was rejected by a validator. HTTP 422."""
     validator: str          # name of the validator that rejected the write
     entity_type: str
     entity_id: str | None   # None for creates before ID assignment
     detail: dict            # validator-specific detail
 
-class EntityNotFoundError(HippoError):
+class EntityNotFoundError(MosaicError):
     """Entity does not exist or is unavailable. HTTP 404."""
     entity_type: str
     entity_id: str
 
-class RelationshipNotFoundError(HippoError):
+class RelationshipNotFoundError(MosaicError):
     """Relationship edge does not exist. HTTP 404."""
     relationship_id: str
 
-class ExternalIdNotFoundError(HippoError):
+class ExternalIdNotFoundError(MosaicError):
     """No entity found for the given (system, external_id) pair. HTTP 404."""
     system: str
     external_id: str
 
-class ExternalIdConflictError(HippoError):
+class ExternalIdConflictError(MosaicError):
     """ExternalID is already registered to a different entity. HTTP 409."""
     system: str
     external_id: str
     existing_entity_id: str
 
-class SchemaVersionMismatchError(HippoError):
+class SchemaVersionMismatchError(MosaicError):
     """Instance schema version differs from storage schema version (future v0.2). HTTP 503."""
     instance_version: str
     storage_version: str
 
 # ── Adapter errors (infrastructure) ──────────────────────────────────────────
 
-class AdapterError(HippoError):
+class AdapterError(MosaicError):
     """Storage backend failure. Always wraps the underlying exception. HTTP 500."""
     cause: Exception
 
@@ -182,11 +182,11 @@ Implement in this sequence. Each phase is independently testable before proceedi
 **Modules:** `core/types.py`, `core/errors.py`, `config/loader.py`, `config/types.py`,
 `schema/parser.py`, `schema/types.py`
 
-**Goal:** Parse `hippo.yaml` and `schema.yaml` into validated Pydantic models. No database,
+**Goal:** Parse `mosaic.yaml` and `schema.yaml` into validated Pydantic models. No database,
 no network.
 
 **Key tests:**
-- `hippo.yaml` with all valid fields parses correctly
+- `mosaic.yaml` with all valid fields parses correctly
 - Missing required fields raise `ConfigError` with clear message
 - Unknown keys raise `ConfigError`
 - `schema.yaml` with entity types, fields, relationships, `base:`, `requires:`, `search:`
@@ -228,11 +228,11 @@ validates against schema before writing.
 - Unknown field in input → warning (not error) + field ignored
 - Valid write succeeds
 
-#### Phase 4 — Full HippoClient (no CEL validators yet)
+#### Phase 4 — Full MosaicClient (no CEL validators yet)
 
 **Modules:** `core/client.py`, `core/ingestion.py`
 
-**Goal:** Implement the full public `HippoClient` interface — availability, supersession,
+**Goal:** Implement the full public `MosaicClient` interface — availability, supersession,
 relationships, ExternalID operations, history, state_at, ingestion pipeline.
 
 **Key tests:**
@@ -270,13 +270,13 @@ fetch and cycle detection.
 - Built-in preset `immutable_field` — rejects update that changes field value
 - `existing` is null for creates; present for updates
 - CEL sandbox has no I/O functions (test that `http` or `open` are not available)
-- Plugin validators (`hippo.write_validators` entry points) are discovered and ordered
+- Plugin validators (`mosaic.write_validators` entry points) are discovered and ordered
 
 #### Phase 6 — REST transport
 
 **Modules:** `rest/app.py`, `rest/routers/*`, `rest/auth.py`, `rest/dependencies.py`
 
-**Goal:** Thin FastAPI transport wrapping `HippoClient`. All routing, serialisation,
+**Goal:** Thin FastAPI transport wrapping `MosaicClient`. All routing, serialisation,
 request/response envelope, error mapping.
 
 **Key tests:**
@@ -286,7 +286,7 @@ request/response envelope, error mapping.
 - `AdapterError` maps to HTTP 500
 - Response envelope always present: `{data, error, meta}`
 - Pagination: `?limit=10&offset=20` returns correct slice + meta pagination fields
-- `X-Hippo-Actor` header sets actor on writes; defaults to `"anonymous"` if absent
+- `X-DataHelix-Actor` header sets actor on writes; defaults to `"anonymous"` if absent
 - `X-Hippo-Context` header parsed as JSON and passed as provenance context
 - OpenAPI docs generated at `/docs`
 
@@ -294,18 +294,18 @@ request/response envelope, error mapping.
 
 **Module:** `cli/main.py`
 
-**Goal:** Implement all CLI commands using `HippoClient` and supporting modules.
+**Goal:** Implement all CLI commands using `MosaicClient` and supporting modules.
 
 **Commands to implement:**
-- `hippo init` — scaffold `hippo.yaml` and blank `schema.yaml` in current directory
-- `hippo serve` — start REST server (loads config, validates, starts Uvicorn)
-- `hippo migrate [--yes]` — diff schema, print plan, apply on confirmation
-- `hippo validate` — run validators.yaml against current data (read-only dry run)
-- `hippo ingest <entity_type> <file> [--dry-run] [--fail-fast] [--actor] [--context]`
-- `hippo reference install <name> [--version]`
-- `hippo reference update <name>`
-- `hippo reference list`
-- `hippo validate-schema <schema_file>`
+- `mosaic init` — scaffold `mosaic.yaml` and blank `schema.yaml` in current directory
+- `mosaic serve` — start REST server (loads config, validates, starts Uvicorn)
+- `mosaic migrate [--yes]` — diff schema, print plan, apply on confirmation
+- `mosaic validate` — run validators.yaml against current data (read-only dry run)
+- `mosaic ingest <entity_type> <file> [--dry-run] [--fail-fast] [--actor] [--context]`
+- `mosaic reference install <name> [--version]`
+- `mosaic reference update <name>`
+- `mosaic reference list`
+- `mosaic validate-schema <schema_file>`
 
 #### Phase 8 — Search
 
@@ -358,7 +358,7 @@ These invariants must hold at all times. Tests should verify them directly.
 ### B.6 Testing Conventions
 
 - All integration tests use `adapter.type: sqlite` with `path: ":memory:"`
-- A `@pytest.fixture` named `client` provides a fresh `HippoClient` with an in-memory
+- A `@pytest.fixture` named `client` provides a fresh `MosaicClient` with an in-memory
   SQLite adapter for each test. No test isolation issues — each test gets a clean DB.
 - A `@pytest.fixture` named `client_with_schema(schema_yaml)` loads a schema from a
   YAML string and returns a configured client.
@@ -395,7 +395,7 @@ more OpenSpec features. Recommended mapping:
 
 | OpenSpec Epic | Phases | Key spec sections |
 |---|---|---|
-| `hippo-foundation` | Phase 1 | sec2 §2.4, reference_hippo_yaml.md, sec3 §3.6 |
+| `hippo-foundation` | Phase 1 | sec2 §2.4, reference_mosaic_yaml.md, sec3 §3.6 |
 | `hippo-storage` | Phase 2 | sec3b, sec6 §6.6 |
 | `hippo-validation-tier1` | Phase 3 | sec2 §2.13 (Tier 1 only) |
 | `hippo-sdk-core` | Phase 4 | sec4 §4.2, sec5 §5.2–5.6, sec6 §6.3 |
@@ -446,7 +446,7 @@ class FakeTermLoader(ReferenceLoader):
         return LoadResult(created=len(entities), entities=entities)
 ```
 
-See `hippo/src/hippo/testing/fake_reference_loader.py` for the in-tree example.
+See `hippo/src/mosaic/testing/fake_reference_loader.py` for the in-tree example.
 
 **Pattern B — large loader (~10⁵+ entities).** Skip the `entities` accumulator.
 Return scalar counters only; the reference write log (§2.14.9) already records
@@ -480,7 +480,7 @@ authoritative for any operation. In particular:
   `EntityRef` per entity type for inspection).
 - The lifecycle layer never derives prune sets from `entities`; it always reads
   from `reference_write_log`.
-- The `hippo reference install` CLI breakdown queries the write log when
+- The `mosaic reference install` CLI breakdown queries the write log when
   `entities` is empty, so the loader author does not have to choose between an
   ergonomic CLI and operating at scale.
 
@@ -516,10 +516,10 @@ Inside the block, `client.put()` records a log row; outside the block it is a
 no-op for the log. User-data writes, ingestion CLI writes, and REST writes
 therefore never hit the log.
 
-`hippo reference doctor` (planned diagnostic command) reports orphan write-log
+`mosaic reference doctor` (planned diagnostic command) reports orphan write-log
 rows — log rows whose `loader_name` is not present in
-`hippo_meta.reference_versions`. Orphans typically arise when a loader was
-force-removed without going through `hippo reference uninstall`; cleanup is
+`mosaic_meta.reference_versions`. Orphans typically arise when a loader was
+force-removed without going through `mosaic reference uninstall`; cleanup is
 manual until v3. The doctor command does not exist in source yet; the child
 issue that lands `--prune-old` and the lifecycle wiring owns the matching
 command surface.

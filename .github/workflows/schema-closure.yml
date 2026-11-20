@@ -4,7 +4,7 @@ name: Schema Closure
 # structurally coherent on every PR and push to main.
 #
 # Two gates:
-#   1. `mosaic validate --schema` on hippo_core (fast structural load check).
+#   1. `mosaic validate --schema` on mosaic_core (fast structural load check).
 #   2. `scripts/check_schema_closure.py` — deeper guard:
 #        a. Positive: valid synthetic fragments merge without error.
 #        b. Negative: incoherent fragment (dangling is_a) is caught and the
@@ -47,10 +47,10 @@ jobs:
       - name: Install dependencies
         run: uv pip install --system -e ".[dev]"
 
-      - name: Gate 1 – mosaic validate hippo_core
+      - name: Gate 1 – mosaic validate mosaic_core
         run: |
-          mosaic validate --schema src/mosaic/schemas/hippo_core.yaml
-          echo "hippo_core schema passed mosaic validate"
+          mosaic validate --schema src/mosaic/schemas/mosaic_core.yaml
+          echo "mosaic_core schema passed mosaic validate"
 
       - name: Gate 2 – merged-closure integrity check
         run: python scripts/check_schema_closure.py

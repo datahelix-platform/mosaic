@@ -42,13 +42,13 @@ from mosaic.linkml_bridge import SchemaRegistry, _bundled_importmap
 
 def _build_widget_registry() -> SchemaRegistry:
     overlay = {
-        "id": "https://example.org/hippo/test_domain_module",
+        "id": "https://example.org/mosaic/test_domain_module",
         "name": "test_domain_module",
         "prefixes": {
             "linkml": "https://w3id.org/linkml/",
-            "hippo": "https://w3id.org/hippo/",
+            "mosaic": "https://w3id.org/datahelix/mosaic/",
         },
-        "imports": ["linkml:types", "hippo_core"],
+        "imports": ["linkml:types", "mosaic_core"],
         "default_range": "string",
         "classes": {
             "Widget": {
@@ -354,13 +354,13 @@ class TestValidationGate:
         # before any write. Staged via plan.put (no seeding) so the
         # required-field NOT NULL column is never inserted into.
         overlay = {
-            "id": "https://example.org/hippo/test_required",
+            "id": "https://example.org/mosaic/test_required",
             "name": "test_required",
             "prefixes": {
                 "linkml": "https://w3id.org/linkml/",
-                "hippo": "https://w3id.org/hippo/",
+                "mosaic": "https://w3id.org/datahelix/mosaic/",
             },
-            "imports": ["linkml:types", "hippo_core"],
+            "imports": ["linkml:types", "mosaic_core"],
             "default_range": "string",
             "classes": {
                 "Gizmo": {

@@ -13,7 +13,7 @@ accessibility. The Infrastructure Layer is optional and adds cloud-scale storage
 │   ┌─────────────────────────┐   ┌───────────────────────────┐  │
 │   │      REST API           │   │    GraphQL API (optional) │  │
 │   │  hippo.rest (FastAPI)   │   │   hippo.graphql           │  │
-│   │  `hippo serve`          │   │                           │  │
+│   │  `mosaic serve`         │   │                           │  │
 │   └────────────┬────────────┘   └─────────────┬─────────────┘  │
 └────────────────│─────────────────────────────│─────────────────┘
                  │  both call SDK directly      │
@@ -24,7 +24,7 @@ accessibility. The Infrastructure Layer is optional and adds cloud-scale storage
 │   │  QueryEngine │  │IngestionPipe │  │  ProvenanceManager  │  │
 │   └──────────────┘  └──────────────┘  └─────────────────────┘  │
 │   ┌──────────────┐  ┌──────────────┐  ┌─────────────────────┐  │
-│   │ SchemaConfig │  │  EntityStore │  │  HippoClient        │  │
+│   │ SchemaConfig │  │  EntityStore │  │  MosaicClient       │  │
 │   │  (YAML)      │  │  (interface) │  │  (public API)       │  │
 │   └──────────────┘  └──────┬───────┘  └─────────────────────┘  │
 └──────────────────────────── │ ───────────────────────────────── ┘
@@ -48,7 +48,7 @@ accessibility. The Infrastructure Layer is optional and adds cloud-scale storage
 hippo/
 │
 ├── core/                        # All business logic — no I/O
-│   ├── client.py                # HippoClient: primary public interface
+│   ├── client.py                # MosaicClient: primary public interface
 │   ├── query.py                 # QueryEngine: filter, join, resolve, search
 │   ├── ingestion.py             # IngestionPipeline: validate & write entities
 │   ├── provenance.py            # ProvenanceManager: change tracking
@@ -94,7 +94,7 @@ hippo/
 ├── graphql/                     # GraphQL transport (optional `graphql` extra; sec4 §4.7)
 │   ├── __init__.py              # Lazy entry points + extra detection
 │   ├── schema_builder.py        # schema_typing type model → strawberry types
-│   ├── resolvers.py             # Query/Mutation roots; thin HippoClient delegation
+│   ├── resolvers.py             # Query/Mutation roots; thin MosaicClient delegation
 │   └── router.py                # FastAPI GraphQLRouter (GraphiQL, bearer auth)
 │
 ├── cli/
@@ -172,7 +172,7 @@ its config, it resolves the configured adapter type to its implementation class 
 it with the adapter-specific config block:
 
 ```yaml
-# hippo.yaml
+# mosaic.yaml
 adapter:
   type: sqlite
   sqlite:
@@ -216,21 +216,21 @@ Hippo defines four entry point groups. Third-party packages can contribute to an
 
 | Entry point group | Purpose | Naming convention |
 |---|---|---|
-| `hippo.storage_adapters` | Storage backend implementations | `hippo-adapter-<name>` |
-| `hippo.external_adapters` | External system connector implementations (Cappella ships these) | `cappella-adapter-<name>` |
-| `hippo.write_validators` | Write-path business rule validators | `hippo-validators-<name>` |
-| `hippo.reference_loaders` | Reference ontology data loaders | `hippo-reference-<name>` |
+| `mosaic.storage_adapters` | Storage backend implementations | `mosaic-adapter-<name>` |
+| `mosaic.external_adapters` | External system connector implementations (Cappella ships these) | `cappella-adapter-<name>` |
+| `mosaic.write_validators` | Write-path business rule validators | `mosaic-validators-<name>` |
+| `mosaic.reference_loaders` | Reference ontology data loaders | `mosaic-reference-<name>` |
 
 **Declaring plugins** (in the third-party package's `pyproject.toml`):
 
 ```toml
-[project.entry-points."hippo.storage_adapters"]
+[project.entry-points."mosaic.storage_adapters"]
 myadapter = "mypkg.adapters.storage:MyStorageAdapter"
 
-[project.entry-points."hippo.write_validators"]
+[project.entry-points."mosaic.write_validators"]
 my_rules = "mypkg.validators:MyBusinessRuleValidator"
 
-[project.entry-points."hippo.reference_loaders"]
+[project.entry-points."mosaic.reference_loaders"]
 my_ontology = "mypkg.reference:MyOntologyLoader"
 ```
 
@@ -263,21 +263,21 @@ changes may occur with deprecation notices. Plugin authors should pin to compati
 versions using `hippo>=0.x,<0.(x+1)` until v1.0 is reached.
 
 **Community registry:** A curated list of known community plugins will be maintained in the
-Hippo repository README. The naming conventions above (`hippo-adapter-<name>`,
-`hippo-reference-<name>`, etc.) ensure discoverability via PyPI search.
+Hippo repository README. The naming conventions above (`mosaic-adapter-<name>`,
+`mosaic-reference-<name>`, etc.) ensure discoverability via PyPI search.
 
 ### 2.4 Config System
 
-All Hippo configuration lives in a single YAML file (`hippo.yaml` by default, overridable via
-`HIPPO_CONFIG` environment variable). The config file has three top-level sections:
+All Hippo configuration lives in a single YAML file (`mosaic.yaml` by default, overridable via
+`MOSAIC_CONFIG` environment variable). The config file has three top-level sections:
 
 ```yaml
-# hippo.yaml
+# mosaic.yaml
 
 adapter:                         # Which storage backend to use and its settings
   type: sqlite
   sqlite:
-    path: ./hippo.db
+    path: ./mosaic.db
 
 schema:                          # Path to entity schema definition (required — see Section 3)
   path: ./schema.yaml            # LinkML format; no default schema is bundled
@@ -285,40 +285,40 @@ schema:                          # Path to entity schema definition (required �
 validators:                      # Path to business rule validators config (optional)
   path: ./validators.yaml        # If omitted, only schema-level validation runs
 
-server:                          # REST API server settings (only needed for hippo serve)
+server:                          # REST API server settings (only needed for mosaic serve)
   host: 0.0.0.0
   port: 8000
   workers: 4
 ```
 
 Config is loaded once at startup, validated against a Pydantic model, and injected throughout
-the SDK via a `HippoConfig` object. Components never read config files directly — they receive
+the SDK via a `MosaicConfig` object. Components never read config files directly — they receive
 a config object at instantiation. This keeps components testable in isolation.
 
 ### 2.5 Dependency Injection
 
-The `HippoClient` is the single entry point to all SDK functionality. It is instantiated with
-a `HippoConfig` and internally constructs the appropriate adapter, query engine, and provenance
-manager. In the REST layer, a single `HippoClient` instance is created at server startup and
+The `MosaicClient` is the single entry point to all SDK functionality. It is instantiated with
+a `MosaicConfig` and internally constructs the appropriate adapter, query engine, and provenance
+manager. In the REST layer, a single `MosaicClient` instance is created at server startup and
 injected into route handlers via FastAPI's dependency system:
 
 ```python
 # hippo/rest/dependencies.py
-def get_client() -> HippoClient:
+def get_client() -> MosaicClient:
     return _client  # module-level singleton initialized at startup
 
 # hippo/rest/routers/entities.py
 @router.get("/{entity_type}")
-def list_entities(entity_type: str, filters: dict, client: HippoClient = Depends(get_client)):
+def list_entities(entity_type: str, filters: dict, client: MosaicClient = Depends(get_client)):
     return client.query(entity_type, **filters)
 ```
 
-For local SDK usage, the caller instantiates `HippoClient` directly:
+For local SDK usage, the caller instantiates `MosaicClient` directly:
 
 ```python
-from hippo import HippoClient, HippoConfig
+from mosaic import MosaicClient, MosaicConfig
 
-client = HippoClient(HippoConfig.from_file("hippo.yaml"))
+client = MosaicClient(MosaicConfig.from_file("mosaic.yaml"))
 results = client.query("Item", category="task", completion_state="pending")
 ```
 
@@ -327,10 +327,10 @@ results = client.query("Item", category="task", completion_state="pending")
 #### REST API
 
 The REST API is a FastAPI application defined in `hippo/rest/app.py`. The `app` object is the
-primary artifact — `hippo serve` is a thin CLI wrapper that runs it via Uvicorn:
+primary artifact — `mosaic serve` is a thin CLI wrapper that runs it via Uvicorn:
 
 ```python
-# hippo serve is equivalent to:
+# mosaic serve is equivalent to:
 uvicorn hippo.rest.app:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
@@ -349,10 +349,10 @@ The REST API exposes an OpenAPI schema automatically via FastAPI at `/docs` and 
 `hippo/graphql/` (reserved-empty in v0.1, implemented since — issue #45) is a Strawberry-based
 GraphQL transport adapter that wraps the SDK directly — not via REST. The GraphQL schema is
 autogenerated at startup by rendering the shared LinkML type model
-(`hippo.core.schema_typing`, issue #47), so the GraphQL and typed-client surfaces cannot
-drift; resolvers are thin `HippoClient` delegations reading the same `app.state.hippo_client`
+(`mosaic.core.schema_typing`, issue #47), so the GraphQL and typed-client surfaces cannot
+drift; resolvers are thin `MosaicClient` delegations reading the same `app.state.mosaic_client`
 the REST routers use. Strawberry ships in the optional `graphql` extra;
-`hippo serve --graphql` mounts the transport at `/graphql` on the same FastAPI app. Auth
+`mosaic serve --graphql` mounts the transport at `/graphql` on the same FastAPI app. Auth
 middleware is shared between REST and GraphQL transports (see 2.7).
 Full design: sec4 §4.7.
 
@@ -373,20 +373,20 @@ The Hippo CLI is implemented with Typer and installed as the `hippo` command:
 
 | Command | Description |
 |---|---|
-| `hippo init` | Scaffold a new `hippo.yaml`, `schema.yaml`, and `validators.yaml` in the current directory |
-| `hippo serve` | Start the REST API server using settings from `hippo.yaml` |
-| `hippo ingest <source> <file>` | Run a batch ingestion from a flat file (CSV/JSON/JSONL) |
-| `hippo validate [--schema <path>]` | Validate config, schema, and validators files without starting the server; `--schema` runs the full namespace graph validation pass (cross-namespace reference checks, duplicate entity detection, circular dependency detection) and reports all errors with file locations |
-| `hippo migrate` | Apply any pending schema migrations to the current storage backend; includes namespace graph validation pass before applying any changes |
-| `hippo status` | Show current config, adapter type, entity counts, schema version, and installed plugins |
-| `hippo validate-schema` | Validate a LinkML schema file |
-| `hippo reference list` | List all installed reference loaders and their installed versions |
-| `hippo reference install <name> [--version <v>]` | Install a reference dataset; merges schema fragment and runs migrate |
-| `hippo reference update <name> [--version <v>]` | Update an installed reference dataset to a newer release |
+| `mosaic init` | Scaffold a new `mosaic.yaml`, `schema.yaml`, and `validators.yaml` in the current directory |
+| `mosaic serve` | Start the REST API server using settings from `mosaic.yaml` |
+| `mosaic ingest <source> <file>` | Run a batch ingestion from a flat file (CSV/JSON/JSONL) |
+| `mosaic validate [--schema <path>]` | Validate config, schema, and validators files without starting the server; `--schema` runs the full namespace graph validation pass (cross-namespace reference checks, duplicate entity detection, circular dependency detection) and reports all errors with file locations |
+| `mosaic migrate` | Apply any pending schema migrations to the current storage backend; includes namespace graph validation pass before applying any changes |
+| `mosaic status` | Show current config, adapter type, entity counts, schema version, and installed plugins |
+| `mosaic validate-schema` | Validate a LinkML schema file |
+| `mosaic reference list` | List all installed reference loaders and their installed versions |
+| `mosaic reference install <name> [--version <v>]` | Install a reference dataset; merges schema fragment and runs migrate |
+| `mosaic reference update <name> [--version <v>]` | Update an installed reference dataset to a newer release |
 
-**Namespace validation in `hippo validate --schema`**
+**Namespace validation in `mosaic validate --schema`**
 
-When `--schema` is provided (or the schema path is read from `hippo.yaml`), the validator
+When `--schema` is provided (or the schema path is read from `mosaic.yaml`), the validator
 runs the full namespace graph validation pass:
 
 1. Discovers all schema files recursively from the schema path (file or directory)
@@ -410,9 +410,9 @@ SchemaValidationError: Duplicate entity 'Sample' in namespace 'tissue'
   also declared in: schemas/tissue_legacy.yaml
 ```
 
-**Namespace validation in `hippo migrate`**
+**Namespace validation in `mosaic migrate`**
 
-`hippo migrate` runs the namespace graph validation pass before generating the migration
+`mosaic migrate` runs the namespace graph validation pass before generating the migration
 plan. If namespace validation fails, the migration is aborted and errors are reported before
 any changes are applied. This ensures no schema with broken namespace references can be
 applied to storage.
@@ -422,7 +422,7 @@ applied to storage.
 | Tier | Storage Adapter | Transport | Auth | Typical Use |
 |---|---|---|---|---|
 | **Local** | SQLite | None (SDK direct) | None | Single researcher, notebook |
-| **Single-host** | SQLite or PostgreSQL | REST (`hippo serve`) | None (v0.1) / JWT (future) | Small team, shared server |
+| **Single-host** | SQLite or PostgreSQL | REST (`mosaic serve`) | None (v0.1) / JWT (future) | Small team, shared server |
 | **Cloud (AWS)** | PostgreSQL (RDS) or DynamoDB | REST behind ALB | JWT + RBAC | Enterprise deployment |
 
 All tiers use the same `hippo` Python package. Tier is determined entirely by config.
@@ -448,7 +448,7 @@ Connection behavior per adapter:
 Errors propagate outward from adapter → SDK → transport layer in a consistent hierarchy:
 
 ```
-HippoError (base)
+MosaicError (base)
 ├── EntityNotFoundError       # Requested entity does not exist
 ├── ValidationError           # Entity failed validation
 │   ├── SchemaValidationError     # Failed schema-level field/type/enum check
@@ -459,7 +459,7 @@ HippoError (base)
 └── ConfigError               # Invalid or missing configuration
 ```
 
-The SDK raises typed `HippoError` subclasses. The REST layer catches these and maps them to
+The SDK raises typed `MosaicError` subclasses. The REST layer catches these and maps them to
 appropriate HTTP status codes (404, 422, 500, etc.) with a consistent JSON error body:
 
 ```json
@@ -501,7 +501,7 @@ surfacing — internal implementation details never leak through the SDK boundar
 
 | Package | Purpose |
 |---|---|
-| Bundled `hippo-reference-*` loaders | FMA, Ensembl, GO, etc. (each is a separate package) |
+| Bundled `mosaic-reference-*` loaders | FMA, Ensembl, GO, etc. (each is a separate package) |
 
 **Installation extras:**
 
@@ -513,12 +513,12 @@ pip install hippo[references]       # Adds bundled reference loader packages
 pip install hippo[all]              # Everything
 
 # Community plugins installed alongside:
-pip install hippo hippo-adapter-redshift    # hypothetical storage adapter
-pip install hippo hippo-reference-reactome  # community reference loader
+pip install datahelix-mosaic mosaic-adapter-redshift    # hypothetical storage adapter
+pip install datahelix-mosaic mosaic-reference-reactome  # community reference loader
 ```
 
-Plugin packages should follow the naming convention `hippo-adapter-<name>` for discoverability.
-The Hippo repository provides a `hippo-adapter-template` cookiecutter for bootstrapping new
+Plugin packages should follow the naming convention `mosaic-adapter-<name>` for discoverability.
+The Hippo repository provides a `mosaic-adapter-template` cookiecutter for bootstrapping new
 adapter packages with the correct entry point declarations, ABC implementations, and test
 scaffolding pre-wired.
 
@@ -542,7 +542,7 @@ Raises `SchemaValidationError` on failure. Cannot be disabled.
 
 #### Tier 2: Config-driven business rule validators (`validators.yaml`)
 
-Optional. Loaded from the path declared in `hippo.yaml`. If the key is absent, this tier is
+Optional. Loaded from the path declared in `mosaic.yaml`. If the key is absent, this tier is
 skipped entirely.
 
 **`validators.yaml` config format:**
@@ -599,7 +599,7 @@ class WriteValidator(ABC):
 
     @abstractmethod
     def validate(self, operation: WriteOperation,
-                 client: HippoClient) -> ValidationResult: ...
+                 client: MosaicClient) -> ValidationResult: ...
 
 @dataclass
 class WriteOperation:
@@ -637,9 +637,9 @@ Redundant entries (child listed with parent) emit a startup warning.
 ### 2.14 Reference Loader System
 
 Reference loaders install community-standard ontology data as regular Hippo entities.
-Distributed as `hippo-reference-<name>` packages, discovered via two entry point groups:
-`hippo.reference_loaders` (the ABC subclass) and `hippo.reference_loader_cli` (an optional
-`typer.Typer` app mounted under `hippo reference <name> ...`).
+Distributed as `mosaic-reference-<name>` packages, discovered via two entry point groups:
+`mosaic.reference_loaders` (the ABC subclass) and `mosaic.reference_loader_cli` (an optional
+`typer.Typer` app mounted under `mosaic reference <name> ...`).
 
 **v2 status.** The contract documented in this section is the v2 ReferenceLoader contract.
 v1 (locked in [PTS-215](/PTS/issues/PTS-215) against GitHub #6) shipped with two follow-up
@@ -649,7 +649,7 @@ substrate did not scale to production references (GitHub #15), and the
 (GitHub #16). v2 closes both. The substrate moves to a Hippo-internal write log
 (§2.14.9). The `LoadResult` shape adopts `EntityRef` and drops the v1 sibling fields
 (§2.14.8). v2 is a clean break — the migration touches in-tree fixtures only because no
-downstream `hippo-reference-*` package has shipped against v1. Decisions are recorded in
+downstream `mosaic-reference-*` package has shipped against v1. Decisions are recorded in
 [sec9 §2.14.J, §2.14.K, §2.14.L](sec9_decisions.md).
 
 **`ReferenceLoader` ABC:**
@@ -663,8 +663,8 @@ class ReferenceLoader(ABC):
     name: str           # e.g. "fma", "ensembl", "go" — must match entry point key
     description: str
 
-    # Optional: Typer app mounted as `hippo reference <name> <subcmd> ...`
-    # Register via the hippo.reference_loader_cli entry point.
+    # Optional: Typer app mounted as `mosaic reference <name> <subcmd> ...`
+    # Register via the mosaic.reference_loader_cli entry point.
     subcommands_app: typer.Typer | None = None
 
     # Optional: Pydantic v2 model for load() parameters.
@@ -686,12 +686,12 @@ class ReferenceLoader(ABC):
     # Must declare default_prefix: matching the loader name (see §2.14.5).
 
     @abstractmethod
-    def load(self, client: HippoClient, version: str,
+    def load(self, client: MosaicClient, version: str,
              params: BaseModel | None = None) -> LoadResult: ...
     # Ingest the reference dataset at the given version.
     # params is an instance of load_params_schema, or None if not declared.
 
-    def upgrade(self, client: HippoClient, from_version: str, to_version: str,
+    def upgrade(self, client: MosaicClient, from_version: str, to_version: str,
                 params: BaseModel | None = None) -> LoadResult:
         # Default: runs load(to_version, params). Override for efficient diffs.
         return self.load(client, to_version, params)
@@ -706,23 +706,23 @@ class ReferenceLoader(ABC):
 **Entry points** (in the loader package's `pyproject.toml`):
 
 ```toml
-[project.entry-points."hippo.reference_loaders"]
+[project.entry-points."mosaic.reference_loaders"]
 ensembl = "hippo_reference_ensembl.loader:EnsemblLoader"
 
 # Optional — only needed if the loader exposes subcommands:
-[project.entry-points."hippo.reference_loader_cli"]
+[project.entry-points."mosaic.reference_loader_cli"]
 ensembl = "hippo_reference_ensembl.cli:app"
 ```
 
-**Install lifecycle (`hippo reference install <name> [--version <v>]`):**
-1. Resolve loader from `hippo.reference_loaders` entry points
+**Install lifecycle (`mosaic reference install <name> [--version <v>]`):**
+1. Resolve loader from `mosaic.reference_loaders` entry points
 2. Call `loader.schema_fragment()` and merge into deployed schema (see §2.14.5)
-3. Run `hippo migrate` (additive = non-interactive; structural = prompt for confirmation)
+3. Run `mosaic migrate` (additive = non-interactive; structural = prompt for confirmation)
 4. Call `loader.load(client, version, params)` — source data fetched via `client.cached_fetch`
    (see §2.14.3)
-5. Record `{loader_name: version}` in `hippo_meta` under key `reference_versions`
+5. Record `{loader_name: version}` in `mosaic_meta` under key `reference_versions`
 
-**Upgrade lifecycle (`hippo reference upgrade <name> [--version <v>] [--prune-old]`):**
+**Upgrade lifecycle (`mosaic reference upgrade <name> [--version <v>] [--prune-old]`):**
 Calls `loader.upgrade(client, from_version, to_version, params)`. The new version's entities
 are ingested additively by default; pass `--prune-old` to remove the prior version's rows
 after the new install succeeds (see §2.14.4).
@@ -732,11 +732,11 @@ after the new install succeeds (see §2.14.4).
 ```yaml
 # schema.yaml — exact-match pins only for v1 (range comparators are deferred)
 requires:
-  - hippo-reference-fma==3.3
-  - hippo-reference-ensembl==mus_musculus.GRCm39.115
+  - mosaic-reference-fma==3.3
+  - mosaic-reference-ensembl==mus_musculus.GRCm39.115
 ```
 
-`hippo validate` fails fast with a clear install suggestion if a required loader is missing.
+`mosaic validate` fails fast with a clear install suggestion if a required loader is missing.
 Users reference loader-provided entity types by name without redeclaring them.
 
 **Coupling notes (D1 ↔ D4 ↔ D5):**
@@ -744,7 +744,7 @@ Users reference loader-provided entity types by name without redeclaring them.
 These three decisions interact. Implementers of the ABC surface must understand all three:
 
 - **D1 → D5**: Sub-command apps declared via `subcommands_app` receive `client` via Typer
-  context injection. This means the loader CLI shares the same `HippoClient` instance (and
+  context injection. This means the loader CLI shares the same `MosaicClient` instance (and
   thus the same `client.cache_dir_for(...)` resolution) as `load()`. Any subcommand that fetches source data MUST
   use `client.cached_fetch` — not a private download path.
 - **D4 → D1**: `load_params_schema` is shared between `load()` and the CLI. When a subcommand
@@ -767,13 +767,13 @@ Examples of valid version slugs:
 - `"2024-01-15"` — date-stamped snapshot
 
 **v1 constraint — exact-match `requires:` only.** The `requires:` directive in `schema.yaml`
-accepts only exact-match pins (`hippo-reference-ensembl==mus_musculus.GRCm39.115`). Range
+accepts only exact-match pins (`mosaic-reference-ensembl==mus_musculus.GRCm39.115`). Range
 comparators (`>=`, `~=`, `^=`) are deferred to v2, which may introduce an optional
 `parse_version(s) -> tuple` ABC method letting Hippo evaluate ranges. Until then, users pin
 exact versions; the install check is string equality only.
 
 Users who need a range constraint should pin the lowest acceptable version and upgrade
-explicitly with `hippo reference upgrade`.
+explicitly with `mosaic reference upgrade`.
 
 ---
 
@@ -796,7 +796,7 @@ class EnsemblLoader(ReferenceLoader):
 ```
 
 When `load_params_schema` is declared:
-- `hippo reference install ensembl --organism mus_musculus` renders `--flag` args from the
+- `mosaic reference install ensembl --organism mus_musculus` renders `--flag` args from the
   model and validates them before invoking `load()`.
 - `load()` always receives a validated model instance (or `None` if no schema is declared).
 - The same model is used for `upgrade()` calls.
@@ -807,12 +807,12 @@ Loaders that do not declare a schema receive `params=None` in `load()` and `upgr
 
 #### 2.14.3 Caching Contract
 
-`HippoClient` exposes two caching primitives for loaders:
+`MosaicClient` exposes two caching primitives for loaders:
 
 ```python
 client.cache_dir_for(loader_name: str) -> Path
-# Resolves to $HIPPO_CACHE_DIR/<loader_name>/ if set,
-# else ~/.cache/hippo/references/<loader_name>/. Auto-mkdir.
+# Resolves to $MOSAIC_CACHE_DIR/<loader_name>/ if set,
+# else ~/.cache/mosaic/references/<loader_name>/. Auto-mkdir.
 
 client.cached_fetch(url: str, *, expected_sha256: str | None = None,
                     loader_name: str) -> Path
@@ -824,13 +824,13 @@ client.cached_fetch(url: str, *, expected_sha256: str | None = None,
 # offending file so the next call re-downloads cleanly.
 ```
 
-`HippoClient` is loader-agnostic — per-loader scoping happens via the `loader_name`
+`MosaicClient` is loader-agnostic — per-loader scoping happens via the `loader_name`
 argument so a single client instance can serve many loaders without stateful
 per-loader binding.
 
 **MUST rule:** Loaders MUST use `client.cached_fetch` for any network download larger than
 1 MB. This enables:
-- `hippo reference clean-cache` to manage disk usage via a single location
+- `mosaic reference clean-cache` to manage disk usage via a single location
 - CI mounts of the cache root for deterministic, network-free re-runs
 - Reproducible audits (content-addressed, optionally hash-verified)
 
@@ -846,7 +846,7 @@ Loaders that access small static files (<1 MB, bundled in the package) may skip
 ones. Entities from the old version remain queryable until explicitly pruned. This preserves
 existing FK references in user data.
 
-**`--prune-old` — opt-in destructive.** When passed to `hippo reference upgrade`, Hippo removes
+**`--prune-old` — opt-in destructive.** When passed to `mosaic reference upgrade`, Hippo removes
 the prior version's rows *after* the new install succeeds. Destructive; gated behind an
 explicit flag. Never the default.
 
@@ -888,7 +888,7 @@ loader) pass through unchanged.
 **Rule 3 — Traceability annotation.** On merge, Hippo injects
 `annotations: { provided_by: { value: "<loader_name>@<package_version>" } }` on every class
 and slot introduced by the fragment. This annotation survives in `SchemaView` for runtime
-introspection (e.g., `hippo status` can show which loader owns which classes).
+introspection (e.g., `mosaic status` can show which loader owns which classes).
 
 **Collision detection** (existing rule, now superseded by Rule 1): with mandatory unique
 prefixes per loader, class-name collisions across loaders can no longer occur. Two loaders
@@ -934,7 +934,7 @@ The `"test"` version SHOULD:
 - Be usable without credentials or network access
 - Be stable across package versions (no external data fetch)
 
-CI pipelines use `hippo reference install <name> --version test` to install the fixture
+CI pipelines use `mosaic reference install <name> --version test` to install the fixture
 dataset without a live network connection. This is a convention, not enforced by the ABC;
 loaders that omit `"test"` will not break Hippo, but their downstream consumers lose the
 hermetic test path.
@@ -969,7 +969,7 @@ class EntityRef:
 
     @classmethod
     def from_put_result(cls, rec: dict) -> "EntityRef":
-        """Bridge from the dict returned by ``HippoClient.put`` to an
+        """Bridge from the dict returned by ``MosaicClient.put`` to an
         ``EntityRef``. Use inside ``load()`` when assembling
         ``LoadResult.entities`` for the advisory inspection list."""
         return cls(id=rec["id"], type=rec["entity_type"])
@@ -998,7 +998,7 @@ any operation. In particular:
 - `--prune-old` is driven by the reference write log (§2.14.9), not by `entities`.
 - `entities` MAY be empty (large loaders are encouraged to leave it empty to avoid in-memory
   growth) or partial (a loader may sample one EntityRef per type).
-- The CLI breakdown shown by `hippo reference install` derives counts from `entities` when
+- The CLI breakdown shown by `mosaic reference install` derives counts from `entities` when
   non-empty, otherwise it queries the write log scoped to `(loader_name, version)` to render
   the same per-type counts. Loader authors do not have to choose between "ergonomic CLI" and
   "scale" — both paths produce the same display.
@@ -1035,8 +1035,8 @@ lifecycle code in `hippo/cli/commands/reference.py`. Downstream loader count at 
 v2 cut-over is zero (the Ensembl prototype team held off shipping per the PTS-215 thread), so
 the deprecation-window cost would be unrecovered overhead.
 
-**`HippoClient.put()` return shape — deferred.** GitHub #16 proposes bundling `HippoClient.put()
--> EntityRef` with this change. v2 declines the bundle: `HippoClient.put()` retains its
+**`MosaicClient.put()` return shape — deferred.** GitHub #16 proposes bundling `MosaicClient.put()
+-> EntityRef` with this change. v2 declines the bundle: `MosaicClient.put()` retains its
 `dict[str, Any]` return (`id`, `entity_type`, `data`, `version`, `created_at`, `updated_at`)
 because tests, `TypedClient`, and the ingestion pipeline all index those keys today. A future
 v3 decision may revisit `put()`'s return type with its own migration story. The
@@ -1080,7 +1080,7 @@ with client.load_context(loader_name=name, version=resolved_version):
     load_result = loader.load(client, resolved_version, params)
 ```
 
-`HippoClient.load_context()` is the **only** sanctioned way to enter logging mode. Inside the
+`MosaicClient.load_context()` is the **only** sanctioned way to enter logging mode. Inside the
 block, every successful `client.put()` records a row in `reference_write_log` keyed by
 `(loader_name, version, entity_id, entity_type)`. Outside the block, `client.put()` is a
 no-op for the log (user-data writes, ingestion CLI, REST handler writes, etc., never hit the
@@ -1089,7 +1089,7 @@ log).
 Rationale for explicit `with` over ContextVar: lifecycle entry/exit is visible at the call
 site, the binding is one stack frame deep, and the scope of "what counts as a load" is
 auditable in code review. ContextVar would obscure the boundary; a wrapper-client would force
-`HippoClient` to be wrap-friendly for one caller's benefit.
+`MosaicClient` to be wrap-friendly for one caller's benefit.
 
 **Failure recovery.** Write-log inserts share the same SQL transaction as the entity write.
 If `loader.load()` raises midway, the in-flight transaction rolls back and no orphan log rows
@@ -1101,13 +1101,13 @@ explicitly own that recovery story; Hippo does not retry on their behalf.
 
 **Garbage collection.**
 
-- `hippo reference upgrade --prune-old` deletes the prior version's entities AND the prior
+- `mosaic reference upgrade --prune-old` deletes the prior version's entities AND the prior
   version's log rows in the same transaction. After a successful prune, the only log rows
   remaining for `loader_name` correspond to the current installed version.
-- `hippo reference uninstall <name>` (existing verb) deletes all log rows where
+- `mosaic reference uninstall <name>` (existing verb) deletes all log rows where
   `loader_name = <name>`.
-- Log rows for a `loader_name` not currently registered in `hippo_meta.reference_versions`
-  (e.g., loader was force-removed without `uninstall`) are GC candidates. `hippo reference
+- Log rows for a `loader_name` not currently registered in `mosaic_meta.reference_versions`
+  (e.g., loader was force-removed without `uninstall`) are GC candidates. `mosaic reference
   doctor` (existing diagnostic command) reports such orphans; cleanup is manual until v3.
 
 **Upgrade overlap.** When `upgrade()` re-writes a stable `entity_id` under a new version slug,
@@ -1120,24 +1120,24 @@ stable-id upgrade overlap MUST override `upgrade()` to skip writing rows that ar
 across versions, OR accept that `--prune-old` on overlap removes the entity (the new install
 will re-create it). v3 may add a `keep_if_unchanged` policy; v2 documents the constraint.
 
-**Replaces `hippo_meta.reference_entity_ids`.** The v1 implementation persisted entity IDs
-as a JSON blob in `hippo_meta.reference_entity_ids`. v2 deletes that key and migrates to the
+**Replaces `mosaic_meta.reference_entity_ids`.** The v1 implementation persisted entity IDs
+as a JSON blob in `mosaic_meta.reference_entity_ids`. v2 deletes that key and migrates to the
 write-log table. The migration runs once on first v2 startup: existing JSON entries are
 read, written into `reference_write_log` (with `entity_type` resolved by per-entity lookup),
-and the `hippo_meta` key is deleted. Migration is idempotent; subsequent startups are no-ops.
+and the `mosaic_meta` key is deleted. Migration is idempotent; subsequent startups are no-ops.
 
 ---
 
 ### 2.15 Error Hierarchy
 
-All Hippo exceptions inherit from `HippoError`. The full hierarchy is specified in
+All Hippo exceptions inherit from `MosaicError`. The full hierarchy is specified in
 `appendix_b_implementation_guide.md §B.3`. Summary:
 
 **Configuration errors (startup time):**
 
 | Exception | Trigger | HTTP |
 |---|---|---|
-| `ConfigError` | Invalid/missing `hippo.yaml` fields; unknown config keys | — |
+| `ConfigError` | Invalid/missing `mosaic.yaml` fields; unknown config keys | — |
 | `SchemaError` | Invalid `schema.yaml`; cycles; unknown type references | — |
 | `MigrationError` | Destructive migration attempt | — |
 | `SearchCapabilityError` | Schema declares unsupported search mode | — |

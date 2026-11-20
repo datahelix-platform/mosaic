@@ -1,12 +1,12 @@
 # REST API Example — Bibliography
 
-All examples below assume `hippo serve` is running locally on port 8000.
+All examples below assume `mosaic serve` is running locally on port 8000.
 Every mutating endpoint requires `Authorization: Bearer <token>`.
 
 Start the server (from the `examples/bibliography/` directory):
 
 ```bash
-hippo serve --config config.json --host 127.0.0.1 --port 8000
+mosaic serve --config config.json --host 127.0.0.1 --port 8000
 ```
 
 ---
@@ -161,7 +161,7 @@ done
 
 ## 7. Full-text search
 
-The `search` endpoint queries FTS5 indexes created from `hippo_search: fts5`
+The `search` endpoint queries FTS5 indexes created from `mosaic_search: fts5`
 schema annotations.
 
 ```bash

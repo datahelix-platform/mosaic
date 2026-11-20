@@ -40,9 +40,7 @@ def _resolve_db_path(db_path: str | Path | None) -> Path:
     """Resolve the SQLite database path.
 
     Priority: explicit *db_path* argument > ``config.json`` in cwd >
-    ``data/mosaic.db`` (the CLI convention) when it exists > the legacy
-    ``data/hippo.db`` / ``hippo.db`` when they exist (ADR-0004) >
-    ``mosaic.db``.
+    ``data/mosaic.db`` (the CLI convention) when it exists > ``mosaic.db``.
     """
     if db_path is not None:
         return Path(db_path)
@@ -57,13 +55,9 @@ def _resolve_db_path(db_path: str | Path | None) -> Path:
         except (json.JSONDecodeError, OSError):
             pass
 
-    for candidate in (
-        Path("data/mosaic.db"),
-        Path("data/hippo.db"),  # legacy (ADR-0004)
-        Path("hippo.db"),  # legacy (ADR-0004)
-    ):
-        if candidate.exists():
-            return candidate
+    candidate = Path("data/mosaic.db")
+    if candidate.exists():
+        return candidate
 
     return Path("mosaic.db")
 
@@ -72,7 +66,7 @@ def _resolve_schema_path(schema_path: str | Path | None) -> Path | None:
     """Resolve the LinkML schema directory/file for the registry.
 
     Priority: explicit *schema_path* argument > ``schemas/`` in cwd (the
-    CLI convention) when it exists > ``None`` (bundled ``hippo_core`` only).
+    CLI convention) when it exists > ``None`` (bundled ``mosaic_core`` only).
     """
     if schema_path is not None:
         return Path(schema_path)
@@ -139,11 +133,10 @@ class SDKBackend:
     Args:
         db_path: Path/URL of the database. If omitted, falls back to
             ``config.json`` in the cwd, then ``data/mosaic.db``, then
-            the legacy ``data/hippo.db`` / ``hippo.db``, then
             ``mosaic.db``.
         schema_path: Path to a LinkML schema file or directory. If omitted,
             falls back to ``schemas/`` in the cwd, then the bundled
-            ``hippo_core`` schema (framework classes only).
+            ``mosaic_core`` schema (framework classes only).
         validators_path: Path to a CEL ``validators.yaml`` for the write
             pipeline. If omitted, falls back to ``config.json``'s
             ``validators_path`` (unless ``validation_enabled`` is false),
@@ -219,7 +212,7 @@ class SDKBackend:
     def _connection_info_sync(self) -> ConnectionInfo:
         target = str(self._db_path)
         schema_desc = (
-            str(self._schema_path) if self._schema_path else "bundled hippo_core"
+            str(self._schema_path) if self._schema_path else "bundled mosaic_core"
         )
         try:
             client = self._get_client()

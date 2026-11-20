@@ -16,9 +16,9 @@ from mosaic.core.storage.ddl_generator import (
     TableDefinition,
 )
 from mosaic.linkml_bridge import (
-    HIPPO_INDEX,
-    HIPPO_INDEX_PARTIAL,
-    HIPPO_UNIQUE,
+    MOSAIC_INDEX,
+    MOSAIC_INDEX_PARTIAL,
+    MOSAIC_UNIQUE,
     SchemaRegistry,
     annotation_value,
     slot_default,
@@ -124,11 +124,11 @@ class PostgresDDLGenerator:
                 )
             )
 
-            if annotation_value(slot, HIPPO_UNIQUE):
+            if annotation_value(slot, MOSAIC_UNIQUE):
                 table.unique_constraints.append([slot.name])
 
-            if annotation_value(slot, HIPPO_INDEX):
-                partial = bool(annotation_value(slot, HIPPO_INDEX_PARTIAL))
+            if annotation_value(slot, MOSAIC_INDEX):
+                partial = bool(annotation_value(slot, MOSAIC_INDEX_PARTIAL))
                 table.indexes.append(
                     IndexDefinition(
                         name=f"idx_{class_name}_{slot.name}",
@@ -157,7 +157,7 @@ class PostgresDDLGenerator:
                     )
                 )
 
-        # is_available: preferred path is declared on Entity in hippo_core
+        # is_available: preferred path is declared on Entity in mosaic_core
         # (flows in via induced_slots above). Fallback hardcoded here for
         # schemas that don't `is_a: Entity`. superseded_by stays hardcoded
         # for now; redesigned in Wave 2 provenance-as-linkml-class.
@@ -278,7 +278,7 @@ class PostgresDDLGenerator:
 
 
 class PostgresFTSMigrationPlanner:
-    """Plans PostgreSQL FTS tables (tsvector + GIN) from ``hippo_search`` annotations."""
+    """Plans PostgreSQL FTS tables (tsvector + GIN) from ``mosaic_search`` annotations."""
 
     def __init__(self) -> None:
         self._fts_tables: dict[str, list[dict[str, str]]] = {}

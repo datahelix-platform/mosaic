@@ -17,21 +17,21 @@ from mosaic.tui.backend.rest import RESTBackend, _resolve_token
 
 def test_explicit_token_takes_precedence(monkeypatch):
     """Explicit --token flag overrides env variable."""
-    monkeypatch.setenv("HIPPO_TUI_TOKEN", "env-token")
+    monkeypatch.setenv("MOSAIC_TUI_TOKEN", "env-token")
     resolved = _resolve_token("explicit-token")
     assert resolved == "explicit-token"
 
 
 def test_env_token_used_when_no_explicit(monkeypatch):
-    """HIPPO_TUI_TOKEN is used when no explicit token is provided."""
-    monkeypatch.setenv("HIPPO_TUI_TOKEN", "envtoken")
+    """MOSAIC_TUI_TOKEN is used when no explicit token is provided."""
+    monkeypatch.setenv("MOSAIC_TUI_TOKEN", "envtoken")
     resolved = _resolve_token(None)
     assert resolved == "envtoken"
 
 
 def test_default_token_when_neither_set(monkeypatch):
     """Falls back to 'dev-token' when neither flag nor env is set."""
-    monkeypatch.delenv("HIPPO_TUI_TOKEN", raising=False)
+    monkeypatch.delenv("MOSAIC_TUI_TOKEN", raising=False)
     resolved = _resolve_token(None)
     assert resolved == "dev-token"
 
@@ -48,15 +48,15 @@ def test_rest_backend_uses_bearer_token():
 
 
 def test_rest_backend_token_from_env(monkeypatch):
-    """RESTBackend picks up token from HIPPO_TUI_TOKEN env variable."""
-    monkeypatch.setenv("HIPPO_TUI_TOKEN", "envtoken")
+    """RESTBackend picks up token from MOSAIC_TUI_TOKEN env variable."""
+    monkeypatch.setenv("MOSAIC_TUI_TOKEN", "envtoken")
     backend = RESTBackend(url="http://localhost:8000")
     assert backend._token == "envtoken"
 
 
 def test_rest_backend_default_token(monkeypatch):
     """RESTBackend uses dev-token when no flag or env variable provided."""
-    monkeypatch.delenv("HIPPO_TUI_TOKEN", raising=False)
+    monkeypatch.delenv("MOSAIC_TUI_TOKEN", raising=False)
     backend = RESTBackend(url="http://localhost:8000")
     assert backend._token == "dev-token"
 

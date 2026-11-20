@@ -14,13 +14,13 @@ from mosaic.linkml_bridge import SchemaRegistry
 from mosaic.serve import create_default_app
 
 XREF_GRAPHQL_SCHEMA = """
-id: https://example.org/hippo/test_xref_graphql
+id: https://example.org/mosaic/test_xref_graphql
 name: test_xref_graphql
 prefixes:
   linkml: https://w3id.org/linkml/
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 default_range: string
 
 classes:
@@ -33,14 +33,14 @@ classes:
         range: ExternalReference
         inlined: true
         annotations:
-          hippo_external_xref: true
+          mosaic_external_xref: true
       other_refs:
         range: ExternalReference
         multivalued: true
         inlined: true
         inlined_as_list: true
         annotations:
-          hippo_external_xref: true
+          mosaic_external_xref: true
 """
 
 AUTH = {"Authorization": "Bearer test-token"}
@@ -61,7 +61,7 @@ def hippo_client(registry):
 
 @pytest.fixture
 def api(hippo_client):
-    app = create_default_app(hippo_client=hippo_client, graphql=True)
+    app = create_default_app(mosaic_client=hippo_client, graphql=True)
     with TestClient(app) as test_client:
         yield test_client
 

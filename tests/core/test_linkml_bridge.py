@@ -5,9 +5,9 @@ from pathlib import Path
 import pytest
 
 from mosaic.linkml_bridge import (
-    HIPPO_SEARCH,
-    HIPPO_INDEX,
-    HIPPO_INDEX_PARTIAL,
+    MOSAIC_SEARCH,
+    MOSAIC_INDEX,
+    MOSAIC_INDEX_PARTIAL,
     TREE_ROOT_CLASS_NAME,
     SchemaRegistry,
     default_accessor,
@@ -48,7 +48,7 @@ class TestSchemaIntrospection:
 
 
 class TestHippoAnnotations:
-    def test_searchable_slots_reads_hippo_search_annotation(
+    def test_searchable_slots_reads_mosaic_search_annotation(
         self, registry: SchemaRegistry
     ):
         searchable = registry.searchable_slots("Sample")
@@ -79,7 +79,7 @@ class TestReferenceSlots:
 
 
 class TestValidation:
-    """Tests use sample_schema.yaml which imports hippo_core (sec9). Sample
+    """Tests use sample_schema.yaml which imports mosaic_core (sec9). Sample
     inherits `is_available` from Entity, so every valid instance must include
     it. Typically the SDK fills it in on create; these tests exercise the raw
     validator interface directly and therefore supply it explicitly.
@@ -140,16 +140,16 @@ class TestLoaders:
 
 
 class TestAnnotationConstants:
-    def test_annotation_keys_use_flat_hippo_prefix(self):
-        assert HIPPO_SEARCH == "hippo_search"
-        assert HIPPO_INDEX == "hippo_index"
-        assert HIPPO_INDEX_PARTIAL == "hippo_index_partial"
+    def test_annotation_keys_use_flat_mosaic_prefix(self):
+        assert MOSAIC_SEARCH == "mosaic_search"
+        assert MOSAIC_INDEX == "mosaic_index"
+        assert MOSAIC_INDEX_PARTIAL == "mosaic_index_partial"
 
 
-class TestHippoExtValidation:
-    """SchemaRegistry validates every hippo_* annotation against hippo_ext at load.
+class TestMosaicExtValidation:
+    """SchemaRegistry validates every mosaic_* annotation against mosaic_ext at load.
 
-    See sec9 §9.4 and design/reference_hippo_ext.md for the declared vocabulary.
+    See sec9 §9.4 and design/reference_mosaic_ext.md for the declared vocabulary.
     """
 
     def _build(self, extra_annotations: dict, on: str = "slot") -> str:
@@ -204,55 +204,55 @@ class TestHippoExtValidation:
         )
 
     def test_declared_annotation_passes(self):
-        # hippo_index: true is valid on a slot
-        yaml_text = self._build({"hippo_index": True})
+        # mosaic_index: true is valid on a slot
+        yaml_text = self._build({"mosaic_index": True})
         reg = SchemaRegistry.from_yaml(yaml_text)
         assert "Thing" in reg.class_names()
 
     def test_undeclared_annotation_fails_with_actionable_message(self):
         from mosaic.core.exceptions import SchemaError
 
-        yaml_text = self._build({"hippo_bogus": True})
+        yaml_text = self._build({"mosaic_bogus": True})
         with pytest.raises(SchemaError) as exc:
             SchemaRegistry.from_yaml(yaml_text)
         msg = str(exc.value)
-        assert "hippo_bogus" in msg
+        assert "mosaic_bogus" in msg
         assert "Thing.name" in msg
-        assert "not declared in hippo_ext" in msg
+        assert "not declared in mosaic_ext" in msg
 
     def test_wrong_value_type_fails(self):
         from mosaic.core.exceptions import SchemaError
 
-        # hippo_index expects boolean, got string
-        yaml_text = self._build({"hippo_index": "yes"})
+        # mosaic_index expects boolean, got string
+        yaml_text = self._build({"mosaic_index": "yes"})
         with pytest.raises(SchemaError) as exc:
             SchemaRegistry.from_yaml(yaml_text)
         msg = str(exc.value)
-        assert "hippo_index" in msg
+        assert "mosaic_index" in msg
         assert "expected boolean" in msg
 
     def test_class_annotation_on_slot_fails(self):
-        # hippo_append_only is a class-only annotation, but in Wave 1 it's
-        # not yet declared in hippo_ext — so this surfaces as "undeclared"
+        # mosaic_append_only is a class-only annotation, but in Wave 1 it's
+        # not yet declared in mosaic_ext — so this surfaces as "undeclared"
         # rather than "wrong applies_to". When Wave 2 lands and declares
-        # hippo_append_only, this test would shift to the wrong-target case.
+        # mosaic_append_only, this test would shift to the wrong-target case.
         from mosaic.core.exceptions import SchemaError
 
-        yaml_text = self._build({"hippo_append_only": True})
+        yaml_text = self._build({"mosaic_append_only": True})
         with pytest.raises(SchemaError) as exc:
             SchemaRegistry.from_yaml(yaml_text)
         msg = str(exc.value)
-        assert "hippo_append_only" in msg
+        assert "mosaic_append_only" in msg
 
     def test_slot_annotation_on_class_fails(self):
-        # hippo_index is a slot annotation; attaching it to a class should fail.
+        # mosaic_index is a slot annotation; attaching it to a class should fail.
         from mosaic.core.exceptions import SchemaError
 
-        yaml_text = self._build({"hippo_index": True}, on="class")
+        yaml_text = self._build({"mosaic_index": True}, on="class")
         with pytest.raises(SchemaError) as exc:
             SchemaRegistry.from_yaml(yaml_text)
         msg = str(exc.value)
-        assert "hippo_index" in msg
+        assert "mosaic_index" in msg
         # The error message mentions the annotation may only attach to slots
         assert "slot_annotation" in msg or "slot" in msg.lower()
 
@@ -260,48 +260,90 @@ class TestHippoExtValidation:
         from mosaic.core.exceptions import SchemaError
 
         yaml_text = self._build(
-            {"hippo_bogus1": True, "hippo_bogus2": True, "hippo_index": "not-bool"}
+            {"mosaic_bogus1": True, "mosaic_bogus2": True, "mosaic_index": "not-bool"}
         )
         with pytest.raises(SchemaError) as exc:
             SchemaRegistry.from_yaml(yaml_text)
         msg = str(exc.value)
-        assert "3 hippo_* annotation error(s)" in msg
-        assert "hippo_bogus1" in msg
-        assert "hippo_bogus2" in msg
-        assert "hippo_index" in msg
+        assert "3 mosaic_* annotation error(s)" in msg
+        assert "mosaic_bogus1" in msg
+        assert "mosaic_bogus2" in msg
+        assert "mosaic_index" in msg
 
-    def test_non_hippo_annotations_are_not_validated(self):
-        # Only hippo_* keys get validated against hippo_ext. Custom user
+    def test_retired_hippo_slot_key_names_its_replacement(self):
+        # Platform ADR-0007: Mosaic reads only mosaic_* keys; a stale
+        # hippo_* key fails loudly with the new name instead of being
+        # silently ignored.
+        from mosaic.core.exceptions import SchemaError
+
+        yaml_text = self._build({"hippo_index": True})
+        with pytest.raises(SchemaError) as exc:
+            SchemaRegistry.from_yaml(yaml_text)
+        assert exc.value.error_code == "EXT_VALIDATION"
+        msg = str(exc.value)
+        assert "`hippo_index`" in msg
+        assert "Thing.name" in msg
+        assert "rename it to `mosaic_index`" in msg
+
+    def test_retired_hippo_class_key_names_its_replacement(self):
+        from mosaic.core.exceptions import SchemaError
+
+        yaml_text = self._build({"hippo_anchor": False}, on="class")
+        with pytest.raises(SchemaError) as exc:
+            SchemaRegistry.from_yaml(yaml_text)
+        msg = str(exc.value)
+        assert "`hippo_anchor`" in msg
+        assert "rename it to `mosaic_anchor`" in msg
+
+    def test_retired_hippo_core_import_names_its_replacement(self):
+        from mosaic.core.exceptions import SchemaError
+
+        yaml_text = (
+            "id: https://example.org/test\n"
+            "name: test\n"
+            "prefixes: {linkml: 'https://w3id.org/linkml/'}\n"
+            "default_range: string\n"
+            "imports: [linkml:types, hippo_core]\n"
+            "classes:\n"
+            "  Thing:\n"
+            "    is_a: Entity\n"
+        )
+        with pytest.raises(SchemaError) as exc:
+            SchemaRegistry.from_yaml(yaml_text)
+        assert "`hippo_core` (rename it to `mosaic_core`)" in str(exc.value)
+
+    def test_non_mosaic_annotations_are_not_validated(self):
+        # Only mosaic_* keys get validated against mosaic_ext. Custom user
         # annotations in other namespaces (prov:, skos:, custom_*) pass
         # through unchecked.
         yaml_text = self._build({"custom_tag": "anything"})
         reg = SchemaRegistry.from_yaml(yaml_text)
         assert "Thing" in reg.class_names()
 
-    def test_hippo_search_accepts_any_string_value(self):
-        # Per Decision 9.4.C: hippo_search range is `string`, not an enum.
+    def test_mosaic_search_accepts_any_string_value(self):
+        # Per Decision 9.4.C: mosaic_search range is `string`, not an enum.
         # The adapter is the authority on which modes it supports; schema-level
         # validation is permissive.
-        yaml_text = self._build({"hippo_search": "fts5"})
+        yaml_text = self._build({"mosaic_search": "fts5"})
         reg1 = SchemaRegistry.from_yaml(yaml_text)
         assert "Thing" in reg1.class_names()
 
         # Non-canonical mode also passes at schema load (adapter would fail
         # at startup if it doesn't support this mode).
-        yaml_text2 = self._build({"hippo_search": "embedding"})
+        yaml_text2 = self._build({"mosaic_search": "embedding"})
         reg2 = SchemaRegistry.from_yaml(yaml_text2)
         assert "Thing" in reg2.class_names()
 
 
-class TestHippoCoreImport:
-    """Tests that `imports: [hippo_core]` resolves and user classes can
+class TestMosaicCoreImport:
+    """Tests that `imports: [mosaic_core]` resolves and user classes can
     `is_a: Entity`. See sec9 §9.3 and §9.5.
     """
 
-    def _user_schema(self, include_hippo_core_import: bool = True) -> str:
+    def _user_schema(self, include_mosaic_core_import: bool = True) -> str:
         imports = ["linkml:types"]
-        if include_hippo_core_import:
-            imports.append("hippo_core")
+        if include_mosaic_core_import:
+            imports.append("mosaic_core")
         imports_block = "\n".join(f"  - {i}" for i in imports)
         return (
             "id: https://example.org/test\n"
@@ -319,16 +361,16 @@ class TestHippoCoreImport:
             "        required: true\n"
         )
 
-    def test_hippo_core_importable_and_entity_resolves(self):
+    def test_mosaic_core_importable_and_entity_resolves(self):
         reg = SchemaRegistry.from_yaml(self._user_schema())
-        # Entity flows in from hippo_core; MySample inherits id + is_available.
+        # Entity flows in from mosaic_core; MySample inherits id + is_available.
         names = set(reg.class_names())
         assert "Entity" in names
         assert "MySample" in names
         slot_names = {s.name for s in reg.induced_slots("MySample")}
         assert {"id", "is_available", "barcode"}.issubset(slot_names)
 
-    def test_hippo_core_enums_available_in_user_view(self):
+    def test_mosaic_core_enums_available_in_user_view(self):
         reg = SchemaRegistry.from_yaml(self._user_schema())
         sv = reg.schema_view
         enums = sv.all_enums()
@@ -339,14 +381,14 @@ class TestHippoCoreImport:
             op_values
         )
 
-    def test_without_hippo_core_import_entity_unresolved(self):
-        # Without `imports: hippo_core`, SchemaView loads successfully but
+    def test_without_mosaic_core_import_entity_unresolved(self):
+        # Without `imports: mosaic_core`, SchemaView loads successfully but
         # LinkML can't resolve `is_a: Entity` when induced slots are
         # requested — SchemaView raises ValueError("No such class: Entity").
         # This is acceptable load-time failure behavior; the error points at
         # the missing import.
         reg = SchemaRegistry.from_yaml(
-            self._user_schema(include_hippo_core_import=False)
+            self._user_schema(include_mosaic_core_import=False)
         )
         with pytest.raises(ValueError, match="Entity"):
             reg.induced_slots("MySample")
@@ -364,7 +406,7 @@ class TestHippoCoreImport:
 
 
 class TestHippoCoreProcess:
-    """Process class shipped in hippo_core (sec9 §9.5). Composite activity
+    """Process class shipped in mosaic_core (sec9 §9.5). Composite activity
     grouping that callers can `is_a: Process` for domain-specific executions
     like Cappella PipelineRuns.
     """
@@ -377,7 +419,7 @@ class TestHippoCoreProcess:
             "default_range: string\n"
             "imports:\n"
             "  - linkml:types\n"
-            "  - hippo_core\n"
+            "  - mosaic_core\n"
             "classes:\n"
             "  PipelineRun:\n"
             "    is_a: Process\n"
@@ -387,14 +429,14 @@ class TestHippoCoreProcess:
             "        required: true\n"
         )
 
-    def test_process_class_present_in_hippo_core(self):
-        # A user schema that imports hippo_core sees Process available.
+    def test_process_class_present_in_mosaic_core(self):
+        # A user schema that imports mosaic_core sees Process available.
         reg = SchemaRegistry.from_yaml(
             "id: https://example.org/t\n"
             "name: t\n"
             "prefixes: {linkml: 'https://w3id.org/linkml/'}\n"
             "default_range: string\n"
-            "imports:\n  - linkml:types\n  - hippo_core\n"
+            "imports:\n  - linkml:types\n  - mosaic_core\n"
             "classes: {}\n"
         )
         assert "Process" in reg.class_names()
@@ -448,23 +490,23 @@ class TestHippoCoreProcess:
         assert ppid.required is False
 
     def test_process_operation_kind_is_indexed(self):
-        # operation_kind annotated hippo_index: true — verify annotation reaches
+        # operation_kind annotated mosaic_index: true — verify annotation reaches
         # the induced slot via the existing annotation_value helper.
         reg = SchemaRegistry.from_yaml(self._schema_with_process_subclass())
         slots = {s.name: s for s in reg.induced_slots("Process")}
-        from mosaic.linkml_bridge import annotation_value, HIPPO_INDEX
-        assert annotation_value(slots["operation_kind"], HIPPO_INDEX) is True
-        assert annotation_value(slots["started_at"], HIPPO_INDEX) is True
+        from mosaic.linkml_bridge import annotation_value, MOSAIC_INDEX
+        assert annotation_value(slots["operation_kind"], MOSAIC_INDEX) is True
+        assert annotation_value(slots["started_at"], MOSAIC_INDEX) is True
 
 
 class TestHippoCoreProvenanceRecord:
-    """ProvenanceRecord class shipped in hippo_core (sec9 §9.6). Declared for
+    """ProvenanceRecord class shipped in mosaic_core (sec9 §9.6). Declared for
     introspection and downstream use (typed-client, REST surface). The
     adapter-side enforcement and ProvenanceStore migration land with the
     `provenance-migration` change per Decision 9.6.A.
     """
 
-    def _schema_importing_hippo_core(self) -> str:
+    def _schema_importing_mosaic_core(self) -> str:
         return (
             "id: https://example.org/test\n"
             "name: test\n"
@@ -472,23 +514,23 @@ class TestHippoCoreProvenanceRecord:
             "default_range: string\n"
             "imports:\n"
             "  - linkml:types\n"
-            "  - hippo_core\n"
+            "  - mosaic_core\n"
             "classes: {}\n"
         )
 
-    def test_provenance_record_present_in_hippo_core(self):
-        reg = SchemaRegistry.from_yaml(self._schema_importing_hippo_core())
+    def test_provenance_record_present_in_mosaic_core(self):
+        reg = SchemaRegistry.from_yaml(self._schema_importing_mosaic_core())
         assert "ProvenanceRecord" in reg.class_names()
 
     def test_provenance_record_is_a_entity(self):
-        reg = SchemaRegistry.from_yaml(self._schema_importing_hippo_core())
+        reg = SchemaRegistry.from_yaml(self._schema_importing_mosaic_core())
         slot_names = {s.name for s in reg.induced_slots("ProvenanceRecord")}
         # Inherited from Entity
         assert "id" in slot_names
         assert "is_available" in slot_names
 
     def test_provenance_record_has_sec9_slots(self):
-        reg = SchemaRegistry.from_yaml(self._schema_importing_hippo_core())
+        reg = SchemaRegistry.from_yaml(self._schema_importing_mosaic_core())
         slot_names = {s.name for s in reg.induced_slots("ProvenanceRecord")}
         expected = {
             "entity_id",
@@ -505,45 +547,45 @@ class TestHippoCoreProvenanceRecord:
         assert expected.issubset(slot_names)
 
     def test_provenance_record_class_uri_is_prov_activity(self):
-        reg = SchemaRegistry.from_yaml(self._schema_importing_hippo_core())
+        reg = SchemaRegistry.from_yaml(self._schema_importing_mosaic_core())
         cls = reg.get_class("ProvenanceRecord")
         assert cls is not None
         assert cls.class_uri == "prov:Activity" or "Activity" in (
             cls.class_uri or ""
         )
 
-    def test_provenance_record_has_hippo_append_only_annotation(self):
-        reg = SchemaRegistry.from_yaml(self._schema_importing_hippo_core())
+    def test_provenance_record_has_mosaic_append_only_annotation(self):
+        reg = SchemaRegistry.from_yaml(self._schema_importing_mosaic_core())
         cls = reg.get_class("ProvenanceRecord")
         assert cls is not None
         from mosaic.linkml_bridge import annotation_value
-        assert annotation_value(cls, "hippo_append_only") is True
+        assert annotation_value(cls, "mosaic_append_only") is True
 
     def test_provenance_record_slots_are_indexed(self):
-        reg = SchemaRegistry.from_yaml(self._schema_importing_hippo_core())
+        reg = SchemaRegistry.from_yaml(self._schema_importing_mosaic_core())
         slots = {s.name: s for s in reg.induced_slots("ProvenanceRecord")}
-        from mosaic.linkml_bridge import annotation_value, HIPPO_INDEX
+        from mosaic.linkml_bridge import annotation_value, MOSAIC_INDEX
         # Slots that sec9 §9.6 and §9.7 say should be indexed for the
         # canonical query paths
-        assert annotation_value(slots["entity_id"], HIPPO_INDEX) is True
-        assert annotation_value(slots["timestamp"], HIPPO_INDEX) is True
-        assert annotation_value(slots["operation"], HIPPO_INDEX) is True
-        assert annotation_value(slots["process_id"], HIPPO_INDEX) is True
+        assert annotation_value(slots["entity_id"], MOSAIC_INDEX) is True
+        assert annotation_value(slots["timestamp"], MOSAIC_INDEX) is True
+        assert annotation_value(slots["operation"], MOSAIC_INDEX) is True
+        assert annotation_value(slots["process_id"], MOSAIC_INDEX) is True
 
     def test_operation_enum_available(self):
         # ProvenanceRecord.operation references the Operation enum declared
-        # in hippo_core. The user view should see both.
-        reg = SchemaRegistry.from_yaml(self._schema_importing_hippo_core())
+        # in mosaic_core. The user view should see both.
+        reg = SchemaRegistry.from_yaml(self._schema_importing_mosaic_core())
         sv = reg.schema_view
         enums = sv.all_enums()
         assert "Operation" in enums
 
 
 class TestHippoAppendOnlyAnnotation:
-    """Validates the hippo_append_only annotation declaration in hippo_ext."""
+    """Validates the mosaic_append_only annotation declaration in mosaic_ext."""
 
     def _schema_with_annotation(self, target: str, value: object) -> str:
-        """Build a schema attaching hippo_append_only to a class or slot."""
+        """Build a schema attaching mosaic_append_only to a class or slot."""
         if target == "class":
             return (
                 "id: https://example.org/t\n"
@@ -554,7 +596,7 @@ class TestHippoAppendOnlyAnnotation:
                 "classes:\n"
                 "  LogEntry:\n"
                 "    annotations:\n"
-                f"      hippo_append_only: {str(value).lower()}\n"
+                f"      mosaic_append_only: {str(value).lower()}\n"
                 "    attributes:\n"
                 "      id: {identifier: true}\n"
             )
@@ -572,27 +614,27 @@ class TestHippoAppendOnlyAnnotation:
             "      name:\n"
             "        range: string\n"
             "        annotations:\n"
-            f"          hippo_append_only: {str(value).lower()}\n"
+            f"          mosaic_append_only: {str(value).lower()}\n"
         )
 
-    def test_hippo_append_only_true_on_class_passes(self):
+    def test_mosaic_append_only_true_on_class_passes(self):
         reg = SchemaRegistry.from_yaml(
             self._schema_with_annotation("class", True)
         )
         cls = reg.get_class("LogEntry")
         from mosaic.linkml_bridge import annotation_value
-        assert annotation_value(cls, "hippo_append_only") is True
+        assert annotation_value(cls, "mosaic_append_only") is True
 
-    def test_hippo_append_only_false_on_class_passes(self):
+    def test_mosaic_append_only_false_on_class_passes(self):
         reg = SchemaRegistry.from_yaml(
             self._schema_with_annotation("class", False)
         )
         cls = reg.get_class("LogEntry")
         from mosaic.linkml_bridge import annotation_value
-        assert annotation_value(cls, "hippo_append_only") is False
+        assert annotation_value(cls, "mosaic_append_only") is False
 
-    def test_hippo_append_only_on_slot_fails(self):
-        # hippo_append_only is a class_annotation; attaching it to a slot
+    def test_mosaic_append_only_on_slot_fails(self):
+        # mosaic_append_only is a class_annotation; attaching it to a slot
         # must fail at schema load with an applies_to violation.
         from mosaic.core.exceptions import SchemaError
 
@@ -601,7 +643,7 @@ class TestHippoAppendOnlyAnnotation:
                 self._schema_with_annotation("slot", True)
             )
         msg = str(exc.value)
-        assert "hippo_append_only" in msg
+        assert "mosaic_append_only" in msg
         assert "slot" in msg.lower() or "class_annotation" in msg
 
 
@@ -611,7 +653,7 @@ class TestAppendOnlyClassesHelper:
     """
 
     def _schema_with_classes(self, annotated: dict[str, bool]) -> str:
-        """Build a schema where each class is optionally hippo_append_only."""
+        """Build a schema where each class is optionally mosaic_append_only."""
         lines = [
             "id: https://example.org/t",
             "name: t",
@@ -624,7 +666,7 @@ class TestAppendOnlyClassesHelper:
             lines.append(f"  {name}:")
             if is_append_only:
                 lines.append("    annotations:")
-                lines.append("      hippo_append_only: true")
+                lines.append("      mosaic_append_only: true")
             lines.append("    attributes:")
             lines.append("      id: {identifier: true}")
         return "\n".join(lines) + "\n"
@@ -641,19 +683,19 @@ class TestAppendOnlyClassesHelper:
         )
         assert reg.append_only_classes() == {"A"}
 
-    def test_includes_provenance_record_from_hippo_core(self):
+    def test_includes_provenance_record_from_mosaic_core(self):
         reg = SchemaRegistry.from_yaml(
             "id: https://example.org/t\n"
             "name: t\n"
             "prefixes: {linkml: 'https://w3id.org/linkml/'}\n"
             "default_range: string\n"
-            "imports: [linkml:types, hippo_core]\n"
+            "imports: [linkml:types, mosaic_core]\n"
             "classes: {}\n"
         )
         assert "ProvenanceRecord" in reg.append_only_classes()
 
     def test_excludes_abstract_classes(self):
-        # A hippo_append_only annotation on an abstract class is declarative
+        # A mosaic_append_only annotation on an abstract class is declarative
         # only; adapters don't need it in the enforcement set because there
         # is no backing table.
         reg = SchemaRegistry.from_yaml(
@@ -666,7 +708,7 @@ class TestAppendOnlyClassesHelper:
             "  AbstractLog:\n"
             "    abstract: true\n"
             "    annotations:\n"
-            "      hippo_append_only: true\n"
+            "      mosaic_append_only: true\n"
             "    attributes:\n"
             "      id: {identifier: true}\n"
         )
@@ -713,12 +755,12 @@ class TestIsPolymorphicBase:
 
 
 class TestHippoCoreExternalID:
-    """ExternalID class shipped in hippo_core (sec3 §3.4, β-refactor PR 1.1).
+    """ExternalID class shipped in mosaic_core (sec3 §3.4, β-refactor PR 1.1).
     First-class lifecycle-tracked entity for cross-system ID mapping. The
     legacy external_id_store is not retired yet — that happens in Phase 2.
     """
 
-    def _schema_importing_hippo_core(self) -> str:
+    def _schema_importing_mosaic_core(self) -> str:
         return (
             "id: https://example.org/test\n"
             "name: test\n"
@@ -726,54 +768,54 @@ class TestHippoCoreExternalID:
             "default_range: string\n"
             "imports:\n"
             "  - linkml:types\n"
-            "  - hippo_core\n"
+            "  - mosaic_core\n"
             "classes: {}\n"
         )
 
-    def test_external_id_present_in_hippo_core(self):
-        reg = SchemaRegistry.from_yaml(self._schema_importing_hippo_core())
+    def test_external_id_present_in_mosaic_core(self):
+        reg = SchemaRegistry.from_yaml(self._schema_importing_mosaic_core())
         assert "ExternalID" in reg.class_names()
 
     def test_external_id_inherits_entity_slots(self):
-        reg = SchemaRegistry.from_yaml(self._schema_importing_hippo_core())
+        reg = SchemaRegistry.from_yaml(self._schema_importing_mosaic_core())
         slot_names = {s.name for s in reg.induced_slots("ExternalID")}
         # Inherited from Entity
         assert "id" in slot_names
         assert "is_available" in slot_names
 
     def test_external_id_has_declared_slots(self):
-        reg = SchemaRegistry.from_yaml(self._schema_importing_hippo_core())
+        reg = SchemaRegistry.from_yaml(self._schema_importing_mosaic_core())
         slot_names = {s.name for s in reg.induced_slots("ExternalID")}
         expected = {"value", "source_system", "entity", "is_active"}
         assert expected.issubset(slot_names)
 
-    def test_value_slot_has_hippo_index_annotation(self):
-        reg = SchemaRegistry.from_yaml(self._schema_importing_hippo_core())
+    def test_value_slot_has_mosaic_index_annotation(self):
+        reg = SchemaRegistry.from_yaml(self._schema_importing_mosaic_core())
         slots = {s.name: s for s in reg.induced_slots("ExternalID")}
-        from mosaic.linkml_bridge import annotation_value, HIPPO_INDEX
-        assert annotation_value(slots["value"], HIPPO_INDEX) is True
+        from mosaic.linkml_bridge import annotation_value, MOSAIC_INDEX
+        assert annotation_value(slots["value"], MOSAIC_INDEX) is True
 
     def test_source_system_slot_not_indexed(self):
-        # Only `value` is marked hippo_index per PR 1.1 spec; source_system
+        # Only `value` is marked mosaic_index per PR 1.1 spec; source_system
         # benefits from the composite unique_keys index, not a standalone one.
-        reg = SchemaRegistry.from_yaml(self._schema_importing_hippo_core())
+        reg = SchemaRegistry.from_yaml(self._schema_importing_mosaic_core())
         slots = {s.name: s for s in reg.induced_slots("ExternalID")}
-        from mosaic.linkml_bridge import annotation_value, HIPPO_INDEX
-        assert annotation_value(slots["source_system"], HIPPO_INDEX) is not True
+        from mosaic.linkml_bridge import annotation_value, MOSAIC_INDEX
+        assert annotation_value(slots["source_system"], MOSAIC_INDEX) is not True
 
     def test_is_active_default_is_true(self):
-        reg = SchemaRegistry.from_yaml(self._schema_importing_hippo_core())
+        reg = SchemaRegistry.from_yaml(self._schema_importing_mosaic_core())
         slots = {s.name: s for s in reg.induced_slots("ExternalID")}
         from mosaic.linkml_bridge import slot_default
         assert slot_default(slots["is_active"]) is True
 
     def test_entity_slot_range_is_entity(self):
-        reg = SchemaRegistry.from_yaml(self._schema_importing_hippo_core())
+        reg = SchemaRegistry.from_yaml(self._schema_importing_mosaic_core())
         slots = {s.name: s for s in reg.induced_slots("ExternalID")}
         assert slots["entity"].range == "Entity"
 
     def test_unique_keys_block_declared(self):
-        reg = SchemaRegistry.from_yaml(self._schema_importing_hippo_core())
+        reg = SchemaRegistry.from_yaml(self._schema_importing_mosaic_core())
         sv = reg.schema_view
         cls = sv.get_class("ExternalID")
         assert cls is not None
@@ -789,17 +831,17 @@ class TestReferenceLoadersHelper:
     ReferenceLoader in the merged schema (sec9 §9.5, reference-loader-shape).
     """
 
-    _HIPPO_CORE_IMPORT_SCHEMA = (
+    _MOSAIC_CORE_IMPORT_SCHEMA = (
         "id: https://example.org/t\n"
         "name: t\n"
         "prefixes: {linkml: 'https://w3id.org/linkml/'}\n"
         "default_range: string\n"
-        "imports: [linkml:types, hippo_core]\n"
+        "imports: [linkml:types, mosaic_core]\n"
         "classes: {}\n"
     )
 
     def test_empty_when_no_subclasses_declared(self):
-        reg = SchemaRegistry.from_yaml(self._HIPPO_CORE_IMPORT_SCHEMA)
+        reg = SchemaRegistry.from_yaml(self._MOSAIC_CORE_IMPORT_SCHEMA)
         assert reg.reference_loaders() == []
 
     def test_includes_subclass_of_reference_loader(self):
@@ -808,7 +850,7 @@ class TestReferenceLoadersHelper:
             "name: t\n"
             "prefixes: {linkml: 'https://w3id.org/linkml/'}\n"
             "default_range: string\n"
-            "imports: [linkml:types, hippo_core]\n"
+            "imports: [linkml:types, mosaic_core]\n"
             "classes:\n"
             "  ChemicalLoader:\n"
             "    is_a: ReferenceLoader\n"
@@ -819,7 +861,7 @@ class TestReferenceLoadersHelper:
         assert "ChemicalLoader" in reg.reference_loaders()
 
     def test_excludes_reference_loader_itself(self):
-        reg = SchemaRegistry.from_yaml(self._HIPPO_CORE_IMPORT_SCHEMA)
+        reg = SchemaRegistry.from_yaml(self._MOSAIC_CORE_IMPORT_SCHEMA)
         assert "ReferenceLoader" not in reg.reference_loaders()
 
     def test_excludes_abstract_subclass(self):
@@ -828,7 +870,7 @@ class TestReferenceLoadersHelper:
             "name: t\n"
             "prefixes: {linkml: 'https://w3id.org/linkml/'}\n"
             "default_range: string\n"
-            "imports: [linkml:types, hippo_core]\n"
+            "imports: [linkml:types, mosaic_core]\n"
             "classes:\n"
             "  AbstractLoader:\n"
             "    is_a: ReferenceLoader\n"
@@ -841,7 +883,7 @@ class TestReferenceLoadersHelper:
 
 
 class TestTreeRootSynthesis:
-    """`_HippoInstanceBundle` is synthesized at SchemaRegistry construction
+    """`_MosaicInstanceBundle` is synthesized at SchemaRegistry construction
     with one multivalued slot per concrete class (sec9 PR 3.1).
 
     The synthesized class is held on the registry and injected only into
@@ -852,7 +894,7 @@ class TestTreeRootSynthesis:
     """
 
     def test_tree_root_class_name_accessor(self, registry: SchemaRegistry):
-        assert registry.tree_root_class_name() == "_HippoInstanceBundle"
+        assert registry.tree_root_class_name() == "_MosaicInstanceBundle"
         assert registry.tree_root_class_name() == TREE_ROOT_CLASS_NAME
 
     def test_tree_root_not_in_class_names(self, registry: SchemaRegistry):
@@ -875,7 +917,7 @@ class TestTreeRootSynthesis:
     def test_bundled_concrete_classes_have_slots(self, registry: SchemaRegistry):
         slot_names = {s.name for s in registry.tree_root_slots()}
         # ProvenanceRecord, Validator, ReferenceLoader, ExternalID come from
-        # the imported hippo_core schema.
+        # the imported mosaic_core schema.
         assert "provenance_records" in slot_names
         assert "validators" in slot_names
         assert "reference_loaders" in slot_names
@@ -887,11 +929,11 @@ class TestTreeRootSynthesis:
         assert "entitys" not in slot_names
         assert "entities" not in slot_names
 
-    def test_hippo_accessor_override_used_for_process(
+    def test_mosaic_accessor_override_used_for_process(
         self, registry: SchemaRegistry
     ):
-        # `hippo_core.yaml` annotates `Process` with
-        # `hippo_accessor: processes` so the naive `+ "s"` pluralizer
+        # `mosaic_core.yaml` annotates `Process` with
+        # `mosaic_accessor: processes` so the naive `+ "s"` pluralizer
         # (which would yield `processs`) is overridden.
         slot_names = {s.name for s in registry.tree_root_slots()}
         assert "processes" in slot_names
@@ -955,9 +997,9 @@ class TestTreeRootSynthesis:
             "name: t\n"
             "prefixes: {linkml: 'https://w3id.org/linkml/'}\n"
             "default_range: string\n"
-            "imports: [linkml:types, hippo_core]\n"
+            "imports: [linkml:types, mosaic_core]\n"
             "classes:\n"
-            "  _HippoInstanceBundle:\n"
+            "  _MosaicInstanceBundle:\n"
             "    description: oops\n"
             "    attributes:\n"
             "      id: {identifier: true}\n"
@@ -969,20 +1011,20 @@ class TestTreeRootSynthesis:
         from mosaic.core.exceptions import SchemaError
 
         # Two classes whose snake_case_plural would collide and neither
-        # overrides via hippo_accessor → synthesis must refuse.
+        # overrides via mosaic_accessor → synthesis must refuse.
         schema = (
             "id: https://example.org/t\n"
             "name: t\n"
             "prefixes: {linkml: 'https://w3id.org/linkml/'}\n"
             "default_range: string\n"
-            "imports: [linkml:types, hippo_core]\n"
+            "imports: [linkml:types, mosaic_core]\n"
             "classes:\n"
             "  WidgetCount:\n"
             "    is_a: Entity\n"
-            "    annotations: {hippo_accessor: counts}\n"
+            "    annotations: {mosaic_accessor: counts}\n"
             "  GadgetCount:\n"
             "    is_a: Entity\n"
-            "    annotations: {hippo_accessor: counts}\n"
+            "    annotations: {mosaic_accessor: counts}\n"
         )
         with pytest.raises(SchemaError):
             SchemaRegistry.from_yaml(schema)

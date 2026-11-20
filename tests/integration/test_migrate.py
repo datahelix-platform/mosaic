@@ -132,7 +132,7 @@ class TestPreviewModeOutput:
                         "name": {"range": "string"},
                         "count": {
                             "range": "integer",
-                            "annotations": {"hippo_index": True},
+                            "annotations": {"mosaic_index": True},
                         },
                     }
                 }

@@ -199,7 +199,7 @@ class TestSchemaDiffEngine:
                         "id": {"identifier": True},
                         "name": {
                             "range": "string",
-                            "annotations": {"hippo_index": True},
+                            "annotations": {"mosaic_index": True},
                         },
                     }
                 }

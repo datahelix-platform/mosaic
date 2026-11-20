@@ -9,7 +9,7 @@ from mosaic.config import (
     MosaicConfig,
     ConfigError,
     ValidationError,
-    load_hippo_config,
+    load_mosaic_config,
     substitute_env_vars,
 )
 
@@ -74,56 +74,56 @@ class TestMosaicConfigModel:
 
 class TestLoadMosaicConfig:
     def test_valid_yaml_without_env_vars(self, tmp_path):
-        config_file = tmp_path / "hippo.yaml"
+        config_file = tmp_path / "mosaic.yaml"
         config_file.write_text("schema_path: /path/to/schema\n")
 
-        config = load_hippo_config(config_file)
+        config = load_mosaic_config(config_file)
         assert config.schema_path == Path("/path/to/schema")
 
     def test_valid_yaml_with_env_vars(self, tmp_path):
         os.environ["SCHEMA_PATH"] = "/env/schema"
-        config_file = tmp_path / "hippo.yaml"
+        config_file = tmp_path / "mosaic.yaml"
         config_file.write_text("schema_path: ${SCHEMA_PATH}\n")
 
-        config = load_hippo_config(config_file)
+        config = load_mosaic_config(config_file)
         assert config.schema_path == Path("/env/schema")
 
     def test_undefined_env_var_error(self, tmp_path):
         os.environ.pop("NONEXISTENT", None)
-        config_file = tmp_path / "hippo.yaml"
+        config_file = tmp_path / "mosaic.yaml"
         config_file.write_text("schema_path: ${NONEXISTENT}\n")
 
         with pytest.raises(ConfigError) as exc_info:
-            load_hippo_config(config_file)
+            load_mosaic_config(config_file)
         assert "NONEXISTENT" in str(exc_info.value)
 
     def test_missing_required_field_error(self, tmp_path):
-        config_file = tmp_path / "hippo.yaml"
+        config_file = tmp_path / "mosaic.yaml"
         config_file.write_text("storage_backend: sqlite\n")
 
         with pytest.raises(ConfigError) as exc_info:
-            load_hippo_config(config_file)
+            load_mosaic_config(config_file)
         assert "schema_path" in str(exc_info.value)
 
     def test_incorrect_type_error(self, tmp_path):
-        config_file = tmp_path / "hippo.yaml"
+        config_file = tmp_path / "mosaic.yaml"
         config_file.write_text("schema_path: 12345\n")
 
         with pytest.raises(ValidationError) as exc_info:
-            load_hippo_config(config_file)
+            load_mosaic_config(config_file)
         assert "schema_path" in str(exc_info.value)
 
     def test_file_not_found_error(self):
         with pytest.raises(ConfigError) as exc_info:
-            load_hippo_config("/nonexistent/path/hippo.yaml")
+            load_mosaic_config("/nonexistent/path/mosaic.yaml")
         assert "not found" in str(exc_info.value)
 
     def test_invalid_yaml_error(self, tmp_path):
-        config_file = tmp_path / "hippo.yaml"
+        config_file = tmp_path / "mosaic.yaml"
         config_file.write_text("invalid: yaml: content: [}\n")
 
         with pytest.raises(ConfigError) as exc_info:
-            load_hippo_config(config_file)
+            load_mosaic_config(config_file)
         assert "invalid yaml" in str(exc_info.value).lower()
 
 

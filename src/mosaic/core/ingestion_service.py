@@ -58,7 +58,7 @@ class IngestionService:
                 # queries sqlite_master with a `?` placeholder, which psycopg
                 # rejects ("0 placeholders but 1 parameters"), breaking every
                 # write on a postgres deployment whose schema declares
-                # hippo_search slots.
+                # mosaic_search slots.
                 if not fts_store.fts_table_exists(table_name):
                     continue
 

@@ -32,14 +32,14 @@ from mosaic.serve import create_default_app
 # convention, a self-referential relationship without the suffix, a
 # multivalued reference, and a full-text-searchable slot.
 GRAPHQL_TEST_SCHEMA = """
-id: https://example.org/hippo/test_graphql
+id: https://example.org/mosaic/test_graphql
 name: test_graphql
 description: Schema exercising the GraphQL generation rules.
 prefixes:
   linkml: https://w3id.org/linkml/
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 default_range: string
 
 classes:
@@ -71,7 +71,7 @@ classes:
         range: boolean
       notes:
         annotations:
-          hippo_search: fts5
+          mosaic_search: fts5
 
   Study:
     is_a: Entity
@@ -106,7 +106,7 @@ def hippo_client(registry: SchemaRegistry):
         db_path = os.path.join(tmpdir, "graphql_test.db")
         storage = SQLiteAdapter(db_path, schema_registry=registry)
         client = MosaicClient(storage=storage, registry=registry)
-        # FTS virtual tables for the `hippo_search`-annotated slots (the
+        # FTS virtual tables for the `mosaic_search`-annotated slots (the
         # adapter does not create them; mirrors tests/integration).
         conn = sqlite3.connect(db_path)
         for tables in client._fts_table_metadata.values():
@@ -123,7 +123,7 @@ def hippo_client(registry: SchemaRegistry):
 @pytest.fixture
 def hippo_app(hippo_client: MosaicClient):
     """FastAPI app with REST + GraphQL transports over one client."""
-    return create_default_app(hippo_client=hippo_client, graphql=True)
+    return create_default_app(mosaic_client=hippo_client, graphql=True)
 
 
 @pytest.fixture

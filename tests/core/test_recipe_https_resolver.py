@@ -43,7 +43,7 @@ MINIMAL_MANIFEST = (
     b"name: https-test\n"
     b"version: 0.1.0\n"
     b"created_at: '2026-05-27T00:00:00+00:00'\n"
-    b"hippo_version: '>=0.3'\n"
+    b"mosaic_version: '>=0.3'\n"
 )
 MINIMAL_SCHEMA = b"classes: {}\n"
 
@@ -273,15 +273,15 @@ class TestFetchErrors:
 
 class TestCacheDirEnvVar:
     def test_default_uses_env_var_when_set(self, tmp_path: Path) -> None:
-        with patch.dict(os.environ, {"HIPPO_RECIPE_CACHE": str(tmp_path / "x")}):
+        with patch.dict(os.environ, {"MOSAIC_RECIPE_CACHE": str(tmp_path / "x")}):
             assert default_recipe_cache_dir() == tmp_path / "x"
 
     def test_default_falls_back_to_home(self) -> None:
         with patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("HIPPO_RECIPE_CACHE", None)
+            os.environ.pop("MOSAIC_RECIPE_CACHE", None)
             assert (
                 default_recipe_cache_dir()
-                == Path.home() / ".hippo" / "recipe-cache"
+                == Path.home() / ".mosaic" / "recipe-cache"
             )
 
 

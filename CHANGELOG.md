@@ -61,14 +61,14 @@
     entry has `abstract`, `parent` and `kinds`; families are listed; a
     reference into a family is `predicate: true`; a family field only some
     kinds have names them in `only_kinds`. `mosaic://capabilities`,
-    `hippoSchema` / `hippoEntityType` (`abstract`, `parent`, `kinds`) and the
+    `mosaicSchema` / `mosaicEntityType` (`abstract`, `parent`, `kinds`) and the
     `construct-query-spec` prompt (one new item) expose it. QuerySpec may
     anchor on a family and filter through edges into one.
-  - **Opt-outs** (Decision 5), new class annotations: `hippo_anchor: false`
+  - **Opt-outs** (Decision 5), new class annotations: `mosaic_anchor: false`
     removes a family's collection (and QuerySpec anchoring on any class) but
-    keeps its interface; `hippo_manifest: false` hides a class from the
+    keeps its interface; `mosaic_manifest: false` hides a class from the
     planner-facing manifest only. Brain bank's root `NamedThing` (86 kinds)
-    is the expected user of `hippo_anchor: false`.
+    is the expected user of `mosaic_anchor: false`.
 
 - **Reverse edges over multivalued (relationship-row) forward slots**
   (issue #231, ADR-0013 and its 2026-11-10 amendment). ADR-0011 rejected an
@@ -151,6 +151,26 @@
   bundle and domain-module teardown use it.
 
 ### Changed
+
+- **BREAKING: the `hippo` data-contract identifiers are renamed**
+  (issue #124, platform ADR-0007, ADR-0015). The bundled schemas are
+  `mosaic_core` / `mosaic_ext` (files `mosaic_core.yaml` / `mosaic_ext.yaml`)
+  with ids `https://w3id.org/datahelix/mosaic/<name>` and the CURIE prefix
+  `mosaic:`, and `recipe_manifest` moves under the same namespace. Every
+  `hippo_*` schema annotation key is now `mosaic_*`; the internal tables
+  are `mosaic_meta` and `mosaic_xref_index` (SQLite and Postgres); GraphQL's
+  `hippoSchema` / `hippoEntityType` are `mosaicSchema` / `mosaicEntityType`;
+  the five `HIPPO_*` error codes lose their prefix; `recipe.yaml`'s
+  `hippo_version` is `mosaic_version`; the synthesized tree-root class is
+  `_MosaicInstanceBundle`; the actor header is `X-DataHelix-Actor`; and the
+  `create_app` / `create_default_app` / `create_mcp_app` client parameter
+  (and the `app.state` attribute the routers read) is `mosaic_client`.
+  There is no compatibility window: a schema that still uses a `hippo_*`
+  key or imports `hippo_core` / `hippo_ext`, and a `recipe.yaml` with
+  `hippo_version`, fails validation with an error naming the replacement.
+  The built-in validator preset ids move with the prefix
+  (`hippo:ref_check` → `mosaic:ref_check`, and so on). See
+  `### Upgrading`.
 
 - **GraphQL: references into a family drop their raw-id fallback**
   (issue #228). A reference ranged on an abstract class with an exposed kind
@@ -249,6 +269,54 @@
     (`Assay.inputs` → `Sample`) counts across the leaves instead of 0.
   - `neighbors` finds a reverse column edge whose target is a subclass row
     of the slot's range.
+
+### Removed
+
+- **ADR-0004's deprecated `hippo` aliases** (ADR-0015, platform ADR-0007
+  Q4): the `hippo` import shim, the `hippo` console script, the `hippo.*`
+  entry-point groups (`storage_adapters`, `write_validators`,
+  `schema_packages`, `reference_loaders`, `reference_loader_cli`), the
+  `HIPPO_*` environment fallbacks, `hippo.yaml` / `hippo.yml`
+  auto-detection, the legacy `data/hippo.db` / `hippo.db` defaults, the
+  `hippo-reference-` package prefix, and the `HippoClient`, `HippoError`,
+  `HippoConfig` and `load_hippo_config` aliases. Default cache/data paths
+  move from `~/.cache/hippo/references/`, `~/.hippo/recipe-cache/` and
+  `~/.hippo/data/` to `~/.cache/mosaic/references/`,
+  `~/.mosaic/recipe-cache/` and `~/.mosaic/data/`.
+
+### Upgrading
+
+- **Rebuild every database from source data.** There is no migration from
+  `hippo_meta` / `hippo_xref_index`; new code never opens an old database.
+- **Rename in your schemas, recipes, clients and deployment config:**
+
+  | Kind | Old | New |
+  |---|---|---|
+  | Core schema import | `imports: [hippo_core]` | `imports: [mosaic_core]` |
+  | Annotation vocabulary | `hippo_ext` | `mosaic_ext` |
+  | Schema ids | `https://w3id.org/hippo/<name>` | `https://w3id.org/datahelix/mosaic/<name>` |
+  | CURIE prefix | `hippo:` | `mosaic:` |
+  | Annotation keys | `hippo_unique`, `hippo_index`, `hippo_index_partial`, `hippo_search`, `hippo_external_xref`, `hippo_append_only`, `hippo_accessor`, `hippo_namespace`, `hippo_anchor`, `hippo_manifest` | `mosaic_unique`, `mosaic_index`, `mosaic_index_partial`, `mosaic_search`, `mosaic_external_xref`, `mosaic_append_only`, `mosaic_accessor`, `mosaic_namespace`, `mosaic_anchor`, `mosaic_manifest` |
+  | Python constants | `HIPPO_ANNOTATION_PREFIX`, `HIPPO_SEARCH`, `HIPPO_INDEX`, … | `MOSAIC_ANNOTATION_PREFIX`, `MOSAIC_SEARCH`, `MOSAIC_INDEX`, … |
+  | Tables | `hippo_meta`, `hippo_xref_index` | `mosaic_meta`, `mosaic_xref_index` |
+  | GraphQL root fields | `hippoSchema`, `hippoEntityType` | `mosaicSchema`, `mosaicEntityType` |
+  | Error codes | `HIPPO_EXT_VALIDATION`, `HIPPO_TREE_ROOT_COLLISION`, `HIPPO_TREE_ROOT_SLOT_COLLISION`, `HIPPO_REQUIRES_UNSATISFIED`, `HIPPO_EXTERNAL_XREF_RANGE` | `EXT_VALIDATION`, `TREE_ROOT_COLLISION`, `TREE_ROOT_SLOT_COLLISION`, `REQUIRES_UNSATISFIED`, `EXTERNAL_XREF_RANGE` |
+  | Recipe manifest key | `hippo_version` | `mosaic_version` |
+  | Tree-root class | `_HippoInstanceBundle` | `_MosaicInstanceBundle` |
+  | Actor header | `X-Hippo-Actor` | `X-DataHelix-Actor` |
+  | App factory parameter | `create_app(hippo_client=…)`, `create_default_app(hippo_client=…)`, `create_mcp_app(hippo_client=…)`, `app.state.hippo_client` | `mosaic_client=…`, `app.state.mosaic_client` |
+  | Validator preset ids | `hippo:ref_check`, `hippo:count_constraint`, `hippo:immutable_field`, `hippo:field_required_if`, `hippo:no_self_ref` | `mosaic:ref_check`, … |
+  | Entry-point groups | `hippo.storage_adapters`, `hippo.write_validators`, `hippo.schema_packages`, `hippo.reference_loaders`, `hippo.reference_loader_cli` | `mosaic.*` only |
+  | Import / CLI | `import hippo`, `hippo …` | `import mosaic`, `mosaic …` |
+  | Python aliases | `HippoClient`, `HippoError`, `HippoConfig`, `load_hippo_config` | `MosaicClient`, `MosaicError`, `MosaicConfig`, `load_mosaic_config` |
+  | Environment | `HIPPO_*` | `MOSAIC_*` |
+  | Config file | `hippo.yaml` / `hippo.yml` | `mosaic.yaml` / `mosaic.yml` |
+  | Default paths | `data/hippo.db`, `~/.cache/hippo/references/`, `~/.hippo/recipe-cache/`, `~/.hippo/data/` | `data/mosaic.db`, `~/.cache/mosaic/references/`, `~/.mosaic/recipe-cache/`, `~/.mosaic/data/` |
+  | Loader package prefix | `hippo-reference-<name>` | `mosaic-reference-<name>` |
+
+- **Proxies must send `X-DataHelix-Actor`.** Mosaic no longer reads
+  `X-Hippo-Actor`; a proxy that still sets it records writes under the
+  default actor.
 
 ## v0.15.0 — 2026-10-27 (anchor-owned `columns` projection, inverse edges over abstract ranges, domain classes named like infrastructure, images under datahelix-platform)
 

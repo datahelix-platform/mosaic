@@ -4,7 +4,7 @@
 ADR-0002 relationship rows), so by the ADR-0013 amendment's pair rule
 ``Study.sample_ids`` stays the stored, writable side and ``Sample.studies``
 is synthesized: it grows ``studies: [Study!]``, ``studiesCount`` and
-``SampleFilter.studies: {some, none}``, ``hippoSchema`` reports
+``SampleFilter.studies: {some, none}``, ``mosaicSchema`` reports
 ``inverseOf: "sample_ids"``, and it stays out of Create/Update inputs while
 the forward slot stays in ``StudyCreateInput``.
 """
@@ -52,12 +52,12 @@ class TestReverseOfMultivaluedForward:
         )
 
     def test_hippo_schema_reports_inverse_of(self, gql):
-        body = gql('{ hippoSchema { name fields { name inverseOf multivalued } } }')
+        body = gql('{ mosaicSchema { name fields { name inverseOf multivalued } } }')
         assert "errors" not in body, body
-        sample = next(t for t in body["data"]["hippoSchema"] if t["name"] == "Sample")
+        sample = next(t for t in body["data"]["mosaicSchema"] if t["name"] == "Sample")
         studies = next(f for f in sample["fields"] if f["name"] == "studies")
         assert studies == {"name": "studies", "inverseOf": "sample_ids", "multivalued": True}
-        study = next(t for t in body["data"]["hippoSchema"] if t["name"] == "Study")
+        study = next(t for t in body["data"]["mosaicSchema"] if t["name"] == "Study")
         fwd = next(f for f in study["fields"] if f["name"] == "sample_ids")
         assert fwd["inverseOf"] is None
 

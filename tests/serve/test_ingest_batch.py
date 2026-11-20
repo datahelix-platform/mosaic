@@ -41,7 +41,7 @@ def hippo_client():
 
 @pytest.fixture
 def client(hippo_client):
-    app = create_default_app(hippo_client=hippo_client, graphql=False)
+    app = create_default_app(mosaic_client=hippo_client, graphql=False)
     with TestClient(app) as tc:
         yield tc
 

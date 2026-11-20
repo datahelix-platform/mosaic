@@ -39,7 +39,7 @@ def _manifest() -> RecipeManifest:
         name="foo",
         version="0.1.0",
         created_at="2026-05-27T00:00:00+00:00",
-        hippo_version=">=0.3",
+        mosaic_version=">=0.3",
     )
 
 
@@ -84,10 +84,10 @@ class TestRecipeRequires:
     def test_populated(self) -> None:
         req = RecipeRequires(
             recipes=(_ref(),),
-            reference_loaders=("hippo-reference-ensembl==115",),
+            reference_loaders=("mosaic-reference-ensembl==115",),
         )
         assert len(req.recipes) == 1
-        assert req.reference_loaders == ("hippo-reference-ensembl==115",)
+        assert req.reference_loaders == ("mosaic-reference-ensembl==115",)
 
 
 class TestRecipeManifest:
@@ -104,10 +104,10 @@ class TestRecipeManifest:
             name="foo",
             version="0.1.0",
             created_at="2026-05-27T00:00:00+00:00",
-            hippo_version=">=0.3",
+            mosaic_version=">=0.3",
             author=RecipeAuthor(name="Jane", email="j@x"),
             parent=_ref(),
-            requires=RecipeRequires(reference_loaders=("hippo-reference-ensembl==115",)),
+            requires=RecipeRequires(reference_loaders=("mosaic-reference-ensembl==115",)),
         )
         assert m.author.name == "Jane"
         assert m.parent.id == "org.example.foo"

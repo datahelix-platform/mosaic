@@ -278,8 +278,8 @@ class TestForeignKey:
         )
 
 
-def _hippo_unique_registry() -> SchemaRegistry:
-    """Registry with a single ``hippo_unique`` slot on ``test_entity.email``."""
+def _mosaic_unique_registry() -> SchemaRegistry:
+    """Registry with a single ``mosaic_unique`` slot on ``test_entity.email``."""
     return build_registry(
         {
             "test_entity": {
@@ -287,7 +287,7 @@ def _hippo_unique_registry() -> SchemaRegistry:
                     "id": {"identifier": True},
                     "email": {
                         "range": "string",
-                        "annotations": {"hippo_unique": True},
+                        "annotations": {"mosaic_unique": True},
                     },
                 }
             }
@@ -296,23 +296,23 @@ def _hippo_unique_registry() -> SchemaRegistry:
 
 
 class TestUniqueConstraint:
-    def test_hippo_unique_annotation_emits_unique(self):
-        ddl = DDLGenerator().generate(_hippo_unique_registry())
+    def test_mosaic_unique_annotation_emits_unique(self):
+        ddl = DDLGenerator().generate(_mosaic_unique_registry())
         conn = execute_ddl(ddl)
         indexes = table_indexes(conn, "test_entity")
-        # hippo_unique should produce a UNIQUE index
+        # mosaic_unique should produce a UNIQUE index
         assert any(idx["unique"] for idx in indexes)
 
-    def test_hippo_unique_index_is_partial(self):
-        """hippo_unique emits a *partial* index (``WHERE is_available = 1``).
+    def test_mosaic_unique_index_is_partial(self):
+        """mosaic_unique emits a *partial* index (``WHERE is_available = 1``).
 
         A non-partial index would treat a superseded predecessor as a
         permanent collision and block migration on the slot forever
         (PTS-348). The partial predicate scopes uniqueness to live rows.
         """
-        ddl = DDLGenerator().generate(_hippo_unique_registry())
+        ddl = DDLGenerator().generate(_mosaic_unique_registry())
         conn = execute_ddl(ddl)
-        # The hippo_unique index is named idx_<class>_<slot>_unique. (The PK on a
+        # The mosaic_unique index is named idx_<class>_<slot>_unique. (The PK on a
         # TEXT identifier yields its own non-partial sqlite_autoindex — correct,
         # and excluded here.)
         hippo_idx = [
@@ -320,15 +320,15 @@ class TestUniqueConstraint:
             for idx in table_indexes(conn, "test_entity")
             if idx["name"] == "idx_test_entity_email_unique"
         ]
-        assert hippo_idx, "expected idx_test_entity_email_unique from hippo_unique"
+        assert hippo_idx, "expected idx_test_entity_email_unique from mosaic_unique"
         assert hippo_idx[0]["unique"]
         assert hippo_idx[0]["partial"], (
-            "hippo_unique index must be partial (WHERE is_available = 1)"
+            "mosaic_unique index must be partial (WHERE is_available = 1)"
         )
 
-    def test_hippo_unique_still_enforced_among_live_rows(self):
+    def test_mosaic_unique_still_enforced_among_live_rows(self):
         """Two *live* rows sharing the key still violate the constraint."""
-        conn = execute_ddl(DDLGenerator().generate(_hippo_unique_registry()))
+        conn = execute_ddl(DDLGenerator().generate(_mosaic_unique_registry()))
         conn.execute(
             "INSERT INTO test_entity (id, email, is_available) "
             "VALUES ('a', 'x@example.org', 1)"
@@ -339,11 +339,11 @@ class TestUniqueConstraint:
                 "VALUES ('b', 'x@example.org', 1)"
             )
 
-    def test_hippo_unique_allows_superseded_plus_live_same_key(self):
+    def test_mosaic_unique_allows_superseded_plus_live_same_key(self):
         """A superseded predecessor (is_available=0) coexists with a live
         replacement (is_available=1) sharing the key — the migration window
         the partial index exists to permit (PTS-348)."""
-        conn = execute_ddl(DDLGenerator().generate(_hippo_unique_registry()))
+        conn = execute_ddl(DDLGenerator().generate(_mosaic_unique_registry()))
         conn.execute(
             "INSERT INTO test_entity (id, email, is_available) "
             "VALUES ('old', 'x@example.org', 0)"
@@ -403,7 +403,7 @@ class TestDefaultValue:
 
 
 class TestIndexGeneration:
-    def test_hippo_index_emits_create_index(self):
+    def test_mosaic_index_emits_create_index(self):
         reg = build_registry(
             {
                 "test_entity": {
@@ -411,7 +411,7 @@ class TestIndexGeneration:
                         "id": {"identifier": True},
                         "name": {
                             "range": "string",
-                            "annotations": {"hippo_index": True},
+                            "annotations": {"mosaic_index": True},
                         },
                     }
                 }
@@ -422,7 +422,7 @@ class TestIndexGeneration:
         assert any("CREATE INDEX" in s for s in ddl)
         assert any("idx_test_entity_name" in s for s in ddl)
 
-    def test_hippo_index_partial_adds_where(self):
+    def test_mosaic_index_partial_adds_where(self):
         reg = build_registry(
             {
                 "test_entity": {
@@ -431,8 +431,8 @@ class TestIndexGeneration:
                         "name": {
                             "range": "string",
                             "annotations": {
-                                "hippo_index": True,
-                                "hippo_index_partial": True,
+                                "mosaic_index": True,
+                                "mosaic_index_partial": True,
                             },
                         },
                     }
@@ -525,8 +525,8 @@ class TestMultiClass:
                         "code": {
                             "range": "string",
                             "annotations": {
-                                "hippo_unique": True,
-                                "hippo_index": True,
+                                "mosaic_unique": True,
+                                "mosaic_index": True,
                             },
                         },
                         "active": {
@@ -558,7 +558,7 @@ class TestMultiClass:
 
 
 class TestHippoCoreProvenanceRecordDDL:
-    """DDL emitted for the ProvenanceRecord class declared in hippo_core.
+    """DDL emitted for the ProvenanceRecord class declared in mosaic_core.
 
     The `provenance-migration` change (sec9 §9.6 / Decision 9.6.A) replaces
     the legacy hand-coded `provenance` table with a DDL-generated
@@ -568,8 +568,8 @@ class TestHippoCoreProvenanceRecordDDL:
 
     @pytest.fixture
     def registry(self) -> SchemaRegistry:
-        # User schema importing hippo_core. The registry's class_names()
-        # includes every class in hippo_core (Entity, ProvenanceRecord,
+        # User schema importing mosaic_core. The registry's class_names()
+        # includes every class in mosaic_core (Entity, ProvenanceRecord,
         # Process, Validator, ReferenceLoader) — the generator iterates
         # all of them.
         yaml_text = (
@@ -579,7 +579,7 @@ class TestHippoCoreProvenanceRecordDDL:
             "default_range: string\n"
             "imports:\n"
             "  - linkml:types\n"
-            "  - hippo_core\n"
+            "  - mosaic_core\n"
             "classes: {}\n"
         )
         return SchemaRegistry.from_yaml(yaml_text)
@@ -628,7 +628,7 @@ class TestHippoCoreProvenanceRecordDDL:
     def test_provenance_record_required_slots_are_not_null(
         self, conn: sqlite3.Connection
     ):
-        # required=true slots per hippo_core.yaml: operation, actor_id,
+        # required=true slots per mosaic_core.yaml: operation, actor_id,
         # timestamp, schema_version.
         cols = table_columns(conn, "ProvenanceRecord")
         for col in ("operation", "actor_id", "timestamp", "schema_version"):
@@ -638,7 +638,7 @@ class TestHippoCoreProvenanceRecordDDL:
 
     def test_provenance_record_indexes_on_annotated_slots(self, ddl: list[str]):
         # sec9 §9.6 annotates entity_id, operation, timestamp, process_id
-        # with hippo_index.
+        # with mosaic_index.
         full = "\n".join(ddl)
         for slot in ("entity_id", "operation", "timestamp", "process_id"):
             assert f"idx_ProvenanceRecord_{slot}" in full, (
@@ -646,7 +646,7 @@ class TestHippoCoreProvenanceRecordDDL:
             )
 
     def test_process_fk_from_provenance_record(self, conn: sqlite3.Connection):
-        # process_id has range Process (another class in hippo_core) — should
+        # process_id has range Process (another class in mosaic_core) — should
         # become a foreign key constraint.
         fks = table_foreign_keys(conn, "ProvenanceRecord")
         assert any(
@@ -655,7 +655,7 @@ class TestHippoCoreProvenanceRecordDDL:
         ), f"Expected FK from process_id to Process, got: {fks}"
 
     def test_provenance_record_append_only_triggers(self, ddl: list[str]):
-        # hippo_append_only: true should emit UPDATE/DELETE prevention triggers
+        # mosaic_append_only: true should emit UPDATE/DELETE prevention triggers
         full = "\n".join(ddl)
         assert "prevent_update_ProvenanceRecord" in full
         assert "prevent_delete_ProvenanceRecord" in full

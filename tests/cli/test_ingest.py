@@ -18,7 +18,7 @@ from mosaic.cli.main import app
 
 
 SCHEMA_YAML = """\
-id: https://example.org/hippo/test/ingest_cli
+id: https://example.org/mosaic/test/ingest_cli
 name: ingest_cli_schema
 description: Minimal LinkML schema for ingest CLI tests.
 
@@ -27,7 +27,7 @@ prefixes:
 
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 
 default_range: string
 
@@ -400,7 +400,7 @@ class TestIngestResult:
 #: (``A -> A``) that no per-row insertion order can satisfy under immediately
 #: enforced foreign keys.
 CYCLIC_SCHEMA_YAML = """\
-id: https://example.org/hippo/test/cyclic
+id: https://example.org/mosaic/test/cyclic
 name: cyclic_schema
 description: Schema with a self-referential reference slot.
 
@@ -409,7 +409,7 @@ prefixes:
 
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 
 default_range: string
 

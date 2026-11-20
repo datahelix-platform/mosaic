@@ -47,12 +47,12 @@ def test_default_mosaic_db_when_no_config(tmp_path, monkeypatch):
     assert resolved == Path("mosaic.db")
 
 
-def test_legacy_hippo_db_still_found(tmp_path, monkeypatch):
-    """An existing legacy hippo.db is still picked up (ADR-0004)."""
+def test_legacy_hippo_db_is_ignored(tmp_path, monkeypatch):
+    """A legacy hippo.db is no longer picked up (ADR-0015)."""
     monkeypatch.chdir(tmp_path)
     (tmp_path / "hippo.db").touch()
     resolved = _resolve_db_path(None)
-    assert resolved == Path("hippo.db")
+    assert resolved == Path("mosaic.db")
 
 
 def test_explicit_string_path_is_resolved():
@@ -213,7 +213,7 @@ prefixes:
   linkml: https://w3id.org/linkml/
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 default_range: string
 classes:
   Procedure:
@@ -335,7 +335,7 @@ def test_sdk_get_schema_fields(sdk_backend):
     assert fields["project_id"].indexed is True
     assert fields["status"].enum_values == ["active", "archived", "distributed"]
     assert fields["volume_ml"].field_type == "float"
-    # Inherited hippo_core Entity system slots are present
+    # Inherited mosaic_core Entity system slots are present
     assert "id" in fields
     assert "is_available" in fields
 

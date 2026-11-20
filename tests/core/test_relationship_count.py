@@ -21,13 +21,13 @@ from mosaic.core.storage.adapters.sqlite_adapter import SQLiteAdapter
 from mosaic.linkml_bridge import SchemaRegistry
 
 SCHEMA = """
-id: https://example.org/hippo/test_relationship_count
+id: https://example.org/mosaic/test_relationship_count
 name: test_relationship_count
 prefixes:
   linkml: https://w3id.org/linkml/
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 default_range: string
 
 classes:

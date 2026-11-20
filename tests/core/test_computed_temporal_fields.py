@@ -48,7 +48,7 @@ def client_with_versioned_schema(db_path: str) -> MosaicClient:
         "default_range: string\n"
         "imports:\n"
         "  - linkml:types\n"
-        "  - hippo_core\n"
+        "  - mosaic_core\n"
         "classes:\n"
         "  Sample:\n"
         "    is_a: Entity\n"

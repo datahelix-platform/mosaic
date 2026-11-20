@@ -37,4 +37,5 @@ The supersede-don't-delete discipline already used in the Key Decisions Log (ent
 | [0011](./ADR-0011-inverse-slots-as-virtual-reverse-edges.md) | `inverse`-declared slots are virtual reverse edges over the forward FK — no storage of their own (issue #204) | ✅ Accepted |
 | [0012](./ADR-0012-inverse-declared-on-the-forward-slot.md) | Honour `inverse` declared on the forward slot, so import-layered schemas can declare reverse edges (amends ADR-0011; issue #230) | ✅ Accepted |
 | [0013](./ADR-0013-reverse-of-multivalued-forward-slots.md) | Reverse edges over multivalued (relationship-row) forward slots (lifts ADR-0011's deferral; issue #231) | ✅ Accepted |
-| [0014](./ADR-0014-polymorphic-graphql-types-for-abstract-ranges.md) | Abstract classes get GraphQL interface types, are queryable anchors, and the manifest carries the class hierarchy (issue #228) | 🟡 Proposed |
+| [0014](./ADR-0014-polymorphic-graphql-types-for-abstract-ranges.md) | Abstract classes get GraphQL interface types, are queryable anchors, and the manifest carries the class hierarchy (issue #228) | ✅ Accepted |
+| [0015](./ADR-0015-end-adr-0004-deprecation-window.md) | End ADR-0004's deprecation window: remove the `hippo` aliases in v0.16.0 (platform ADR-0007 Q4; issue #124) | ✅ Accepted |

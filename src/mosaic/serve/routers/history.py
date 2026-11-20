@@ -15,8 +15,8 @@ router = APIRouter(prefix="/entities", tags=["history"])
 
 async def get_client(request: Request) -> MosaicClient:
     """Get the MosaicClient from request state."""
-    if hasattr(request.app.state, "hippo_client"):
-        return request.app.state.hippo_client
+    if hasattr(request.app.state, "mosaic_client"):
+        return request.app.state.mosaic_client
     return MosaicClient()
 
 

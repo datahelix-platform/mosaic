@@ -16,11 +16,11 @@ class TestFTSMigrationPlanner:
                         "id": {"identifier": True},
                         "title": {
                             "range": "string",
-                            "annotations": {"hippo_search": "fts5"},
+                            "annotations": {"mosaic_search": "fts5"},
                         },
                         "description": {
                             "range": "string",
-                            "annotations": {"hippo_search": "fts"},
+                            "annotations": {"mosaic_search": "fts"},
                         },
                     }
                 }
@@ -40,7 +40,7 @@ class TestFTSMigrationPlanner:
                         "id": {"identifier": True},
                         "title": {
                             "range": "string",
-                            "annotations": {"hippo_search": "fts5"},
+                            "annotations": {"mosaic_search": "fts5"},
                         },
                     }
                 }
@@ -60,7 +60,7 @@ class TestFTSMigrationPlanner:
                         "id": {"identifier": True},
                         "title": {
                             "range": "string",
-                            "annotations": {"hippo_search": "fts5"},
+                            "annotations": {"mosaic_search": "fts5"},
                         },
                     }
                 }
@@ -83,7 +83,7 @@ class TestMigrationPlanner:
                         "id": {"identifier": True},
                         "title": {
                             "range": "string",
-                            "annotations": {"hippo_search": "fts5"},
+                            "annotations": {"mosaic_search": "fts5"},
                         },
                     }
                 }
@@ -113,7 +113,7 @@ class TestMigrationPlannerFromDiff:
                         "name": {"range": "string"},
                         "title": {
                             "range": "string",
-                            "annotations": {"hippo_search": "fts5"},
+                            "annotations": {"mosaic_search": "fts5"},
                         },
                     }
                 }
@@ -131,7 +131,7 @@ class TestMigrationPlannerFromDiff:
         assert any(
             'CREATE TABLE "Sample"' in s for s in plan.ddl_statements
         ), plan.ddl_statements
-        assert plan.fts_ddl_statements, "expected FTS DDL for hippo_search slot"
+        assert plan.fts_ddl_statements, "expected FTS DDL for mosaic_search slot"
 
         executor = MigrationExecutor(sqlite_connection)
         result = executor.execute_migration(plan)
@@ -184,7 +184,7 @@ class TestMigrationExecutor:
                         "id": {"identifier": True},
                         "title": {
                             "range": "string",
-                            "annotations": {"hippo_search": "fts5"},
+                            "annotations": {"mosaic_search": "fts5"},
                         },
                     }
                 }

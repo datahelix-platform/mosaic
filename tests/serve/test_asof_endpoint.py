@@ -35,7 +35,7 @@ def client(db_path):
     hippo_client = MosaicClient(storage=storage, bypass_validation=True)
     app = create_app(
         routers=[health.router, entity.router, ingest.router],
-        hippo_client=hippo_client,
+        mosaic_client=hippo_client,
     )
     return TestClient(app)
 

@@ -87,7 +87,7 @@ Existing schema files with no `namespace` key SHALL continue to load and behave 
 
 #### Scenario: Existing single-file schema without namespace loads correctly
 - **WHEN** `schema.yaml` has no `namespace` key and defines entities `Sample` and `Donor`
-- **THEN** all entities are accessible as bare strings and all existing `HippoClient` calls continue to work without modification
+- **THEN** all entities are accessible as bare strings and all existing `MosaicClient` calls continue to work without modification
 
 #### Scenario: Mixing namespaced and non-namespaced files in the same schema directory works
 - **WHEN** the schema directory contains both `legacy.yaml` (no namespace) and `tissue.yaml` (namespace: tissue)

@@ -65,7 +65,7 @@ LinkML enums become GraphQL enums. Field names are camelCased
 they reach the SDK.
 
 A list query's `filters` argument accepts **either** spelling for its `field` —
-the LinkML slot name (`volume_ml`, as listed by `hippoSchema`) or the camelCased
+the LinkML slot name (`volume_ml`, as listed by `mosaicSchema`) or the camelCased
 field name the type exposes (`volumeMl`). A `field` that matches neither is an
 error (`extensions.code: UNKNOWN_FILTER_FIELD`) rather than an empty page, as
 are the two kinds of name that look filterable but cannot be: read-time
@@ -282,7 +282,7 @@ query { supersededBy(id: "old") { entityId supersededBy chain } }
 
 ### Full-text search
 
-Slots annotated `hippo_search` in your schema are searchable per type. Search
+Slots annotated `mosaic_search` in your schema are searchable per type. Search
 **composes with the list surface** (issue #157): the twins take the same
 `filters`/`where`/`filterMode` arguments as list queries and return the same
 `Page` envelope:
@@ -344,8 +344,8 @@ useful for generic clients that need the LinkML classification:
 
 ```graphql
 {
-  hippoSchema { name accessorName }
-  hippoEntityType(name: "Sample") {
+  mosaicSchema { name accessorName }
+  mosaicEntityType(name: "Sample") {
     fields { name kind range role required multivalued targetEntityType enumValues }
     relationships { field targetEntityType }
   }

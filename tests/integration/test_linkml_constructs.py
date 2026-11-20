@@ -138,11 +138,11 @@ class TestMigrateWithLinkMLConstructs:
                         "id": {"identifier": True},
                         "name": {
                             "range": "string",
-                            "annotations": {"hippo_index": True},
+                            "annotations": {"mosaic_index": True},
                         },
                         "barcode": {
                             "range": "string",
-                            "annotations": {"hippo_index": True},
+                            "annotations": {"mosaic_index": True},
                         },
                         "notes": {"range": "string"},
                     }

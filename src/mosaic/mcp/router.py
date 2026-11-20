@@ -21,7 +21,7 @@ from mosaic.mcp.server import create_mcp_server
 ALLOWED_HOSTS_ENV = "MOSAIC_MCP_ALLOWED_HOSTS"
 
 
-def create_mcp_app(hippo_client: MosaicClient) -> tuple[Any, Any]:
+def create_mcp_app(mosaic_client: MosaicClient) -> tuple[Any, Any]:
     """Build ``(mcp_server, asgi_app)`` for one Mosaic deployment.
 
     ``stateless_http``/``json_response`` are both True: the resources
@@ -30,7 +30,7 @@ def create_mcp_app(hippo_client: MosaicClient) -> tuple[Any, Any]:
     machinery nothing here needs yet. A future stateful tool (if one ever
     needs session-scoped state) would revisit this.
     """
-    mcp = create_mcp_server(hippo_client)
+    mcp = create_mcp_server(mosaic_client)
     asgi_app = mcp.streamable_http_app(
         streamable_http_path="/",
         stateless_http=True,

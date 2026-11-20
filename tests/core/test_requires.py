@@ -33,18 +33,18 @@ class TestParseRequires:
         assert parse_requires(None) == []
 
     def test_exact_match_pin(self):
-        pins = parse_requires(["hippo-reference-fma==3.3"])
+        pins = parse_requires(["mosaic-reference-fma==3.3"])
         assert pins == [
-            RequirePin(package_name="hippo-reference-fma", version="3.3")
+            RequirePin(package_name="mosaic-reference-fma", version="3.3")
         ]
 
     def test_data_version_slug_pin(self):
         pins = parse_requires(
-            ["hippo-reference-ensembl==mus_musculus.GRCm39.115"]
+            ["mosaic-reference-ensembl==mus_musculus.GRCm39.115"]
         )
         assert pins == [
             RequirePin(
-                package_name="hippo-reference-ensembl",
+                package_name="mosaic-reference-ensembl",
                 version="mus_musculus.GRCm39.115",
             )
         ]
@@ -52,39 +52,39 @@ class TestParseRequires:
     def test_multiple_pins_preserve_order(self):
         pins = parse_requires(
             [
-                "hippo-reference-fma==3.3",
-                "hippo-reference-ensembl==v115",
+                "mosaic-reference-fma==3.3",
+                "mosaic-reference-ensembl==v115",
             ]
         )
         assert [p.package_name for p in pins] == [
-            "hippo-reference-fma",
-            "hippo-reference-ensembl",
+            "mosaic-reference-fma",
+            "mosaic-reference-ensembl",
         ]
 
     def test_non_list_value_raises(self):
         with pytest.raises(SchemaError) as exc:
-            parse_requires("hippo-reference-fma==3.3")
+            parse_requires("mosaic-reference-fma==3.3")
         assert exc.value.field_name == "requires"
         assert "must be a list" in exc.value.message
 
     def test_non_string_entry_raises(self):
         with pytest.raises(SchemaError) as exc:
-            parse_requires([{"name": "hippo-reference-fma"}])
+            parse_requires([{"name": "mosaic-reference-fma"}])
         assert "must be a string pin" in exc.value.message
 
     def test_malformed_pin_raises(self):
         with pytest.raises(SchemaError) as exc:
-            parse_requires(["hippo-reference-fma"])
+            parse_requires(["mosaic-reference-fma"])
         assert "malformed" in exc.value.message
 
     @pytest.mark.parametrize(
         "pin",
         [
-            "hippo-reference-fma>=3.3",
-            "hippo-reference-fma~=3.3",
-            "hippo-reference-fma^=3.3",
-            "hippo-reference-fma<3.3",
-            "hippo-reference-fma>3.3",
+            "mosaic-reference-fma>=3.3",
+            "mosaic-reference-fma~=3.3",
+            "mosaic-reference-fma^=3.3",
+            "mosaic-reference-fma<3.3",
+            "mosaic-reference-fma>3.3",
         ],
     )
     def test_range_comparator_rejected_with_v1_message(self, pin: str):
@@ -96,18 +96,24 @@ class TestParseRequires:
     def test_le_and_ne_also_rejected(self):
         # Spec lists >=, ~=, ^=, <, > explicitly; <= and != follow the
         # same v1 deferral.
-        for pin in ["hippo-reference-fma<=3.3", "hippo-reference-fma!=3.3"]:
+        for pin in ["mosaic-reference-fma<=3.3", "mosaic-reference-fma!=3.3"]:
             with pytest.raises(SchemaError) as exc:
                 parse_requires([pin])
             assert exc.value.message == V1_RANGE_REJECT_MESSAGE
 
     def test_short_name_strips_convention_prefix(self):
-        pin = RequirePin(package_name="hippo-reference-fma", version="3.3")
+        pin = RequirePin(package_name="mosaic-reference-fma", version="3.3")
         assert pin.short_name == "fma"
 
     def test_short_name_passes_through_non_convention_name(self):
         pin = RequirePin(package_name="some-other-pkg", version="1.0")
         assert pin.short_name == "some-other-pkg"
+
+    def test_short_name_keeps_retired_hippo_prefix(self):
+        # ADR-0015: the legacy ``hippo-reference-`` prefix is no longer
+        # recognized, so the name passes through unchanged.
+        pin = RequirePin(package_name="hippo-reference-fma", version="3.3")
+        assert pin.short_name == "hippo-reference-fma"
 
 
 # ---------------------------------------------------------------------------
@@ -126,25 +132,25 @@ class TestExtractRequires:
         schema.write_text(
             "id: https://example.org/x\nname: x\n"
             "requires:\n"
-            "  - hippo-reference-fma==3.3\n"
+            "  - mosaic-reference-fma==3.3\n"
         )
         assert extract_requires(schema) == [
-            RequirePin(package_name="hippo-reference-fma", version="3.3")
+            RequirePin(package_name="mosaic-reference-fma", version="3.3")
         ]
 
     def test_directory_accumulates_pins_across_files(self, tmp_path: Path):
         (tmp_path / "a.yaml").write_text(
             "id: https://example.org/a\nname: a\n"
-            "requires:\n  - hippo-reference-fma==3.3\n"
+            "requires:\n  - mosaic-reference-fma==3.3\n"
         )
         (tmp_path / "b.yaml").write_text(
             "id: https://example.org/b\nname: b\n"
-            "requires:\n  - hippo-reference-ensembl==v115\n"
+            "requires:\n  - mosaic-reference-ensembl==v115\n"
         )
         pins = extract_requires(tmp_path)
         assert {p.package_name for p in pins} == {
-            "hippo-reference-fma",
-            "hippo-reference-ensembl",
+            "mosaic-reference-fma",
+            "mosaic-reference-ensembl",
         }
 
     def test_directory_with_no_requires_returns_empty(self, tmp_path: Path):
@@ -155,7 +161,7 @@ class TestExtractRequires:
         schema = tmp_path / "schema.yaml"
         schema.write_text(
             "id: https://example.org/x\nname: x\n"
-            "requires:\n  - hippo-reference-fma>=3.3\n"
+            "requires:\n  - mosaic-reference-fma>=3.3\n"
         )
         with pytest.raises(SchemaError) as exc:
             extract_requires(schema)
@@ -176,7 +182,7 @@ class TestCheckRequires:
             "mosaic.requires._dist_version", lambda name: "3.3"
         )
         errors = check_requires(
-            [RequirePin(package_name="hippo-reference-fma", version="3.3")]
+            [RequirePin(package_name="mosaic-reference-fma", version="3.3")]
         )
         assert errors == []
 
@@ -188,11 +194,11 @@ class TestCheckRequires:
 
         monkeypatch.setattr("mosaic.requires._dist_version", _missing)
         errors = check_requires(
-            [RequirePin(package_name="hippo-reference-fma", version="3.3")]
+            [RequirePin(package_name="mosaic-reference-fma", version="3.3")]
         )
         assert len(errors) == 1
         msg = errors[0]
-        assert "requires hippo-reference-fma" in msg
+        assert "requires mosaic-reference-fma" in msg
         assert "is not installed" in msg
         assert "mosaic reference install fma --version 3.3" in msg
 
@@ -203,11 +209,11 @@ class TestCheckRequires:
             "mosaic.requires._dist_version", lambda name: "3.2"
         )
         errors = check_requires(
-            [RequirePin(package_name="hippo-reference-fma", version="3.3")]
+            [RequirePin(package_name="mosaic-reference-fma", version="3.3")]
         )
         assert len(errors) == 1
         msg = errors[0]
-        assert "requires hippo-reference-fma==3.3" in msg
+        assert "requires mosaic-reference-fma==3.3" in msg
         assert "but version 3.2 is installed" in msg
         assert "mosaic reference install fma --version 3.3" in msg
 
@@ -216,11 +222,11 @@ class TestCheckRequires:
     ):
         # Acceptance (§9 S0): a pure-schema SchemaPackage *pins via
         # requires:*. The version-pin gate is package-name agnostic — a
-        # schema package (no ``hippo-reference-`` prefix) resolves
+        # schema package (no ``mosaic-reference-`` prefix) resolves
         # identically to a reference loader once installed.
         monkeypatch.setattr("mosaic.requires._dist_version", lambda name: "1.0")
         ok = check_requires(
-            [RequirePin(package_name="hippo-schema-fake", version="1.0")]
+            [RequirePin(package_name="mosaic-schema-fake", version="1.0")]
         )
         assert ok == []
 
@@ -228,32 +234,32 @@ class TestCheckRequires:
         # an install hint, proving the gate is live for it.
         monkeypatch.setattr("mosaic.requires._dist_version", lambda name: "0.9")
         errors = check_requires(
-            [RequirePin(package_name="hippo-schema-fake", version="1.0")]
+            [RequirePin(package_name="mosaic-schema-fake", version="1.0")]
         )
         assert len(errors) == 1
-        assert "hippo-schema-fake==1.0" in errors[0]
+        assert "mosaic-schema-fake==1.0" in errors[0]
         assert "but version 0.9 is installed" in errors[0]
 
     def test_mixed_results_collected(self, monkeypatch: pytest.MonkeyPatch):
         def _per_pkg(name: str) -> str:
-            if name == "hippo-reference-fma":
+            if name == "mosaic-reference-fma":
                 return "3.3"  # pass
-            if name == "hippo-reference-ensembl":
+            if name == "mosaic-reference-ensembl":
                 return "wrong"  # mismatch
             raise PackageNotFoundError(name)  # missing
 
         monkeypatch.setattr("mosaic.requires._dist_version", _per_pkg)
         errors = check_requires(
             [
-                RequirePin(package_name="hippo-reference-fma", version="3.3"),
+                RequirePin(package_name="mosaic-reference-fma", version="3.3"),
                 RequirePin(
-                    package_name="hippo-reference-ensembl", version="v115"
+                    package_name="mosaic-reference-ensembl", version="v115"
                 ),
                 RequirePin(
-                    package_name="hippo-reference-missing", version="1.0"
+                    package_name="mosaic-reference-missing", version="1.0"
                 ),
             ]
         )
         assert len(errors) == 2
-        assert any("hippo-reference-ensembl" in m for m in errors)
-        assert any("hippo-reference-missing" in m for m in errors)
+        assert any("mosaic-reference-ensembl" in m for m in errors)
+        assert any("mosaic-reference-missing" in m for m in errors)

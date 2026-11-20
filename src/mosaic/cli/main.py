@@ -76,8 +76,7 @@ def serve(
         "--config",
         "-c",
         help=(
-            "Path to a Mosaic config (config.json / mosaic.yaml; legacy "
-            "hippo.yaml honored). If omitted, "
+            "Path to a Mosaic config (config.json / mosaic.yaml). If omitted, "
             "one is auto-detected in the current directory; otherwise the "
             "server falls back to a default SQLite database."
         ),
@@ -172,7 +171,7 @@ def serve(
         client = create_client()
         typer.echo(
             f"No config found; serving a default SQLite database at "
-            f"{DEFAULT_SQLITE_PATH} with the bundled hippo_core schema"
+            f"{DEFAULT_SQLITE_PATH} with the bundled mosaic_core schema"
         )
 
     cors_allow_origins = (
@@ -551,7 +550,7 @@ def validate(
 
 
 def _build_schema_registry(schema_path: str | None = None):
-    """Build a SchemaRegistry from ``schema_path`` or the bundled hippo_core schema.
+    """Build a SchemaRegistry from ``schema_path`` or the bundled mosaic_core schema.
 
     The bundled schema only declares Mosaic's framework classes (Entity,
     ProvenanceRecord, ExternalID, ...). Callers that need user-domain
@@ -569,11 +568,10 @@ def _build_schema_registry(schema_path: str | None = None):
 def _get_client(db_path: str | None = None, schema_path: str | None = None):
     """Construct a MosaicClient via the shared config-driven factory.
 
-    Looks for the database at --db-path, then data/mosaic.db (legacy
-    data/hippo.db). When
+    Looks for the database at --db-path, then data/mosaic.db. When
     ``schema_path`` is provided, the storage adapter is wired to a
     SchemaRegistry built from that path so writes of user-domain classes
-    validate correctly; otherwise only the bundled hippo_core classes
+    validate correctly; otherwise only the bundled mosaic_core classes
     are recognized.
     """
     from mosaic.core.factory import create_client
@@ -1615,7 +1613,7 @@ def tui(
     token: Optional[str] = typer.Option(
         None,
         "--token",
-        help="Bearer token for REST backend (rest mode only; falls back to MOSAIC_TUI_TOKEN env (legacy HIPPO_TUI_TOKEN))",
+        help="Bearer token for REST backend (rest mode only; falls back to MOSAIC_TUI_TOKEN env)",
     ),
     db: Optional[str] = typer.Option(
         None,
@@ -1625,7 +1623,7 @@ def tui(
     schema: Optional[str] = typer.Option(
         None,
         "--schema",
-        help="Path to a LinkML schema file or directory (sdk mode only; falls back to schemas/ then the bundled hippo_core schema)",
+        help="Path to a LinkML schema file or directory (sdk mode only; falls back to schemas/ then the bundled mosaic_core schema)",
     ),
     validators: Optional[str] = typer.Option(
         None,

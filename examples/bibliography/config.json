@@ -1,7 +1,7 @@
 {
   "schema_path": "./schemas",
   "storage_backend": "sqlite",
-  "database_url": "./data/hippo.db",
+  "database_url": "./data/mosaic.db",
   "validation_enabled": true,
   "validators_path": "./validators.yaml"
 }

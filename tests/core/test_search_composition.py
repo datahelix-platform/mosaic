@@ -20,13 +20,13 @@ from mosaic.core.storage.adapters.sqlite_adapter import SQLiteAdapter
 from mosaic.linkml_bridge import SchemaRegistry
 
 SCHEMA = """
-id: https://example.org/hippo/test_search_composition
+id: https://example.org/mosaic/test_search_composition
 name: test_search_composition
 prefixes:
   linkml: https://w3id.org/linkml/
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 default_range: string
 
 classes:
@@ -40,7 +40,7 @@ classes:
         range: integer
       body:
         annotations:
-          hippo_search: fts5
+          mosaic_search: fts5
 
   Plain:
     is_a: Entity
@@ -61,7 +61,7 @@ def client(registry: SchemaRegistry):
         db_path = os.path.join(tmpdir, "test_search_composition.db")
         storage = SQLiteAdapter(db_path, schema_registry=registry)
         c = MosaicClient(storage=storage, registry=registry)
-        # FTS virtual tables for the hippo_search-annotated slots (the
+        # FTS virtual tables for the mosaic_search-annotated slots (the
         # adapter does not create them; put() syncs content once they exist).
         conn = sqlite3.connect(db_path)
         for tables in c._fts_table_metadata.values():

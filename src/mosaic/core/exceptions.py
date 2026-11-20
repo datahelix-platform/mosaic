@@ -73,7 +73,7 @@ class ValidationError(MosaicError):
 
 
 class XrefUniquenessError(ValidationError):
-    """A ``hippo_external_xref`` ``(system, value)`` pair is already claimed.
+    """A ``mosaic_external_xref`` ``(system, value)`` pair is already claimed.
 
     Raised by the storage adapter inside the entity-write transaction
     (create / update / replace / availability-on) when inserting the
@@ -454,7 +454,7 @@ class RecipeManifestError(MosaicError):
 
 
 class RecipeVersionIncompatibleError(MosaicError):
-    """Raised when a recipe's ``hippo_version`` excludes the running Mosaic.
+    """Raised when a recipe's ``mosaic_version`` excludes the running Mosaic.
 
     Parsed via ``packaging.specifiers.SpecifierSet`` (sec10 §10.3.2 /
     error model). Always raised before any state change.
@@ -467,19 +467,19 @@ class RecipeVersionIncompatibleError(MosaicError):
         recipe_id: Optional[str] = None,
         recipe_version: Optional[str] = None,
         specifier: Optional[str] = None,
-        hippo_version: Optional[str] = None,
+        mosaic_version: Optional[str] = None,
         **context: Any,
     ):
         self.source = source
         self.recipe_id = recipe_id
         self.recipe_version = recipe_version
         self.specifier = specifier
-        self.hippo_version = hippo_version
+        self.mosaic_version = mosaic_version
         context["source"] = source
         context["recipe_id"] = recipe_id
         context["recipe_version"] = recipe_version
         context["specifier"] = specifier
-        context["hippo_version"] = hippo_version
+        context["mosaic_version"] = mosaic_version
         super().__init__(message, **context)
 
 
@@ -838,7 +838,3 @@ class OrchestrationError(MosaicError):
         context["missing"] = self.missing
         super().__init__(message, **context)
 
-
-# Deprecated alias (ADR-0004): the base exception was renamed with the
-# component. Assignment alias so existing ``except HippoError`` keeps working.
-HippoError = MosaicError  # deprecated

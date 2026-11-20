@@ -4,8 +4,8 @@ format: linkml
 # This example does not reference any external ontology packages.
 # A deployment that uses FMA anatomy terms or Ensembl gene IDs would declare them here:
 # requires:
-#   - hippo-reference-fma>=3.3
-#   - hippo-reference-ensembl>=GRCh38.109
+#   - mosaic-reference-fma>=3.3
+#   - mosaic-reference-ensembl>=GRCh38.109
 
 entities:
 

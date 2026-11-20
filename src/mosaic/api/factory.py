@@ -71,7 +71,7 @@ _MOSAIC_EXCEPTION_STATUS: list[tuple[type[MosaicError], int, str]] = [
 
 def create_app(
     routers: Optional[list] = None,
-    hippo_client: Optional[MosaicClient] = None,
+    mosaic_client: Optional[MosaicClient] = None,
     title: str = "Mosaic API",
     version: Optional[str] = None,
     description: str = (
@@ -89,7 +89,7 @@ def create_app(
     Args:
         routers: Optional list of APIRouter instances to mount.
                  Defaults to empty list.
-        hippo_client: Optional MosaicClient instance for the application.
+        mosaic_client: Optional MosaicClient instance for the application.
         title: API title for OpenAPI documentation.
         version: API version for OpenAPI documentation. Defaults to the
             installed Mosaic package version.
@@ -122,8 +122,8 @@ def create_app(
         openapi_url=openapi_url,
     )
 
-    if hippo_client:
-        app.state.hippo_client = hippo_client
+    if mosaic_client:
+        app.state.mosaic_client = mosaic_client
 
     app.add_exception_handler(
         RequestValidationError,
@@ -268,7 +268,7 @@ def create_app(
     # does via the core factory), enrich the generated OpenAPI document with
     # LinkML-derived per-entity-type components (issue #46). Apps without a
     # client/registry keep the default document.
-    registry = getattr(hippo_client, "registry", None) if hippo_client else None
+    registry = getattr(mosaic_client, "registry", None) if mosaic_client else None
     if registry is not None:
         from mosaic.api.openapi import install_typed_openapi
 

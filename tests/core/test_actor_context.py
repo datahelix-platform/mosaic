@@ -163,7 +163,7 @@ class TestMiddlewareSetsContextVar:
         from fastapi.testclient import TestClient
 
         client = TestClient(app)
-        resp = client.get("/context-var", headers={"x-hippo-actor": "actor:agent-abc"})
+        resp = client.get("/context-var", headers={"x-datahelix-actor": "actor:agent-abc"})
         assert resp.status_code == 200
         assert resp.json()["actor_id"] == "agent-abc"
 

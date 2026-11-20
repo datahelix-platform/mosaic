@@ -105,8 +105,8 @@ Citation) that demonstrates Mosaic's core LinkML runtime features:
 
 - Polymorphic entity hierarchies (Publication → JournalArticle / Preprint /
   ConferencePaper)
-- Full-text search (`hippo_search: fts5`) on titles, abstracts, journal names
-- B-tree indexes (`hippo_index: true`) on FK-style slots
+- Full-text search (`mosaic_search: fts5`) on titles, abstracts, journal names
+- B-tree indexes (`mosaic_index: true`) on FK-style slots
 - Entity supersession (preprint → journal article)
 
 ## Quick start

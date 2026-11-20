@@ -5,7 +5,7 @@ Covers the four acceptance criteria from the issue:
 1. ``mosaic reference <name> --help`` shows the registered subcommands.
 2. Invoking a subcommand reads ``client.cache_dir_for(<name>)`` and
    gets the same path as ``load()`` would.
-3. A loader that registers only ``hippo.reference_loaders`` (no sub-app)
+3. A loader that registers only ``mosaic.reference_loaders`` (no sub-app)
    does not break the CLI; the parent install/upgrade/list verbs still
    work on it.
 4. Two loaders each with their own sub-app coexist (mounted under
@@ -42,9 +42,9 @@ class TestFakeLoaderSubapp:
     def test_fake_subapp_cache_path_matches_load_cache_dir(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
-        # Drive both surfaces against the same HIPPO_CACHE_DIR override and
+        # Drive both surfaces against the same MOSAIC_CACHE_DIR override and
         # verify the sub-app prints the path the loader's load() would use.
-        monkeypatch.setenv("HIPPO_CACHE_DIR", str(tmp_path / "cache"))
+        monkeypatch.setenv("MOSAIC_CACHE_DIR", str(tmp_path / "cache"))
 
         runner = CliRunner()
         result = runner.invoke(app, ["reference", "fake", "cache-path"])
@@ -58,10 +58,10 @@ class TestFakeLoaderSubapp:
         from linkml_runtime.utils.schemaview import SchemaView
         import importlib.resources
 
-        hippo_core_path = importlib.resources.files("mosaic.schemas").joinpath(
-            "hippo_core.yaml"
+        mosaic_core_path = importlib.resources.files("mosaic.schemas").joinpath(
+            "mosaic_core.yaml"
         )
-        registry = SchemaRegistry(SchemaView(str(hippo_core_path)))
+        registry = SchemaRegistry(SchemaView(str(mosaic_core_path)))
         client = MosaicClient(
             storage=SQLiteAdapter(":memory:", schema_registry=registry),
             registry=registry,
@@ -69,7 +69,7 @@ class TestFakeLoaderSubapp:
         expected = client.cache_dir_for("fake")
 
         assert str(expected) in result.output
-        # Same prefix as $HIPPO_CACHE_DIR proves the env override is honored
+        # Same prefix as $MOSAIC_CACHE_DIR proves the env override is honored
         # in both the sub-app path and the load() path.
         assert str(tmp_path / "cache" / "fake") == str(expected)
 
@@ -168,12 +168,12 @@ class TestDiscoveryStrictness:
                 self._eps = eps
 
             def select(self, group: str):
-                if group == "hippo.reference_loader_cli":
+                if group == "mosaic.reference_loader_cli":
                     return self._eps
                 return []
 
             def __getitem__(self, group: str):
-                if group == "hippo.reference_loader_cli":
+                if group == "mosaic.reference_loader_cli":
                     return self._eps
                 raise KeyError(group)
 

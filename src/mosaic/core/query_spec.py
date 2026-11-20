@@ -672,7 +672,7 @@ def validate_query_spec(
     errors: list[QuerySpecError] = []
     anchor = manifest.get(spec.anchor)
     if anchor is None or not anchor.anchor:
-        # A class opted out with ``hippo_anchor: false`` (ADR-0014
+        # A class opted out with ``mosaic_anchor: false`` (ADR-0014
         # Decision 5) stays in the manifest as an edge target only.
         known = sorted(name for name, cap in manifest.items() if cap.anchor)
         return ValidationResult(

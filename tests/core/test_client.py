@@ -261,7 +261,7 @@ class TestFTSIntegration:
                         "name": {"range": "string", "required": True},
                         "notes": {
                             "range": "string",
-                            "annotations": {"hippo_search": "fts5"},
+                            "annotations": {"mosaic_search": "fts5"},
                         },
                     }
                 }
@@ -306,7 +306,7 @@ class TestFTSIntegration:
                         "name": {"range": "string", "required": True},
                         "notes": {
                             "range": "string",
-                            "annotations": {"hippo_search": "fts5"},
+                            "annotations": {"mosaic_search": "fts5"},
                         },
                     }
                 },
@@ -316,7 +316,7 @@ class TestFTSIntegration:
                         "title": {"range": "string", "required": True},
                         "description": {
                             "range": "string",
-                            "annotations": {"hippo_search": "fts5"},
+                            "annotations": {"mosaic_search": "fts5"},
                         },
                     }
                 },

@@ -98,7 +98,7 @@ mosaic tui [OPTIONS]
 |--------|------|---------|-------------|
 | `--backend`, `-b` | `string` | `"sdk"` | Backend mode: `sdk` (local database) or `rest` (remote `mosaic serve`) |
 | `--db` | `string` | resolved | SQLite database path (sdk mode). Falls back to `config.json`, then `data/mosaic.db`, then `mosaic.db` |
-| `--schema` | `string` | resolved | LinkML schema file or directory (sdk mode). Falls back to `schemas/`, then the bundled `hippo_core` schema |
+| `--schema` | `string` | resolved | LinkML schema file or directory (sdk mode). Falls back to `schemas/`, then the bundled `mosaic_core` schema |
 | `--url` | `string` | `"http://127.0.0.1:8000"` | Base URL (rest mode) |
 | `--token` | `string` | env / `dev-token` | Bearer token (rest mode). Falls back to `MOSAIC_TUI_TOKEN` |
 
@@ -249,7 +249,7 @@ mosaic entity <subcommand> [OPTIONS]
 |------------|-------------|
 | `get TYPE ID` | Fetch a single entity by type and id (`--expand` for related entities) |
 | `query TYPE` | List entities; `--filter field=value` (repeatable, AND), `--limit`/`--offset` |
-| `search TYPE QUERY` | Full-text search over fields declared with `hippo_search` |
+| `search TYPE QUERY` | Full-text search over fields declared with `mosaic_search` |
 | `history ID` | Provenance trail for an entity, oldest first |
 
 ### Common Options

@@ -9,9 +9,9 @@ from typing import Any, Optional
 from linkml_runtime.linkml_model.meta import SlotDefinition
 
 from mosaic.linkml_bridge import (
-    HIPPO_INDEX,
-    HIPPO_INDEX_PARTIAL,
-    HIPPO_UNIQUE,
+    MOSAIC_INDEX,
+    MOSAIC_INDEX_PARTIAL,
+    MOSAIC_UNIQUE,
     SchemaRegistry,
     annotation_value,
 )
@@ -148,12 +148,12 @@ class SchemaDiffEngine:
     ) -> None:
         existing_idx_names = {idx["name"] for idx in existing.indexes}
         for slot in registry.induced_slots(class_name):
-            if not annotation_value(slot, HIPPO_INDEX):
+            if not annotation_value(slot, MOSAIC_INDEX):
                 continue
             name = f"idx_{class_name}_{slot.name}"
             if name in existing_idx_names:
                 continue
-            partial = bool(annotation_value(slot, HIPPO_INDEX_PARTIAL))
+            partial = bool(annotation_value(slot, MOSAIC_INDEX_PARTIAL))
             diff.new_indexes.setdefault(class_name, []).append(
                 {
                     "name": name,
@@ -175,7 +175,7 @@ class SchemaDiffEngine:
             col["name"] for col in existing.columns if col.get("primary_key")
         }
         for slot in registry.induced_slots(class_name):
-            if annotation_value(slot, HIPPO_UNIQUE) and slot.name not in existing_unique:
+            if annotation_value(slot, MOSAIC_UNIQUE) and slot.name not in existing_unique:
                 diff.new_constraints.setdefault(class_name, []).append(
                     {"type": "unique", "columns": [slot.name]}
                 )

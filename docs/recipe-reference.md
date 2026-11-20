@@ -14,7 +14,7 @@ Complete field and command reference for the Mosaic recipe system. For authoring
 | `name` | yes | string | Short, filesystem-safe slug. Becomes the `default_prefix` of the schema fragment. Must not collide with any installed prefix. |
 | `version` | yes | string | Opaque version slug. SemVer recommended, not enforced. |
 | `created_at` | yes | datetime | ISO 8601 UTC instant (`"2026-05-27T14:00:00Z"`). |
-| `hippo_version` | yes | string | PEP 440 version specifier (e.g. `">=0.3,<1.0"`). Import fails with `RecipeVersionIncompatibleError` when the running Mosaic version is excluded by this specifier. |
+| `mosaic_version` | yes | string | PEP 440 version specifier (e.g. `">=0.3,<1.0"`). Import fails with `RecipeVersionIncompatibleError` when the running Mosaic version is excluded by this specifier. |
 | `description` | no | string | Human-readable, one paragraph. |
 | `license` | no | string | SPDX identifier (e.g. `CC-BY-4.0`). |
 | `source` | no | string | Author-declared canonical origin URI (e.g. a Zenodo DOI URL). Metadata only — Mosaic never fetches from this field. |
@@ -43,7 +43,7 @@ All fields are optional.
 
 ## `RecipeRef` fields
 
-Reused for `parent`, each `requires.recipes[i]` entry, and entries stored in `hippo_meta.installed_recipes`.
+Reused for `parent`, each `requires.recipes[i]` entry, and entries stored in `mosaic_meta.installed_recipes`.
 
 | Field | Required | Notes |
 |---|---|---|
@@ -56,7 +56,7 @@ Reused for `parent`, each `requires.recipes[i]` entry, and entries stored in `hi
 
 ## Installed recipe registry
 
-`hippo_meta.installed_recipes` is a JSON object keyed by recipe `id`. Each entry extends `RecipeRef` with fields recorded at install time.
+`mosaic_meta.installed_recipes` is a JSON object keyed by recipe `id`. Each entry extends `RecipeRef` with fields recorded at install time.
 
 | Field | Notes |
 |---|---|
@@ -136,11 +136,11 @@ mosaic recipe export --out PATH [--parent <installed-id>] [--db-path PATH] [--sc
 | Option | Description |
 |---|---|
 | `--out PATH` | Output directory. Writes `recipe.yaml` and `schema.yaml` here; fails if either file already exists. |
-| `--parent <installed-id>` | `id` of an installed recipe to declare as the lineage parent. Until `mosaic recipe list` ships (Phase 4), find installed ids in `hippo_meta.installed_recipes`. |
+| `--parent <installed-id>` | `id` of an installed recipe to declare as the lineage parent. Until `mosaic recipe list` ships (Phase 4), find installed ids in `mosaic_meta.installed_recipes`. |
 | `--db-path PATH` | SQLite database path (default: `data/mosaic.db`). |
 | `--schema-dir DIR` | Schema directory (default: `schemas/`). |
 
-**Selectivity:** only classes and slots whose `provided_by` annotation is absent or does not start with `recipe.` or `loader.`, and whose containing schema is not a Mosaic framework schema (`hippo_core`, `recipe_manifest`), are exported. Content contributed by installed recipes or Reference Loaders is excluded.
+**Selectivity:** only classes and slots whose `provided_by` annotation is absent or does not start with `recipe.` or `loader.`, and whose containing schema is not a Mosaic framework schema (`mosaic_core`, `recipe_manifest`), are exported. Content contributed by installed recipes or Reference Loaders is excluded.
 
 `requires.recipes` is auto-populated from `is_a:` and slot range references to installed recipe content.
 
@@ -159,7 +159,7 @@ List all installed recipes.
 mosaic recipe list
 ```
 
-Prints `id`, `version`, `source`, and `digest` for every entry in `hippo_meta.installed_recipes`.
+Prints `id`, `version`, `source`, and `digest` for every entry in `mosaic_meta.installed_recipes`.
 
 ---
 
@@ -206,7 +206,7 @@ mosaic recipe diff <a> <b>
 !!! note "Coming in Phase 4"
     This command is not yet available.
 
-Serialize `hippo_meta.installed_recipes` as a portable lockfile.
+Serialize `mosaic_meta.installed_recipes` as a portable lockfile.
 
 ```bash
 mosaic recipe export-lockfile [--out PATH] [--db-path PATH]
@@ -245,7 +245,7 @@ Re-fetches each entry via its `source`, verifies each `digest`, and installs in 
 
 | Variable | Default | Description |
 |---|---|---|
-| `MOSAIC_RECIPE_CACHE` | `~/.hippo/recipe-cache/` | Override the cache directory used by `HttpsResolver` for fetched recipes. Useful for shared NFS mounts or CI cache volumes. |
+| `MOSAIC_RECIPE_CACHE` | `~/.mosaic/recipe-cache/` | Override the cache directory used by `HttpsResolver` for fetched recipes. Useful for shared NFS mounts or CI cache volumes. |
 
 ---
 
@@ -256,7 +256,7 @@ Re-fetches each entry via its `source`, verifies each `digest`, and installs in 
 | `RecipeManifestError` | `recipe.yaml` fails validation against the `recipe_manifest.yaml` LinkML schema. |
 | `RecipePrefixCollisionError` | The recipe's `name`/`default_prefix` collides with an already-installed prefix from any source (recipe, loader, or hand-authored). |
 | `RecipeRequiresUnsatisfiedError` | A `requires.recipes` or `requires.reference_loaders` dependency cannot be satisfied. The error message includes the unresolved `RecipeRef.source`. |
-| `RecipeVersionIncompatibleError` | The running Mosaic version is excluded by the recipe's `hippo_version` specifier. |
+| `RecipeVersionIncompatibleError` | The running Mosaic version is excluded by the recipe's `mosaic_version` specifier. |
 | `RecipeLineageCycleError` | The `parent` / `requires.recipes` dependency graph contains a cycle. |
 | `RecipeSchemaError` | `schema.yaml` fails LinkML validation, or the merge layer rejects the fragment — including attempts to modify an upstream class in-place. |
 | `RecipeFetchError` | Resolver could not retrieve the artifact (HTTP error, corrupt tarball, unsupported URI scheme). |

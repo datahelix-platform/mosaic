@@ -42,7 +42,7 @@ def hippo_client(storage):
 
 @pytest.fixture
 def client(hippo_client):
-    app = create_app(routers=[health.router], hippo_client=hippo_client)
+    app = create_app(routers=[health.router], mosaic_client=hippo_client)
     return TestClient(app, raise_server_exceptions=False)
 
 

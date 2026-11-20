@@ -117,10 +117,10 @@ class OboDemoLoader(ReferenceLoader):
 
     def schema_fragment(self) -> dict:
         return {
-            "id": "https://example.org/hippo/obodemo",
+            "id": "https://example.org/mosaic/obodemo",
             "name": "obodemo",
             "default_prefix": "obodemo",
-            "prefixes": {"obodemo": "https://example.org/hippo/obodemo/"},
+            "prefixes": {"obodemo": "https://example.org/mosaic/obodemo/"},
             "classes": {
                 _ENTITY_TYPE: {
                     "is_a": "Entity",

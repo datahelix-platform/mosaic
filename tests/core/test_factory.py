@@ -2,7 +2,7 @@
 
 The factory is the single construction path shared by the CLI, the TUI SDK
 backend, and ``mosaic serve``: it resolves the storage backend through the
-``hippo.storage_adapters`` entry-point group and assembles a configured
+``mosaic.storage_adapters`` entry-point group and assembles a configured
 ``MosaicClient`` (registry + storage adapter + validation pipeline).
 """
 
@@ -170,7 +170,7 @@ def test_create_client_from_config(tmp_path):
 
 
 def test_load_config_autodetect_explicit_path(tmp_path):
-    cfg_path = tmp_path / "hippo.yaml"
+    cfg_path = tmp_path / "mosaic.yaml"
     cfg_path.write_text(
         f"schema_path: {_FIXTURE_SCHEMA}\n"
         "storage_backend: sqlite\n"
@@ -267,7 +267,7 @@ def test_build_schema_registry_allows_id_identifier(tmp_path):
 
 
 def test_build_schema_registry_default_bundled_schema_is_valid():
-    """The bundled hippo_core schema (Validator/ReferenceLoader included)
+    """The bundled mosaic_core schema (Validator/ReferenceLoader included)
     must not trip the new validation when no schema_path is given."""
     registry = build_schema_registry()
     assert "Entity" in registry.class_names()

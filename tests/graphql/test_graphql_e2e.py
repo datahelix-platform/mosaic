@@ -64,15 +64,15 @@ class TestAuthAndMounting:
 
         from mosaic.serve import create_default_app
 
-        app = create_default_app(hippo_client=hippo_client)
+        app = create_default_app(mosaic_client=hippo_client)
         with TestClient(app) as plain:
             assert plain.get("/graphql").status_code == 404
 
     def test_graphql_resolvers_use_the_app_state_client(self, hippo_app, client):
-        """GraphQL reads through app.state.hippo_client — the same
+        """GraphQL reads through app.state.mosaic_client — the same
         client instance the REST routers use (no separate construction).
         """
-        state_client = hippo_app.state.hippo_client
+        state_client = hippo_app.state.mosaic_client
         created = state_client.create("Donor", {"name": "FromState"})
         body = client.post(
             "/graphql",

@@ -1,7 +1,7 @@
 """Integration tests for ``migrate_bundle`` — the S4 *one command* (PTS-340).
 
 Exercises the orchestration glue end to end: discover installed packages,
-read current versions from ``hippo_meta``, fold the merged registry, run the
+read current versions from ``mosaic_meta``, fold the merged registry, run the
 dependency-ordered staged migration, and persist version pointers only on a
 clean commit. The orchestrator internals are unit-tested in
 ``test_orchestrator``; here we prove the CLI-level SDK entrypoint wires them
@@ -35,13 +35,13 @@ from mosaic.linkml_bridge import SchemaRegistry, _bundled_importmap
 
 def _registry() -> SchemaRegistry:
     overlay = {
-        "id": "https://example.org/hippo/test_migrate_bundle",
+        "id": "https://example.org/mosaic/test_migrate_bundle",
         "name": "test_migrate_bundle",
         "prefixes": {
             "linkml": "https://w3id.org/linkml/",
-            "hippo": "https://w3id.org/hippo/",
+            "mosaic": "https://w3id.org/datahelix/mosaic/",
         },
-        "imports": ["linkml:types", "hippo_core"],
+        "imports": ["linkml:types", "mosaic_core"],
         "default_range": "string",
         "classes": {
             "Sample": {

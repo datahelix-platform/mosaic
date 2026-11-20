@@ -45,7 +45,7 @@ def _write_recipe(
             name: {name}
             version: 0.1.0
             created_at: '2026-05-27T00:00:00+00:00'
-            hippo_version: '>=0.0'
+            mosaic_version: '>=0.0'
             """
         )
     )

@@ -17,7 +17,7 @@
 # relative defaults (config auto-discovery, schemas/, data/mosaic.db) all
 # resolve inside the mount. Absolute --config/--schema-dir/--db-path flags
 # work regardless of the workdir, so existing deployments that mount config
-# elsewhere (e.g. the certification stack's /app/hippo.yaml) are unaffected.
+# elsewhere (e.g. the certification stack's /app/mosaic.yaml) are unaffected.
 #
 # Dependencies install from uv.lock (mosaic#242), so the image runs the same
 # versions as CI and `uv run pytest`: `uv export --locked` writes the locked,

@@ -1,11 +1,11 @@
-id: https://w3id.org/hippo/recipe_manifest
+id: https://w3id.org/datahelix/mosaic/recipe_manifest
 name: recipe_manifest
-title: Hippo Recipe Manifest Schema
+title: Mosaic Recipe Manifest Schema
 description: >-
-  LinkML schema for the ``recipe.yaml`` manifest carried by every Hippo
+  LinkML schema for the ``recipe.yaml`` manifest carried by every Mosaic
   recipe. Defines ``RecipeManifest`` (the document a recipe author writes)
   and ``RecipeRef`` (the typed reference reused for ``parent``,
-  ``requires.recipes[i]``, and entries in ``hippo_meta.installed_recipes``).
+  ``requires.recipes[i]``, and entries in ``mosaic_meta.installed_recipes``).
 
   Authoritative spec: ``design/sec10_recipes.md`` §10.3.2 (manifest fields)
   and §10.3.3 (RecipeRef shape). The handoff (``sec9_handoff_recipes_v1.md``)
@@ -20,8 +20,8 @@ version: 0.1.0
 
 prefixes:
   linkml: https://w3id.org/linkml/
-  hippo: https://w3id.org/hippo/
-default_prefix: hippo
+  mosaic: https://w3id.org/datahelix/mosaic/
+default_prefix: mosaic
 default_range: string
 
 imports:
@@ -55,7 +55,7 @@ classes:
         required: true
         description: >-
           Opaque version slug. SemVer is recommended in user docs but not
-          enforced by Hippo (parallels the Reference Loader convention,
+          enforced by Mosaic (parallels the Reference Loader convention,
           D2.14.C).
       description:
         range: string
@@ -77,20 +77,20 @@ classes:
         range: datetime
         required: true
         description: ISO 8601 UTC instant the recipe was authored.
-      hippo_version:
+      mosaic_version:
         range: string
         required: true
         description: >-
           PEP 440 version specifier (e.g. ``">=0.3,<0.5"``). Parsed at
           install time with ``packaging.specifiers.SpecifierSet``. Import
           fails with ``RecipeVersionIncompatibleError`` when the running
-          Hippo version is excluded.
+          Mosaic version is excluded.
       source:
         range: string
         required: false
         description: >-
           Author-declared canonical origin URI (e.g. a Zenodo DOI URL).
-          Metadata only — Hippo NEVER fetches from this field. Distinct
+          Metadata only — Mosaic NEVER fetches from this field. Distinct
           from per-``RecipeRef.source`` and per-installed ``source`` —
           the three may legitimately disagree.
       parent:
@@ -99,7 +99,7 @@ classes:
         inlined: true
         description: >-
           Optional ``RecipeRef`` pointing at the parent recipe this one
-          extends. Present on recipes produced by ``hippo recipe extend``.
+          extends. Present on recipes produced by ``mosaic recipe extend``.
           Auto-resolved as a dependency at install time (sec10 §10.4.4);
           a child manifest does NOT need to also list its parent in
           ``requires.recipes``.
@@ -135,7 +135,7 @@ classes:
       empty.
 
       ``reference_loaders`` entries are pin strings of the form
-      ``name==version``; v1 treats them as PRECONDITIONS only — Hippo
+      ``name==version``; v1 treats them as PRECONDITIONS only — Mosaic
       checks the named Reference Loader is installed at the declared
       version and raises ``RecipeRequiresUnsatisfiedError`` otherwise.
       It does NOT install Reference Loaders as a side effect of recipe
@@ -162,7 +162,7 @@ classes:
     description: >-
       Typed reference to a recipe. Reused as ``RecipeManifest.parent``,
       each entry of ``RecipeManifest.requires.recipes``, and the shape
-      stored in ``hippo_meta.installed_recipes``. See sec10 §10.3.3 for
+      stored in ``mosaic_meta.installed_recipes``. See sec10 §10.3.3 for
       the per-field semantics.
 
       ``digest`` is REQUIRED when ``source`` is an ``https:`` URI and

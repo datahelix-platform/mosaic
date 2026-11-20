@@ -46,7 +46,7 @@ class TestExtraDetection:
         from mosaic.serve import create_default_app
 
         with pytest.raises(ConfigError):
-            create_default_app(hippo_client=MosaicClient(), graphql=True)
+            create_default_app(mosaic_client=MosaicClient(), graphql=True)
 
 
 class TestErrorMapping:

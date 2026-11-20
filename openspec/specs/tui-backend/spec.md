@@ -4,7 +4,7 @@
 TBD - created by archiving change tui-browser-schema-explorer. Update Purpose after archive.
 ## Requirements
 ### Requirement: TUIBackend protocol defines the data access contract
-The system SHALL define a `TUIBackend` `typing.Protocol` in `src/hippo/tui/backend/protocol.py`
+The system SHALL define a `TUIBackend` `typing.Protocol` in `src/mosaic/tui/backend/protocol.py`
 exposing the following methods: `list_entity_types()`, `list_entities(type, page, filter)`,
 `get_entity(type, id)`, `get_schema()`, and `get_provenance(type, id)`. All methods SHALL be
 async. All TUI views SHALL call only `TUIBackend` methods and SHALL NOT import SDK or HTTP
@@ -20,10 +20,10 @@ client classes directly.
 
 ---
 
-### Requirement: SDKBackend wraps HippoClient for SDK-direct mode
-The system SHALL provide an `SDKBackend` class in `src/hippo/tui/backend/sdk.py` that
-implements `TUIBackend`. `SDKBackend` SHALL instantiate `HippoClient` with a `SQLiteAdapter`
-using the configured `db_path`. All synchronous `HippoClient` calls SHALL be dispatched via
+### Requirement: SDKBackend wraps MosaicClient for SDK-direct mode
+The system SHALL provide an `SDKBackend` class in `src/mosaic/tui/backend/sdk.py` that
+implements `TUIBackend`. `SDKBackend` SHALL instantiate `MosaicClient` with a `SQLiteAdapter`
+using the configured `db_path`. All synchronous `MosaicClient` calls SHALL be dispatched via
 `asyncio.to_thread()` so that Textual's async event loop is never blocked.
 
 #### Scenario: SDK backend resolves db_path from config
@@ -34,33 +34,33 @@ using the configured `db_path`. All synchronous `HippoClient` calls SHALL be dis
 - **WHEN** `SDKBackend` is constructed with an explicit `db_path` argument
 - **THEN** it uses that path and ignores `config.json`
 
-#### Scenario: Synchronous HippoClient call does not block event loop
+#### Scenario: Synchronous MosaicClient call does not block event loop
 - **WHEN** `SDKBackend.list_entities()` is awaited during TUI rendering
 - **THEN** the call executes in a thread via `asyncio.to_thread()` and the UI event loop remains responsive
 
 ---
 
-### Requirement: RESTBackend calls a running hippo serve instance
-The system SHALL provide a `RESTBackend` class in `src/hippo/tui/backend/rest.py` that
+### Requirement: RESTBackend calls a running mosaic serve instance
+The system SHALL provide a `RESTBackend` class in `src/mosaic/tui/backend/rest.py` that
 implements `TUIBackend` using `httpx.AsyncClient`. The default base URL SHALL be
 `http://127.0.0.1:8000`. The default auth token SHALL be `dev-token`, overridable via `--token`
-CLI flag or the `HIPPO_TUI_TOKEN` environment variable. The `HIPPO_TUI_TOKEN` environment
+CLI flag or the `MOSAIC_TUI_TOKEN` environment variable. The `MOSAIC_TUI_TOKEN` environment
 variable SHALL take lower precedence than the `--token` flag.
 
 #### Scenario: REST backend uses Bearer token from flag
-- **WHEN** `hippo tui --backend rest --token mytoken` is invoked
+- **WHEN** `mosaic tui --backend rest --token mytoken` is invoked
 - **THEN** `RESTBackend` sends `Authorization: Bearer mytoken` on every request
 
 #### Scenario: REST backend falls back to env variable
-- **WHEN** `HIPPO_TUI_TOKEN=envtoken` is set and `--token` is not provided
+- **WHEN** `MOSAIC_TUI_TOKEN=envtoken` is set and `--token` is not provided
 - **THEN** `RESTBackend` sends `Authorization: Bearer envtoken`
 
 #### Scenario: REST backend uses default token when neither flag nor env is set
-- **WHEN** neither `--token` nor `HIPPO_TUI_TOKEN` is provided
+- **WHEN** neither `--token` nor `MOSAIC_TUI_TOKEN` is provided
 - **THEN** `RESTBackend` sends `Authorization: Bearer dev-token`
 
 #### Scenario: REST backend reports connection failure gracefully
-- **WHEN** the `hippo serve` instance is unreachable
+- **WHEN** the `mosaic serve` instance is unreachable
 - **THEN** the TUI displays an error message in the status bar and does not crash
 
 ---

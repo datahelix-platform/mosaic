@@ -24,8 +24,8 @@ from mosaic.core.validation.validators import WriteOperation
 logger = logging.getLogger(__name__)
 
 from mosaic.linkml_bridge import (
-    HIPPO_ACCESSOR,
-    HIPPO_NAMESPACE,
+    MOSAIC_ACCESSOR,
+    MOSAIC_NAMESPACE,
     SchemaRegistry,
     annotation_value,
     default_accessor,
@@ -108,7 +108,7 @@ SDK_RESERVED_NAMES: frozenset[str] = frozenset(
 )
 
 # ``root`` is reserved as the alias for flat root-namespace access. A
-# user schema MUST NOT declare ``hippo_namespace: root``.
+# user schema MUST NOT declare ``mosaic_namespace: root``.
 ROOT_NAMESPACE_RESERVED = "root"
 
 
@@ -282,36 +282,36 @@ class Namespace:
 def _resolve_namespace(cls_name: str, cls_obj: Any) -> list[str]:
     """Return the namespace path for a class as a list of segments.
 
-    Empty list means root namespace. Dots in ``hippo_namespace: a.b.c``
+    Empty list means root namespace. Dots in ``mosaic_namespace: a.b.c``
     produce three segments ``["a", "b", "c"]``.
     """
-    ns = annotation_value(cls_obj, HIPPO_NAMESPACE)
+    ns = annotation_value(cls_obj, MOSAIC_NAMESPACE)
     if ns is None or ns == "":
         return []
     if not isinstance(ns, str):
         raise TypedClientError(
-            f"hippo_namespace on class {cls_name!r} must be a string, got "
+            f"mosaic_namespace on class {cls_name!r} must be a string, got "
             f"{type(ns).__name__}",
             case="namespace_type",
         )
     if ns == ROOT_NAMESPACE_RESERVED:
         raise TypedClientError(
-            f"Class {cls_name!r} declares hippo_namespace: root — `root` is "
+            f"Class {cls_name!r} declares mosaic_namespace: root — `root` is "
             f"reserved as the typed-client flat-access alias. Omit "
-            f"`hippo_namespace` for root-namespace classes.",
+            f"`mosaic_namespace` for root-namespace classes.",
             case="reserved_root",
         )
     segments = ns.split(".")
     for seg in segments:
         if not _is_valid_identifier(seg):
             raise TypedClientError(
-                f"Class {cls_name!r} declares hippo_namespace: {ns!r}; "
+                f"Class {cls_name!r} declares mosaic_namespace: {ns!r}; "
                 f"segment {seg!r} is not a valid Python identifier.",
                 case="invalid_namespace_segment",
             )
         if seg in SDK_RESERVED_NAMES:
             raise TypedClientError(
-                f"Class {cls_name!r} declares hippo_namespace: {ns!r}; "
+                f"Class {cls_name!r} declares mosaic_namespace: {ns!r}; "
                 f"segment {seg!r} conflicts with an SDK-reserved attribute.",
                 case="namespace_reserved",
             )
@@ -319,11 +319,11 @@ def _resolve_namespace(cls_name: str, cls_obj: Any) -> list[str]:
 
 
 def _resolve_accessor(cls_name: str, cls_obj: Any) -> str:
-    override = annotation_value(cls_obj, HIPPO_ACCESSOR)
+    override = annotation_value(cls_obj, MOSAIC_ACCESSOR)
     if override is not None:
         if not isinstance(override, str) or not _is_valid_identifier(override):
             raise TypedClientError(
-                f"Class {cls_name!r} declares hippo_accessor: {override!r}; "
+                f"Class {cls_name!r} declares mosaic_accessor: {override!r}; "
                 f"must be a valid Python identifier.",
                 case="invalid_accessor",
             )
@@ -363,7 +363,7 @@ def _install_accessor(
         raise TypedClientError(
             f"typed-client accessor collision: classes {other!r} and "
             f"{cls_name!r} both resolve to accessor {accessor_name!r} in "
-            f"namespace {target.namespace_name!r}. Add `hippo_accessor` to "
+            f"namespace {target.namespace_name!r}. Add `mosaic_accessor` to "
             f"at least one class to disambiguate.",
             case="duplicate_accessor",
         )
@@ -399,7 +399,7 @@ def build_typed_surface(
     """Build the namespace-aware accessor tree for ``client``.
 
     Returns the root ``Namespace``. Non-abstract domain classes (i.e.
-    those not inherited from hippo_core primitives that the generic
+    those not inherited from mosaic_core primitives that the generic
     client already exposes) get accessors rooted under their declared
     namespace. Raises :class:`TypedClientError` on any of the four
     collision cases (sec9 §9.8 Decision 9.8.B).
@@ -408,7 +408,7 @@ def build_typed_surface(
     root = Namespace("")
     sv = registry.schema_view
 
-    # Domain classes = concrete, non-abstract classes that aren't hippo_core
+    # Domain classes = concrete, non-abstract classes that aren't mosaic_core
     # infrastructure. The selection lives once in mosaic.core.schema_typing so
     # the typed client and the GraphQL/OpenAPI transports can't drift.
     for cls_name in exposed_class_names(registry):
@@ -421,7 +421,7 @@ def build_typed_surface(
             raise TypedClientError(
                 f"accessor/reserved-name collision: class {cls_name!r}'s "
                 f"accessor {accessor_name!r} conflicts with an SDK-reserved "
-                f"attribute. Add `hippo_accessor` to override.",
+                f"attribute. Add `mosaic_accessor` to override.",
                 case="accessor_reserved",
             )
 

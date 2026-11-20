@@ -7,7 +7,7 @@ flag).
 
 The GraphQL schema is generated once, at mount time, from the
 configured client's ``SchemaRegistry``. At request time resolvers use
-``request.app.state.hippo_client`` — the exact client the REST routers
+``request.app.state.mosaic_client`` — the exact client the REST routers
 read (injected by ``create_default_app`` from the config-driven factory,
 issue #42) — so both transports always serve the same deployment.
 
@@ -31,7 +31,7 @@ from mosaic.graphql.schema_builder import GraphQLTypeBuilder
 
 
 def create_graphql_router(
-    hippo_client: MosaicClient,
+    mosaic_client: MosaicClient,
     path: str = "",
     graphiql: bool = True,
     max_query_depth: int = DEFAULT_MAX_QUERY_DEPTH,
@@ -40,14 +40,14 @@ def create_graphql_router(
 
     Schema generation happens once, here, at startup — resolvers then
     serve every request through the app's shared ``MosaicClient``
-    (``app.state.hippo_client``, the same source the REST routers use;
-    *hippo_client* is the construction-time registry source and the
+    (``app.state.mosaic_client``, the same source the REST routers use;
+    *mosaic_client* is the construction-time registry source and the
     fallback when the app carries no client). The request context
     carries the client, the generated type universe, and a per-request
     DataLoader cache for batched relationship resolution.
 
     Args:
-        hippo_client: SDK client; must carry a ``SchemaRegistry``.
+        mosaic_client: SDK client; must carry a ``SchemaRegistry``.
         path: Router-internal path (mount point is chosen by the caller
             via ``app.include_router(..., prefix="/graphql")``).
         graphiql: Serve the GraphiQL IDE on GET requests.
@@ -55,11 +55,11 @@ def create_graphql_router(
             introspection is exempt).
 
     Raises:
-        ConfigError: When ``hippo_client`` has no schema registry — the
+        ConfigError: When ``mosaic_client`` has no schema registry — the
             GraphQL surface is generated from the LinkML schema, so a
             schemaless client cannot be served.
     """
-    registry = hippo_client.registry
+    registry = mosaic_client.registry
     if registry is None:
         raise ConfigError(
             "GraphQL transport requires a schema-backed MosaicClient: the "
@@ -78,8 +78,8 @@ def create_graphql_router(
         # Same client source as the REST routers (base.get_client_from_
         # request): the app-state client injected by create_default_app.
         # Falls back to the construction-time client for apps that never
-        # set app.state.hippo_client (e.g. a bare include_router mount).
-        client = getattr(request.app.state, "hippo_client", None) or hippo_client
+        # set app.state.mosaic_client (e.g. a bare include_router mount).
+        client = getattr(request.app.state, "mosaic_client", None) or mosaic_client
         return {
             "client": client,
             "builder": builder,

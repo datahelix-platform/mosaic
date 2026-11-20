@@ -5,14 +5,9 @@ external packages discover adapters, validators, and schema packages
 through them. A dangling entry point is invisible until a consumer
 tries to load it, so resolve them all here.
 
-Per ADR-0004 (Hippo -> Mosaic rename), the entry-point groups are
-**dual-registered** during the deprecation window: the canonical
-``mosaic.*`` groups plus legacy ``hippo.*`` spellings that resolve the
-same targets, so that Canon/Cappella and any third-party
-``hippo-reference-*`` / ``hippo-adapter-*`` plugins keep working until
-they migrate. We assert both sides of that contract here: every
-``mosaic.*`` entry point resolves, and every legacy ``hippo.*`` entry
-point resolves too (to the same target).
+The legacy ``hippo.*`` spellings were removed when ADR-0015 ended the
+ADR-0004 deprecation window (platform ADR-0007): only ``mosaic.*`` is
+registered, and nothing is left under the retired groups.
 """
 
 from importlib.metadata import entry_points
@@ -28,7 +23,6 @@ GROUP_SUFFIXES = [
 ]
 
 MOSAIC_GROUPS = [f"mosaic.{suffix}" for suffix in GROUP_SUFFIXES]
-HIPPO_GROUPS = [f"hippo.{suffix}" for suffix in GROUP_SUFFIXES]
 
 
 def _own_entry_points(groups: list) -> list:
@@ -65,31 +59,23 @@ def test_mosaic_entry_point_resolves(ep) -> None:
     _load_or_skip(ep)
 
 
-@pytest.mark.parametrize("ep", _own_entry_points(HIPPO_GROUPS))
-def test_legacy_hippo_entry_point_resolves(ep) -> None:
-    """Legacy ``hippo.*`` groups still resolve during the ADR-0004 deprecation window."""
-    _load_or_skip(ep)
+@pytest.mark.parametrize("suffix", GROUP_SUFFIXES)
+def test_mosaic_group_declares_entry_points(suffix: str) -> None:
+    mosaic_eps = {ep.name for ep in entry_points(group=f"mosaic.{suffix}")}
+    assert mosaic_eps, f"mosaic.{suffix} declared no entry points"
 
 
 @pytest.mark.parametrize("suffix", GROUP_SUFFIXES)
-def test_legacy_hippo_groups_mirror_mosaic_groups(suffix: str) -> None:
-    """The legacy ``hippo.*`` group must dual-register the same names/targets
-
-    as its canonical ``mosaic.*`` counterpart — that equivalence is the
-    deprecation-window contract (ADR-0004): a consumer registered against
-    either spelling must get the same plugin.
-    """
-    mosaic_eps = {ep.name: ep.value for ep in entry_points(group=f"mosaic.{suffix}")}
-    hippo_eps = {ep.name: ep.value for ep in entry_points(group=f"hippo.{suffix}")}
-    assert mosaic_eps, f"mosaic.{suffix} declared no entry points"
-    assert hippo_eps == mosaic_eps
+def test_legacy_hippo_groups_are_not_registered(suffix: str) -> None:
+    """ADR-0015: Mosaic no longer registers anything under ``hippo.*``."""
+    own = [
+        ep
+        for ep in entry_points(group=f"hippo.{suffix}")
+        if ep.value.startswith("mosaic.")
+    ]
+    assert own == []
 
 
 def test_storage_adapter_group_declares_both_adapters() -> None:
     names = {ep.name for ep in entry_points(group="mosaic.storage_adapters")}
-    assert {"sqlite", "postgres"} <= names
-
-
-def test_legacy_storage_adapter_group_declares_both_adapters() -> None:
-    names = {ep.name for ep in entry_points(group="hippo.storage_adapters")}
     assert {"sqlite", "postgres"} <= names

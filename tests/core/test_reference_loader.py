@@ -494,15 +494,15 @@ class TestPureSchemaPackage:
         )
         from mosaic.testing.fake_reference_loader import FakeSchemaPackage
 
-        hippo_core = importlib.resources.files("mosaic.schemas").joinpath(
-            "hippo_core.yaml"
+        mosaic_core = importlib.resources.files("mosaic.schemas").joinpath(
+            "mosaic_core.yaml"
         )
-        deployed_sv = SchemaView(str(hippo_core))
+        deployed_sv = SchemaView(str(mosaic_core))
 
         pkg = FakeSchemaPackage()
         spec = LoaderFragmentSpec(
             loader_name=pkg.name,
-            package_name="hippo-schema-fake",
+            package_name="mosaic-schema-fake",
             package_version="1.0.0",
             fragment=pkg.schema_fragment(),
         )
@@ -745,7 +745,7 @@ class TestPureSchemaPackageInstall:
     recorded — without any hand-written ``load()``/``provision()``.
 
     Entry points are monkeypatched so the test does not depend on a fresh
-    editable reinstall picking up the ``hippo.schema_packages`` group.
+    editable reinstall picking up the ``mosaic.schema_packages`` group.
     """
 
     def test_install_pure_schema_package_merges_and_records_version(
@@ -800,7 +800,7 @@ class TestPureSchemaPackageInstall:
         finally:
             conn.close()
 
-        # The version is pinned in hippo_meta (the requires: source of truth).
+        # The version is pinned in mosaic_meta (the requires: source of truth).
         assert versions == {"fake_schema": "v1"}
 
 
@@ -816,10 +816,10 @@ class TestPureSchemaPackageInstall:
 
 @pytest.fixture()
 def isolated_cache(tmp_path, monkeypatch):
-    """Pin ``$HIPPO_CACHE_DIR`` to a tmp path so ``cached_fetch`` never
-    touches the developer's real ``~/.cache/hippo``."""
+    """Pin ``$MOSAIC_CACHE_DIR`` to a tmp path so ``cached_fetch`` never
+    touches the developer's real ``~/.cache/mosaic``."""
     cache_root = tmp_path / "cache"
-    monkeypatch.setenv("HIPPO_CACHE_DIR", str(cache_root))
+    monkeypatch.setenv("MOSAIC_CACHE_DIR", str(cache_root))
     return cache_root
 
 

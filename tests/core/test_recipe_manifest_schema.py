@@ -54,7 +54,7 @@ def valid_manifest() -> dict:
         },
         "license": "MIT",
         "created_at": "2026-05-27T14:30:00+00:00",
-        "hippo_version": ">=0.3,<0.5",
+        "mosaic_version": ">=0.3,<0.5",
         "source": "https://zenodo.org/record/12345",
         "parent": {
             "id": "org.broad.bioinformatics-base",
@@ -70,7 +70,7 @@ def valid_manifest() -> dict:
                     "source": "file:./vendored/cell-ontology",
                 }
             ],
-            "reference_loaders": ["hippo-reference-ensembl==115"],
+            "reference_loaders": ["mosaic-reference-ensembl==115"],
         },
     }
 
@@ -96,7 +96,7 @@ class TestRecipeManifestSchema:
             for slot in schema_view.class_induced_slots("RecipeManifest")
         }
         required_names = {name for name, slot in induced.items() if slot.required}
-        assert required_names == {"id", "name", "version", "created_at", "hippo_version"}
+        assert required_names == {"id", "name", "version", "created_at", "mosaic_version"}
 
 
 class TestValidManifest:
@@ -114,7 +114,7 @@ class TestValidManifest:
             "name": "minimal",
             "version": "0.1.0",
             "created_at": "2026-05-27T00:00:00+00:00",
-            "hippo_version": ">=0.3",
+            "mosaic_version": ">=0.3",
         }
         report = validator.validate(minimal, "RecipeManifest")
         assert report.results == [], [r.message for r in report.results]
@@ -124,7 +124,7 @@ class TestRequiredFieldsRejected:
     """Each required field, when missing, yields a validation error."""
 
     @pytest.mark.parametrize(
-        "missing_field", ["id", "name", "version", "created_at", "hippo_version"]
+        "missing_field", ["id", "name", "version", "created_at", "mosaic_version"]
     )
     def test_missing_required_field_fails(
         self, validator: Validator, valid_manifest: dict, missing_field: str

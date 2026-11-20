@@ -29,9 +29,7 @@ import pytest
 # Skip all tests if psycopg is not installed or no database URL is set
 psycopg = pytest.importorskip("psycopg")
 
-POSTGRES_URL = os.environ.get("MOSAIC_DATABASE_URL") or os.environ.get(
-    "HIPPO_DATABASE_URL"
-)
+POSTGRES_URL = os.environ.get("MOSAIC_DATABASE_URL")
 
 pytestmark = pytest.mark.skipif(
     not POSTGRES_URL,
@@ -43,20 +41,20 @@ def _mv_schema_registry():
     """SchemaRegistry with a multivalued reference slot and a multivalued
     scalar slot — the same shape as ``tests/core/test_multivalued_refs.py``'s
     inline schema, built the way ``tests/conftest.py`` builds its minimal
-    registry (overlay + bundled hippo_core import)."""
+    registry (overlay + bundled mosaic_core import)."""
     import yaml
     from linkml_runtime.utils.schemaview import SchemaView
 
     from mosaic.linkml_bridge import SchemaRegistry, _bundled_importmap
 
     overlay = {
-        "id": "https://example.org/hippo/test_mv_postgres",
+        "id": "https://example.org/mosaic/test_mv_postgres",
         "name": "test_mv_postgres",
         "prefixes": {
             "linkml": "https://w3id.org/linkml/",
-            "hippo": "https://w3id.org/hippo/",
+            "mosaic": "https://w3id.org/datahelix/mosaic/",
         },
-        "imports": ["linkml:types", "hippo_core"],
+        "imports": ["linkml:types", "mosaic_core"],
         "default_range": "string",
         "classes": {
             "Sample": {

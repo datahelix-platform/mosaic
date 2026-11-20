@@ -578,14 +578,14 @@ class QueryService:
     ) -> "PaginatedResult":
         """Query entities updated after a watermark timestamp (sec4 §4.5).
 
-        Designed for polling callers (e.g. Cappella's ``hippo_poll``
+        Designed for polling callers (e.g. Cappella's ``mosaic_poll``
         trigger). Selects entities whose provenance-derived ``updated_at``
         is strictly greater than ``since`` and orders results by
         ``updated_at`` ascending — oldest first, so callers can process
         in order and persist the last ``updated_at`` they saw as the
         watermark for the next poll.
 
-        ``since`` is compared against Hippo's server-side provenance
+        ``since`` is compared against Mosaic's server-side provenance
         timestamps (UTC); callers should never use their own clock. The
         watermark filter runs over the same provenance-derived read path
         :meth:`query` uses (mirroring its ``date_from``/``date_to`` in-Python

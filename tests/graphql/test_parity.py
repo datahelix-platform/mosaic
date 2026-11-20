@@ -50,7 +50,7 @@ class TestFullTextSearch:
         assert deep["data"]["searchSamples"]["total"] == 3
 
     def test_search_on_type_without_searchable_slots_is_empty(self, gql):
-        # Donor declares no hippo_search slots — same as REST: no FTS
+        # Donor declares no mosaic_search slots — same as REST: no FTS
         # tables means no results, not an error.
         body = gql('{ searchDonors(q: "anything") { items { name } total } }')
         assert body["data"]["searchDonors"] == {"items": [], "total": 0}
@@ -62,8 +62,8 @@ class TestMosaicSchemaIntrospection:
     def test_hippo_schema_lists_exposed_entity_types(self, gql, registry):
         from mosaic.core.schema_typing import exposed_class_names
 
-        body = gql("{ hippoSchema { name accessorName } }")
-        names = [item["name"] for item in body["data"]["hippoSchema"]]
+        body = gql("{ mosaicSchema { name accessorName } }")
+        names = [item["name"] for item in body["data"]["mosaicSchema"]]
         assert names == exposed_class_names(registry)
         assert "Sample" in names
         assert "ExternalID" in names  # exposed, like the typed client
@@ -71,12 +71,12 @@ class TestMosaicSchemaIntrospection:
 
     def test_entity_type_slots_carry_the_model_classification(self, gql):
         body = gql(
-            '{ hippoEntityType(name: "Sample") {'
+            '{ mosaicEntityType(name: "Sample") {'
             "  name accessorName description"
             "  fields { name kind range role required multivalued"
             "           targetEntityType enumName } } }"
         )
-        info = body["data"]["hippoEntityType"]
+        info = body["data"]["mosaicEntityType"]
         assert info["name"] == "Sample"
         assert info["accessorName"] == "samples"
         fields = {f["name"]: f for f in info["fields"]}
@@ -90,11 +90,11 @@ class TestMosaicSchemaIntrospection:
 
     def test_enum_slots_expose_their_values(self, gql):
         body = gql(
-            '{ hippoEntityType(name: "Donor") {'
+            '{ mosaicEntityType(name: "Donor") {'
             "  fields { name kind enumName enumValues } } }"
         )
         fields = {
-            f["name"]: f for f in body["data"]["hippoEntityType"]["fields"]
+            f["name"]: f for f in body["data"]["mosaicEntityType"]["fields"]
         }
         assert fields["sex"]["kind"] == "enum"
         assert fields["sex"]["enumName"] == "SexEnum"
@@ -103,16 +103,16 @@ class TestMosaicSchemaIntrospection:
     def test_relationships_mirror_schema_references(self, gql):
         # Same shape as REST GET /schemas/Sample/references.
         body = gql(
-            '{ hippoEntityType(name: "Sample") {'
+            '{ mosaicEntityType(name: "Sample") {'
             "  relationships { field targetEntityType } } }"
         )
-        relationships = body["data"]["hippoEntityType"]["relationships"]
+        relationships = body["data"]["mosaicEntityType"]["relationships"]
         assert {"field": "donor_id", "targetEntityType": "Donor"} in relationships
         assert {"field": "parent", "targetEntityType": "Sample"} in relationships
 
     def test_unknown_entity_type_is_null(self, gql):
-        body = gql('{ hippoEntityType(name: "Nope") { name } }')
-        assert body["data"]["hippoEntityType"] is None
+        body = gql('{ mosaicEntityType(name: "Nope") { name } }')
+        assert body["data"]["mosaicEntityType"] is None
         assert "errors" not in body
 
 

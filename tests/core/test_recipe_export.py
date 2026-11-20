@@ -37,7 +37,7 @@ def _make_upstream_recipe(
             name: {name}
             version: 0.1.0
             created_at: '2026-05-27T00:00:00+00:00'
-            hippo_version: '>=0.0'
+            mosaic_version: '>=0.0'
             """
         )
     )
@@ -135,7 +135,7 @@ class TestExportManifestStub:
         assert "name" in m
         assert "version" in m
         assert "created_at" in m
-        assert "hippo_version" in m
+        assert "mosaic_version" in m
 
     def test_manifest_stubs_marked_TODO(self, client: MosaicClient) -> None:
         result = client.recipe_export()

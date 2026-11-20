@@ -151,7 +151,7 @@ def _allowed_filter_ops(spec: "SlotSpec") -> set[str]:
 @strawberry.input(
     description=(
         "Field/value filter (SDK query filter). ``field`` is a LinkML slot "
-        "name (snake_case, as listed by `hippoSchema`); the equivalent "
+        "name (snake_case, as listed by `mosaicSchema`); the equivalent "
         "camelCase spelling exposed on the entity type is also accepted. An "
         "unrecognized name is an error, never an empty result (issue #149). "
         "``op`` defaults to EQ (equality); IN treats ``value`` as a list and "
@@ -221,7 +221,7 @@ class BulkAvailabilityResult:
 @strawberry.type(
     description=(
         "Entity resolved from an external reference (system, value) pair "
-        "via the hippo_external_xref reverse-lookup index (issue #48). "
+        "via the mosaic_external_xref reverse-lookup index (issue #48). "
         "Generic envelope shape — the matching entity type is only known "
         "at query time, so `data` carries the typed payload as JSON; use "
         "`entityType` with the per-type queries for typed traversal."
@@ -1398,7 +1398,7 @@ def _superseded_by_resolver(info: Info, id: strawberry.ID) -> SupersessionInfo: 
 def _find_by_xref_resolver(
     info: Info, system: str, value: str
 ) -> Optional[XrefMatch]:
-    """Reverse lookup over hippo_external_xref-annotated slots.
+    """Reverse lookup over mosaic_external_xref-annotated slots.
 
     Thin delegation to ``MosaicClient.find_by_xref`` (mirrors REST
     ``GET /xref/{system}/{value}``). Null when no available entity holds
@@ -1537,13 +1537,13 @@ def _neighbors_resolver(
     )
 
 
-def _make_hippo_schema_resolver(builder: GraphQLTypeBuilder):
+def _make_mosaic_schema_resolver(builder: GraphQLTypeBuilder):
     def resolver(info: Info) -> list[MosaicEntityTypeInfo]:
         b = _builder(info)
         models = {**b.type_model, **{n: f.model for n, f in b.families.items()}}
         return [_entity_type_info(model, b) for _, model in sorted(models.items())]
 
-    resolver.__name__ = "hippo_schema"
+    resolver.__name__ = "mosaic_schema"
     resolver.__doc__ = (
         "The deployment's LinkML type model — every exposed entity type "
         "with its slots and relationships (mirrors REST GET /schemas). "
@@ -1552,7 +1552,7 @@ def _make_hippo_schema_resolver(builder: GraphQLTypeBuilder):
     return resolver
 
 
-def _make_hippo_entity_type_resolver(builder: GraphQLTypeBuilder):
+def _make_mosaic_entity_type_resolver(builder: GraphQLTypeBuilder):
     def resolver(info: Info, name: str) -> Optional[MosaicEntityTypeInfo]:
         b = _builder(info)
         model = b.type_model.get(name)
@@ -1562,7 +1562,7 @@ def _make_hippo_entity_type_resolver(builder: GraphQLTypeBuilder):
             return None
         return _entity_type_info(model, b)
 
-    resolver.__name__ = "hippo_entity_type"
+    resolver.__name__ = "mosaic_entity_type"
     resolver.__doc__ = (
         "One exposed entity type from the LinkML type model, with its "
         "slots and relationships (mirrors REST GET /schemas/{name} and "
@@ -1891,13 +1891,13 @@ def build_query_type(builder: GraphQLTypeBuilder) -> type:
     )
     fields.append(
         strawberry.field(
-            resolver=_make_hippo_schema_resolver(builder), name="hippoSchema"
+            resolver=_make_mosaic_schema_resolver(builder), name="mosaicSchema"
         )
     )
     fields.append(
         strawberry.field(
-            resolver=_make_hippo_entity_type_resolver(builder),
-            name="hippoEntityType",
+            resolver=_make_mosaic_entity_type_resolver(builder),
+            name="mosaicEntityType",
         )
     )
     return create_type("Query", fields)
@@ -1945,7 +1945,7 @@ def build_mutation_type(builder: GraphQLTypeBuilder) -> type:
         strawberry.mutation(resolver=_validate_batch_resolver, name="validateBatch")
     )
     # converseQuerySpec (issue #205) -- hand-authored, alongside the
-    # codegen'd mutations above, exactly like hippoSchema is hand-authored
+    # codegen'd mutations above, exactly like mosaicSchema is hand-authored
     # alongside the codegen'd Query fields. Registered ONLY when
     # MOSAIC_EXON_URL is set (read once, at schema-build time, mirroring
     # the MCP tool's own mount-time gate in mosaic/mcp/server.py) -- an

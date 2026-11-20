@@ -31,7 +31,7 @@ tools — there is no per-request client lookup for them at all (the SDK's
 static/non-templated resources cannot take a ``Context`` parameter in
 the first place; see :func:`create_mcp_server`'s docstring). The tools DO
 read live data, so they take ``ctx: Context`` and resolve
-``request.app.state.hippo_client`` the same way GraphQL's
+``request.app.state.mosaic_client`` the same way GraphQL's
 ``context_getter`` does, falling back to the construction-time client.
 The prompt is static text (like the resources) — it carries no schema
 data of its own, only procedural guidance about the artifact's semantics.
@@ -121,24 +121,24 @@ MAX_EXECUTE_LIMIT = 1000
 # Context), and hand both to run_converse_turn.
 
 
-def create_mcp_server(hippo_client: MosaicClient) -> MCPServer:
+def create_mcp_server(mosaic_client: MosaicClient) -> MCPServer:
     """Build the MCP server for one Mosaic deployment.
 
-    Both resources are pure functions of ``hippo_client.registry`` — a
+    Both resources are pure functions of ``mosaic_client.registry`` — a
     deployment's schema, not per-request state — so they are computed
     once, here, at mount time and served as static payloads (mirrors
     ``create_graphql_router``'s schema-at-mount-time split; the SDK's
     static/non-templated resources cannot take a ``Context`` parameter
     at all, so there is no per-request client lookup to do here). Unlike
     the schema/capability resources, a future ``execute_query_spec`` tool
-    (#183's remaining half) DOES need the live ``app.state.hippo_client``
+    (#183's remaining half) DOES need the live ``app.state.mosaic_client``
     per request, the same way GraphQL resolvers do.
 
     Raises:
-        ConfigError: When ``hippo_client`` has no schema registry — both
+        ConfigError: When ``mosaic_client`` has no schema registry — both
             resources are computed from the deployment's LinkML schema.
     """
-    registry = hippo_client.registry
+    registry = mosaic_client.registry
     if registry is None:
         raise ConfigError(
             "MCP transport requires a schema-backed MosaicClient: both "
@@ -150,7 +150,7 @@ def create_mcp_server(hippo_client: MosaicClient) -> MCPServer:
 
     type_model = build_type_model(registry)
     capability_manifest = build_capability_manifest(registry)
-    # Entities plus families (ADR-0014 Decision 4), as hippoSchema lists them.
+    # Entities plus families (ADR-0014 Decision 4), as mosaicSchema lists them.
     schema_payload = {
         name: entity_type_model_to_dict(e)
         for name, e in {
@@ -211,7 +211,7 @@ def create_mcp_server(hippo_client: MosaicClient) -> MCPServer:
         description=(
             "Every exposed entity type's fields, kinds (scalar/enum/"
             "reference), roles, and relationships — the raw LinkML type "
-            "model (mirrors GraphQL's hippoSchema / REST's GET /schemas)."
+            "model (mirrors GraphQL's mosaicSchema / REST's GET /schemas)."
         ),
         mime_type="application/json",
     )
@@ -243,7 +243,7 @@ def create_mcp_server(hippo_client: MosaicClient) -> MCPServer:
         request = getattr(ctx.request_context, "request", None)
         app = getattr(request, "app", None)
         state = getattr(app, "state", None)
-        client = getattr(state, "hippo_client", None) if state is not None else None
+        client = getattr(state, "mosaic_client", None) if state is not None else None
         return client or fallback
 
     def _manifest_for(client: MosaicClient) -> dict[str, EntityCapability]:
@@ -362,7 +362,7 @@ def create_mcp_server(hippo_client: MosaicClient) -> MCPServer:
         ),
     )
     def validate_query_spec(query_spec: dict, ctx: Context) -> dict[str, Any]:
-        client = _client_from_context(ctx, hippo_client)
+        client = _client_from_context(ctx, mosaic_client)
         try:
             spec = parse_query_spec(query_spec)
         except QuerySpecShapeError as exc:
@@ -390,7 +390,7 @@ def create_mcp_server(hippo_client: MosaicClient) -> MCPServer:
     def execute_query_spec(
         query_spec: dict, ctx: Context, limit: int = 100, offset: int = 0
     ) -> dict[str, Any]:
-        client = _client_from_context(ctx, hippo_client)
+        client = _client_from_context(ctx, mosaic_client)
         manifest = _manifest_for(client)
         if not (1 <= limit <= MAX_EXECUTE_LIMIT):
             return {
@@ -477,7 +477,7 @@ def create_mcp_server(hippo_client: MosaicClient) -> MCPServer:
         ),
     )
     def count_query_spec(query_spec: dict, ctx: Context) -> dict[str, Any]:
-        client = _client_from_context(ctx, hippo_client)
+        client = _client_from_context(ctx, mosaic_client)
         manifest = _manifest_for(client)
         try:
             spec = parse_query_spec(query_spec)
@@ -517,7 +517,7 @@ def create_mcp_server(hippo_client: MosaicClient) -> MCPServer:
         ),
     )
     def facet_query_spec(query_spec: dict, field: str, ctx: Context) -> dict[str, Any]:
-        client = _client_from_context(ctx, hippo_client)
+        client = _client_from_context(ctx, mosaic_client)
         manifest = _manifest_for(client)
         try:
             spec = parse_query_spec(query_spec)
@@ -561,7 +561,7 @@ def create_mcp_server(hippo_client: MosaicClient) -> MCPServer:
         ),
     )
     def field_range_query_spec(query_spec: dict, field: str, ctx: Context) -> dict[str, Any]:
-        client = _client_from_context(ctx, hippo_client)
+        client = _client_from_context(ctx, mosaic_client)
         manifest = _manifest_for(client)
         try:
             spec = parse_query_spec(query_spec)
@@ -611,7 +611,7 @@ def create_mcp_server(hippo_client: MosaicClient) -> MCPServer:
     def search_query_spec(
         query_spec: dict, q: str, ctx: Context, limit: int = 100, offset: int = 0
     ) -> dict[str, Any]:
-        client = _client_from_context(ctx, hippo_client)
+        client = _client_from_context(ctx, mosaic_client)
         manifest = _manifest_for(client)
         if not (1 <= limit <= MAX_EXECUTE_LIMIT):
             return {
@@ -719,7 +719,7 @@ def create_mcp_server(hippo_client: MosaicClient) -> MCPServer:
             # planning delegation, the ADR-0010 relay terms, and the
             # in-process re-validation lives in run_converse_turn, shared
             # verbatim with the GraphQL converseQuerySpec mutation.
-            client = _client_from_context(ctx, hippo_client)
+            client = _client_from_context(ctx, mosaic_client)
             manifest = _manifest_for(client)
             return run_converse_turn(
                 manifest=manifest,

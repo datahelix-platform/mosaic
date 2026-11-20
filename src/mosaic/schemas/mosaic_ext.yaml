@@ -1,14 +1,14 @@
-id: https://w3id.org/hippo/hippo_ext
-name: hippo_ext
-title: Hippo Annotation Extension Vocabulary
+id: https://w3id.org/datahelix/mosaic/mosaic_ext
+name: mosaic_ext
+title: Mosaic Annotation Extension Vocabulary
 description: >-
-  Formal declaration of the hippo_* annotations consumed by Hippo's schema
-  pipeline, DDL generators, validators, and typed client. Every hippo_*
-  annotation used in any Hippo-managed schema MUST be declared here.
-  See sec9 §9.4 of the Hippo design spec for the rationale.
+  Formal declaration of the mosaic_* annotations consumed by Mosaic's schema
+  pipeline, DDL generators, validators, and typed client. Every mosaic_*
+  annotation used in any Mosaic-managed schema MUST be declared here.
+  See sec9 §9.4 of the Mosaic design spec for the rationale.
 
   Modeling note: LinkML has no native metamodel for declaring a vocabulary
-  of allowed annotation tags. This schema represents each hippo_*
+  of allowed annotation tags. This schema represents each mosaic_*
   annotation as a `slot` — repurposing LinkML's slot declaration as the
   most natural container for (range, description, default, applicability).
   The `in_subset` assignment (`class_annotation` or `slot_annotation`)
@@ -21,8 +21,8 @@ version: 0.4.0
 
 prefixes:
   linkml: https://w3id.org/linkml/
-  hippo: https://w3id.org/hippo/
-default_prefix: hippo
+  mosaic: https://w3id.org/datahelix/mosaic/
+default_prefix: mosaic
 default_range: string
 
 imports:
@@ -40,11 +40,11 @@ subsets:
     description: Annotations that may attach to a slot definition.
 
 #
-# Annotation declarations — one slot per hippo_* annotation.
+# Annotation declarations — one slot per mosaic_* annotation.
 #
 slots:
 
-  hippo_unique:
+  mosaic_unique:
     description: >-
       Emit a single-column UNIQUE constraint for this slot at the
       storage layer. For composite uniqueness across multiple slots,
@@ -54,7 +54,7 @@ slots:
     in_subset:
       - slot_annotation
 
-  hippo_index:
+  mosaic_index:
     description: >-
       Emit a single-column index for this slot. Adapters honor this
       annotation via their DDL shim; see sec9 §9.10.
@@ -63,17 +63,17 @@ slots:
     in_subset:
       - slot_annotation
 
-  hippo_index_partial:
+  mosaic_index_partial:
     description: >-
-      When `hippo_index: true`, emit the index as partial with
-      `WHERE is_available = 1`. Has no effect unless `hippo_index` is
+      When `mosaic_index: true`, emit the index as partial with
+      `WHERE is_available = 1`. Has no effect unless `mosaic_index` is
       true on the same slot.
     range: boolean
     ifabsent: "false"
     in_subset:
       - slot_annotation
 
-  hippo_search:
+  mosaic_search:
     description: >-
       Include this slot in a full-text search index of the declared
       mode. The mode value is a free-form string — the adapter is the
@@ -87,18 +87,18 @@ slots:
     in_subset:
       - slot_annotation
 
-  hippo_external_xref:
+  mosaic_external_xref:
     description: >-
       Mark an `ExternalReference`-ranged slot as a reverse-lookup key.
       The annotated slot's `(system, value)` pairs are maintained in the
-      adapter's `hippo_xref_index` side table on every entity write
+      adapter's `mosaic_xref_index` side table on every entity write
       (create / update / replace / availability transition) in the same
       transaction as the entity write — the same annotation-driven
-      side-table pattern as `hippo_search`. The index enforces global
+      side-table pattern as `mosaic_search`. The index enforces global
       uniqueness of `(system, value)` among AVAILABLE entities (index
       rows exist only for `is_available = 1` rows, mirroring the
-      `hippo_unique` partial-index semantics from PTS-348) and serves
-      `HippoClient.find_by_xref(system, value)` / `GET /xref/{system}/
+      `mosaic_unique` partial-index semantics from PTS-348) and serves
+      `MosaicClient.find_by_xref(system, value)` / `GET /xref/{system}/
       {value}` reverse lookups. Only valid on slots whose range is the
       `ExternalReference` value type (single- or multivalued); the DDL
       generator fails at startup otherwise. A slot can hold an
@@ -110,7 +110,7 @@ slots:
     in_subset:
       - slot_annotation
 
-  hippo_append_only:
+  mosaic_append_only:
     description: >-
       Storage adapter MUST reject UPDATE and DELETE against rows of the
       annotated class — only INSERT is permitted. Used by
@@ -130,14 +130,14 @@ slots:
     in_subset:
       - class_annotation
 
-  hippo_accessor:
+  mosaic_accessor:
     description: >-
       Override the typed client's accessor name for this class, and the
-      synthesized tree-root slot name used by `hippo validate` / `hippo
+      synthesized tree-root slot name used by `mosaic validate` / `mosaic
       ingest`. By default both surfaces use `snake_case(ClassName) + "s"`
       — e.g. `Sample` → `client.samples` and `samples:` in the YAML
       bundle; `TissueType` → `client.tissue_types`. Deployments set
-      `hippo_accessor` when the default derivation collides with another
+      `mosaic_accessor` when the default derivation collides with another
       class in the same namespace, collides with an SDK-reserved name,
       or produces an awkward plural (`Process` → `processs`, `analyses`
       vs. `analysises`). The value is the desired accessor string; it
@@ -149,7 +149,7 @@ slots:
     in_subset:
       - class_annotation
 
-  hippo_anchor:
+  mosaic_anchor:
     description: >-
       Whether this class may be queried as a collection of its own (ADR-0014
       Decision 5). Default true. On a family — an abstract class with exposed
@@ -164,7 +164,7 @@ slots:
     in_subset:
       - class_annotation
 
-  hippo_manifest:
+  mosaic_manifest:
     description: >-
       Whether this class is listed in the planner-facing capability manifest
       (`mosaic://capabilities`; ADR-0014 Decision 5). Default true. `false`
@@ -176,7 +176,7 @@ slots:
     in_subset:
       - class_annotation
 
-  hippo_namespace:
+  mosaic_namespace:
     description: >-
       Declare the namespace this class belongs to for typed-client
       access. Value is a literal string; dots are organizational

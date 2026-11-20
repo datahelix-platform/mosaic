@@ -168,11 +168,8 @@ class MosaicClient:
         """Resolve the root directory holding per-loader reference caches.
 
         ``$MOSAIC_CACHE_DIR`` wins when set (the deployment opts into a
-        custom location, e.g. a CI mount; the legacy ``$HIPPO_CACHE_DIR``
-        spelling is honored with a ``DeprecationWarning`` — ADR-0004);
-        otherwise we default to ``~/.cache/hippo/references/`` (the
-        pre-rename on-disk location, kept so installed references stay
-        found). The directory is NOT created here —
+        custom location, e.g. a CI mount); otherwise we default to
+        ``~/.cache/mosaic/references/``. The directory is NOT created here —
         :meth:`cache_dir_for` handles per-loader mkdir.
         """
         from mosaic.config.env import get_env
@@ -180,13 +177,13 @@ class MosaicClient:
         env = get_env("CACHE_DIR")
         if env:
             return Path(env)
-        return Path.home() / ".cache" / "hippo" / "references"
+        return Path.home() / ".cache" / "mosaic" / "references"
 
     def cache_dir_for(self, loader_name: str) -> Path:
         """Return the per-loader cache directory, creating it on demand.
 
         Resolves to ``$MOSAIC_CACHE_DIR/<loader_name>/`` when the env var
-        is set, else ``~/.cache/hippo/references/<loader_name>/``. The
+        is set, else ``~/.cache/mosaic/references/<loader_name>/``. The
         accessor is stateless: per-loader scoping happens via the
         ``loader_name`` argument so a single ``MosaicClient`` instance can
         serve many loaders without per-loader binding (see PTS-225
@@ -290,7 +287,7 @@ class MosaicClient:
         """The merged LinkML schema registry backing this client (read-only).
 
         Exposes the in-memory merged schema (user schema + reference
-        loaders + ``hippo_core``/``hippo_ext``) so lifecycle hooks can
+        loaders + ``mosaic_core``/``mosaic_ext``) so lifecycle hooks can
         validate staged records against it in-process — notably
         :meth:`DomainModule.evolve`'s staged dry-run gate, the SDK
         equivalent of ``mosaic ingest --validate-schema <merged-dir>
@@ -659,7 +656,7 @@ class MosaicClient:
             loader_name: ``ReferenceLoader.name`` for the loader running
                 the current install/upgrade.
             version: Resolved version slug for the load (the same string
-                that flows into ``hippo_meta.reference_versions``).
+                that flows into ``mosaic_meta.reference_versions``).
 
         Raises:
             RuntimeError: If ``load_context`` is already active on this
@@ -1038,10 +1035,10 @@ class MosaicClient:
         """Query entities updated after a watermark timestamp (sec4 §4.5).
 
         Polling support for change detection (e.g. Cappella's
-        ``hippo_poll`` trigger). Returns entities whose provenance-derived
+        ``mosaic_poll`` trigger). Returns entities whose provenance-derived
         ``updated_at`` is strictly greater than ``since``, ordered by
         ``updated_at`` ascending so callers can advance their watermark
-        incrementally. ``since`` is compared against Hippo's server-side
+        incrementally. ``since`` is compared against Mosaic's server-side
         provenance timestamps (UTC) to avoid clock-skew issues.
 
         ``entity_type`` is optional: pass ``None`` to poll across all
@@ -1117,7 +1114,7 @@ class MosaicClient:
         .. deprecated:: 0.9
             The ExternalID entity pattern is deprecated (issue #48).
             Declare an ``ExternalReference``-ranged slot on the entity
-            class (annotate it ``hippo_external_xref: true`` for reverse
+            class (annotate it ``mosaic_external_xref: true`` for reverse
             lookup) and write the reference as ordinary slot data.
 
         ``source_system`` defaults to ``"default"`` for backward
@@ -1129,7 +1126,7 @@ class MosaicClient:
         warnings.warn(
             "register_external_id() and the ExternalID entity are "
             "deprecated (issue #48); store an ExternalReference value on "
-            "an entity slot annotated hippo_external_xref instead.",
+            "an entity slot annotated mosaic_external_xref instead.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -1192,12 +1189,12 @@ class MosaicClient:
         .. deprecated:: 0.9
             The ExternalID entity pattern is deprecated (issue #48).
             Use :meth:`find_by_xref` (system, value) over
-            ``hippo_external_xref``-annotated slots instead.
+            ``mosaic_external_xref``-annotated slots instead.
         """
         warnings.warn(
             "get_by_external_id() and the ExternalID entity are "
             "deprecated (issue #48); use find_by_xref(system, value) "
-            "over hippo_external_xref-annotated slots instead.",
+            "over mosaic_external_xref-annotated slots instead.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -1226,15 +1223,15 @@ class MosaicClient:
             entity_id, include_superseded
         )
 
-    # -- External references (hippo_external_xref, issue #48) --
+    # -- External references (mosaic_external_xref, issue #48) --
 
     def find_by_xref(
         self, system: str, value: str
     ) -> Optional[dict[str, Any]]:
         """Reverse-lookup the entity holding external reference ``(system, value)``.
 
-        Resolves through the ``hippo_xref_index`` side table maintained
-        for ``hippo_external_xref``-annotated ``ExternalReference`` slots.
+        Resolves through the ``mosaic_xref_index`` side table maintained
+        for ``mosaic_external_xref``-annotated ``ExternalReference`` slots.
         ``(system, value)`` is globally unique among available entities,
         so at most one entity can match.
 
@@ -1258,8 +1255,8 @@ class MosaicClient:
         """List the indexed external-reference pairs for an entity.
 
         Returns ``[{"slot", "system", "value"}, ...]`` from the
-        ``hippo_xref_index`` side table — i.e. only pairs from
-        ``hippo_external_xref``-annotated slots of an AVAILABLE entity.
+        ``mosaic_xref_index`` side table — i.e. only pairs from
+        ``mosaic_external_xref``-annotated slots of an AVAILABLE entity.
         The full ``ExternalReference`` values (including ``retrieved_at``
         and ``version``) are ordinary slot data on the entity itself.
 
@@ -1333,7 +1330,7 @@ class MosaicClient:
     # -- RecipeService delegations (sec10 §10.2.1) --
 
     def recipe_list(self) -> list[InstalledRecipe]:
-        """Return every entry in ``hippo_meta.installed_recipes``.
+        """Return every entry in ``mosaic_meta.installed_recipes``.
 
         Thin delegator over :meth:`RecipeService.list_installed`. Returns
         ``[]`` on a clean instance.
@@ -1447,7 +1444,3 @@ class MosaicClient:
         """
         return self._recipe_service.install_from_lockfile(lockfile)
 
-
-# Deprecated alias (ADR-0004): the class was renamed with the component.
-# Assignment alias so ``isinstance`` / ``issubclass`` hold across spellings.
-HippoClient = MosaicClient  # deprecated

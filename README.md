@@ -1,9 +1,9 @@
 # Mosaic — A LinkML runtime engine.
 
 > **Formerly Hippo** (renamed per ADR-0004; distributed as `datahelix-mosaic`).
-> `import hippo`, the `hippo` CLI, `hippo.yaml`, `HIPPO_*` env vars, and the
-> `hippo.*` entry-point groups keep working through a deprecation window —
-> see [docs/installation.md](docs/installation.md#upgrading-from-hippo).
+> Since v0.16.0 the `hippo` aliases and data-contract names are gone
+> (ADR-0015, platform ADR-0007) — see
+> [docs/installation.md](docs/installation.md#upgrading-from-hippo).
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Tests](https://img.shields.io/badge/tests-634%20passing-green.svg)](https://github.com/BU-Neuromics/hippo)
