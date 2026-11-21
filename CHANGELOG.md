@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **TUI command palette: picking an entity type or a command does nothing**
+  (#285). The app's handlers were still named `on_hippo_command_palette_*`
+  after ADR-0004 renamed the palette to `MosaicCommandPalette`, so Textual
+  never dispatched to them. They are now bound with `@on(...)` so a class
+  rename can't unbind them again, and Textual pilot tests cover both paths.
+
 ## v0.16.0 — 2026-11-20 (BREAKING: the `hippo` data-contract identifiers retired (platform ADR-0007), families' raw-id fallback dropped; families as GraphQL interfaces, concrete-parent closure, reverse edges over multivalued and forward-declared `inverse`, traversal `columns`)
 
 **Breaking release.** Two changes break existing clients: the `hippo` →

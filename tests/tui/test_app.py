@@ -110,3 +110,71 @@ def test_app_pilot_smoke():
             await pilot.press("q")
 
     asyncio.run(run())
+
+
+# ---------------------------------------------------------------------------
+# Command palette → app dispatch (#285)
+# ---------------------------------------------------------------------------
+
+
+def _pick_from_palette(app, query: str):
+    """Open the palette, filter to ``query``, select the first match.
+
+    Returns the screen stack (as class names) after the selection settles.
+    """
+
+    async def run():
+        async with app.run_test(headless=True, size=(100, 30)) as pilot:
+            await pilot.pause()
+            await app.action_command_palette()
+            await pilot.pause()
+            await pilot.press(*query)
+            await pilot.pause()
+            # Focus the filtered list and select its first entry.
+            from textual.widgets import ListView
+
+            lv = app.screen.query_one(ListView)
+            lv.focus()
+            lv.index = 0
+            await pilot.pause()
+            await pilot.press("enter")
+            await pilot.pause()
+            await pilot.pause()
+            return [type(s).__name__ for s in app.screen_stack]
+
+    return asyncio.run(run())
+
+
+def test_palette_entity_type_opens_entity_browser():
+    """Picking an entity type in the palette opens its entity browser."""
+    from mosaic.tui.app import MosaicTUIApp
+    from mosaic.tui.backend.protocol import EntityTypeSchema
+
+    class SchemaBackend(MockBackend):
+        async def get_schema(self):
+            return SchemaView(entity_types=[EntityTypeSchema(name="Donor")])
+
+    app = MosaicTUIApp(backend=SchemaBackend())
+    opened: list[str] = []
+
+    async def fake_open_entity_browser(entity_type, count=0):
+        opened.append(entity_type)
+
+    app.open_entity_browser = fake_open_entity_browser
+    _pick_from_palette(app, "Donor")
+    assert opened == ["Donor"]
+
+
+def test_palette_command_runs():
+    """Picking a built-in command in the palette runs it."""
+    from mosaic.tui.app import MosaicTUIApp
+
+    app = MosaicTUIApp(backend=MockBackend())
+    ran: list[str] = []
+
+    async def fake_open_query_view():
+        ran.append("query")
+
+    app.open_query_view = fake_open_query_view
+    _pick_from_palette(app, "Query")
+    assert ran == ["query"]

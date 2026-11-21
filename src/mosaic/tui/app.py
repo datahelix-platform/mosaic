@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from textual import on
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
@@ -291,12 +292,17 @@ class MosaicTUIApp(App):
     # Message handlers — command palette
     # ------------------------------------------------------------------
 
-    async def on_hippo_command_palette_entity_type_navigated(
+    # Bound with @on rather than the on_<class>_<message> naming convention so
+    # a rename of the palette class can't silently unbind them (#285).
+
+    @on(MosaicCommandPalette.EntityTypeNavigated)
+    async def _palette_entity_type_navigated(
         self, message: MosaicCommandPalette.EntityTypeNavigated
     ) -> None:
         await self.open_entity_browser(message.entity_type)
 
-    async def on_hippo_command_palette_command_executed(
+    @on(MosaicCommandPalette.CommandExecuted)
+    async def _palette_command_executed(
         self, message: MosaicCommandPalette.CommandExecuted
     ) -> None:
         command = message.command
