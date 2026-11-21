@@ -287,7 +287,10 @@
 ### Upgrading
 
 - **Rebuild every database from source data.** There is no migration from
-  `hippo_meta` / `hippo_xref_index`; new code never opens an old database.
+  `hippo_meta` / `hippo_xref_index`, and Mosaic does not detect a pre-rename
+  database: pointed at one, it opens it and creates an empty `mosaic_meta`
+  next to the old `hippo_meta`, so the old data is not read. Start from an
+  empty database.
 - **Rename in your schemas, recipes, clients and deployment config:**
 
   | Kind | Old | New |

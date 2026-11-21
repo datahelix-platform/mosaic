@@ -326,20 +326,20 @@ results = client.query("Item", category="task", completion_state="pending")
 
 #### REST API
 
-The REST API is a FastAPI application defined in `hippo/rest/app.py`. The `app` object is the
-primary artifact — `mosaic serve` is a thin CLI wrapper that runs it via Uvicorn:
+The REST API is a FastAPI application built by the app factories in `mosaic/serve/` and
+`mosaic/api/factory.py`. `mosaic serve` is a thin CLI wrapper that runs it via Uvicorn:
 
 ```python
 # mosaic serve is equivalent to:
-uvicorn hippo.rest.app:app --host 0.0.0.0 --port 8000 --workers 4
+uvicorn mosaic.serve:create_app_from_env --factory --host 0.0.0.0 --port 8000 --workers 4
 ```
 
 Embedding in a larger application is a first-class use case:
 
 ```python
 # Future workflow executor or data portal:
-from hippo.rest.app import app as hippo_app
-platform_app.mount("/hippo", hippo_app)
+from mosaic.serve import create_default_app
+platform_app.mount("/mosaic", create_default_app())
 ```
 
 The REST API exposes an OpenAPI schema automatically via FastAPI at `/docs` and `/openapi.json`.
@@ -707,11 +707,11 @@ class ReferenceLoader(ABC):
 
 ```toml
 [project.entry-points."mosaic.reference_loaders"]
-ensembl = "hippo_reference_ensembl.loader:EnsemblLoader"
+ensembl = "mosaic_reference_ensembl.loader:EnsemblLoader"
 
 # Optional — only needed if the loader exposes subcommands:
 [project.entry-points."mosaic.reference_loader_cli"]
-ensembl = "hippo_reference_ensembl.cli:app"
+ensembl = "mosaic_reference_ensembl.cli:app"
 ```
 
 **Install lifecycle (`mosaic reference install <name> [--version <v>]`):**

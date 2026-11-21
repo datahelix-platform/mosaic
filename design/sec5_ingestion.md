@@ -53,7 +53,7 @@ mosaic ingest Sample samples.csv --fail-fast
 #### `IngestionPipeline` SDK
 
 ```python
-from hippo.core.ingestion import IngestionPipeline, IngestOptions
+from mosaic.core.ingestion import IngestionPipeline, IngestOptions
 
 pipeline = IngestionPipeline(client)
 result = pipeline.ingest_file(

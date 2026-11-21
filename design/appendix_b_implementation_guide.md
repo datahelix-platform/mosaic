@@ -431,7 +431,7 @@ cheap at this scale and gives the CLI a precise breakdown without a write-log
 query.
 
 ```python
-from hippo.core.loaders.reference import EntityRef, LoadResult, ReferenceLoader
+from mosaic.core.loaders.reference import EntityRef, LoadResult, ReferenceLoader
 
 class FakeTermLoader(ReferenceLoader):
     name = "fake_terms"
@@ -455,7 +455,7 @@ every `client.put()` made inside the lifecycle `load_context` block, so
 
 ```python
 from collections import Counter
-from hippo.core.loaders.reference import LoadResult, ReferenceLoader
+from mosaic.core.loaders.reference import LoadResult, ReferenceLoader
 
 class EnsemblGeneLoader(ReferenceLoader):
     name = "ensembl_genes"

@@ -27,7 +27,9 @@ rename plus a rebuild:
 - **Schemas and data:** schemas import `mosaic_core` (not `hippo_core`) and
   use `mosaic_*` annotation keys; the internal tables are `mosaic_meta` and
   `mosaic_xref_index`. There is no migration: rebuild the database from
-  source data. The full old → new table is in the CHANGELOG's v0.16.0
+  source data. Mosaic does not detect a pre-rename database; opened, it
+  gets an empty `mosaic_meta` next to `hippo_meta` and none of the old data
+  is read. The full old → new table is in the CHANGELOG's v0.16.0
   `### Upgrading` section.
 
 ## Requirements

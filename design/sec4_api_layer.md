@@ -667,8 +667,8 @@ type Query {
                                                             #   ranked FTS (issue #158)
   neighbors(id: ID!, depth: Int!, asOf: String): NeighborhoodGraph!  # client.neighbors — two-edge-store
                                                             #   subgraph envelope (issue #158)
-  mosaicSchema: [HippoEntityTypeInfo!]!                      # the LinkML type model (mirrors GET /schemas)
-  mosaicEntityType(name: String!): HippoEntityTypeInfo       # one type + relationships (mirrors /schemas/{type}[/references])
+  mosaicSchema: [MosaicEntityTypeInfo!]!                      # the LinkML type model (mirrors GET /schemas)
+  mosaicEntityType(name: String!): MosaicEntityTypeInfo       # one type + relationships (mirrors /schemas/{type}[/references])
 }
 
 type Mutation {

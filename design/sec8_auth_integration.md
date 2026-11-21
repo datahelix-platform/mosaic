@@ -104,7 +104,7 @@ Bridge strips the original `Authorization` header and injects two verified heade
 # hippo/rest/auth_bridge.py
 
 from fastapi import Request, HTTPException
-from hippo.rest.auth import AuthMiddleware
+from mosaic.core.middleware import AuthMiddleware
 
 # Maps Bridge roles to permitted Hippo operations.
 _ROLE_PERMISSIONS: dict[str, set[str]] = {

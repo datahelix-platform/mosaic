@@ -31,8 +31,8 @@ adapter:
   # postgres:
   #   host: localhost       # required
   #   port: 5432            # optional; default: 5432
-  #   database: hippo       # required
-  #   user: hippo           # required
+  #   database: mosaic      # required
+  #   user: mosaic          # required
   #   password: "${MOSAIC_DB_PASSWORD}"  # env var substitution supported (see §Config Env Vars)
   #   pool_size: 5          # optional; default: 5
   #   pool_timeout: 30      # optional; seconds; default: 30
@@ -40,7 +40,7 @@ adapter:
   #
   # dynamodb:
   #   region: us-east-1     # required
-  #   table_prefix: hippo_  # optional; default: "mosaic_"
+  #   table_prefix: mosaic_ # optional; default: "mosaic_"
 
 # ---------------------------------------------------------------------------
 # schema (required)
