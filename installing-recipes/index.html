@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.2">
     
     
       
@@ -1726,7 +1726,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>id:           org.broad.scrnaseq
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>name:         scrnaseq
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>version:      1.2.0
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>hippo:        &gt;=0.3,&lt;1.0
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>mosaic:       &gt;=0.3,&lt;1.0
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>created_at:   2026-05-27T14:00:00Z
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>description:  Single-cell RNA-seq metadata schema fragment
 <a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>license:      CC-BY-4.0
@@ -1752,13 +1752,13 @@
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span>--digest<span class="w"> </span>sha256:f3a8c9b...
 </code></pre></div>
 <p><strong>Dry run:</strong></p>
-<p>A dry run resolves and validates all dependencies, checks the <code>hippo_version</code> specifier, and checks Reference Loader preconditions — but writes nothing to the database:</p>
+<p>A dry run resolves and validates all dependencies, checks the <code>mosaic_version</code> specifier, and checks Reference Loader preconditions — but writes nothing to the database:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>mosaic<span class="w"> </span>recipe<span class="w"> </span>import<span class="w"> </span>./scrnaseq-1.2.0/<span class="w"> </span>--dry-run
 </code></pre></div>
 <h3 id="what-happens-during-import">What happens during import<a class="headerlink" href="#what-happens-during-import" title="Permanent link">&para;</a></h3>
 <ol>
 <li>Mosaic resolves every <code>parent</code> and <code>requires.recipes</code> dependency bottom-up, recursively.</li>
-<li><code>hippo_version</code> is checked against the running Mosaic version; import fails if the specifier excludes it.</li>
+<li><code>mosaic_version</code> is checked against the running Mosaic version; import fails if the specifier excludes it.</li>
 <li>Every <code>requires.reference_loaders</code> pin is checked against installed loader versions; import fails if any pin is unmet (Mosaic does not install loaders automatically).</li>
 <li>Each schema fragment is merged through <code>SchemaManager</code>, verifying no prefix collisions and no in-place redefinition of upstream classes.</li>
 <li>An <code>installed_recipes</code> entry and a <code>recipe_imported</code> provenance event are written for each recipe — all in a single storage transaction.</li>
@@ -1770,7 +1770,7 @@
 <p>For <code>https:</code> sources, Mosaic verifies the fetched bytes' canonical content hash against the declared <code>--digest</code>. A mismatch aborts with <code>RecipeDigestMismatchError</code>. The cache is not polluted — the fetch result is discarded.</p>
 <hr />
 <h2 id="content-addressable-cache">Content-addressable cache<a class="headerlink" href="#content-addressable-cache" title="Permanent link">&para;</a></h2>
-<p><code>HttpsResolver</code> caches fetched recipes at <code>~/.hippo/recipe-cache/&lt;sha256&gt;/</code>. A cache hit skips the network entirely on subsequent installs of the same digest. Cache eviction is not implemented in v1.</p>
+<p><code>HttpsResolver</code> caches fetched recipes at <code>~/.mosaic/recipe-cache/&lt;sha256&gt;/</code>. A cache hit skips the network entirely on subsequent installs of the same digest. Cache eviction is not implemented in v1.</p>
 <p>To use a different cache directory, set <code>MOSAIC_RECIPE_CACHE</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">MOSAIC_RECIPE_CACHE</span><span class="o">=</span>/shared/mosaic-recipe-cache
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>mosaic<span class="w"> </span>recipe<span class="w"> </span>import<span class="w"> </span>https://zenodo.org/record/12345/files/scrnaseq-1.2.0.tar.gz<span class="w"> </span><span class="se">\</span>
@@ -1786,7 +1786,7 @@
 <p><strong>Export the lockfile from an existing instance:</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>mosaic<span class="w"> </span>recipe<span class="w"> </span>export-lockfile<span class="w"> </span>--out<span class="w"> </span>recipe.lock.yaml
 </code></pre></div>
-<p>This serialises <code>hippo_meta.installed_recipes</code> as a portable YAML document:</p>
+<p>This serialises <code>mosaic_meta.installed_recipes</code> as a portable YAML document:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nt">lockfile_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
 <a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nt">installed_recipes</span><span class="p">:</span>
 <a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="nt">org.broad.scrnaseq</span><span class="p">:</span>

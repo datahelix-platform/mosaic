@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.2">
     
     
       
@@ -1604,11 +1604,9 @@
 <blockquote>
 <p><strong>Formerly Hippo.</strong> The component was renamed to <strong>Mosaic</strong> (ADR-0004): the
 distribution is <code>datahelix-mosaic</code>, the import package is <code>mosaic</code>, and the
-CLI is <code>mosaic</code>. Existing code and deployments keep working through a
-deprecation window — <code>import hippo</code>, the <code>hippo</code> command, <code>hippo.yaml</code>,
-<code>HIPPO_*</code> environment variables, and <code>hippo.*</code> entry-point groups are all
-still honored (with deprecation warnings). See
-<a href="installation/#upgrading-from-hippo">Installation</a> for the upgrade notes.</p>
+CLI is <code>mosaic</code>. Since v0.16.0 no <code>hippo</code> spelling is honored any more
+(ADR-0015) — see <a href="installation/#upgrading-from-hippo">Installation</a> for
+the upgrade notes.</p>
 </blockquote>
 <p>A runtime for LinkML schemas. Point it at a schema and you get a typed Python SDK, a REST API, a relational database with append-only PROV-O provenance, and CEL-based dynamic validation — without writing any of that infrastructure yourself. <strong>The schema defines the application; Mosaic runs it.</strong></p>
 <h2 id="start-here">Start here<a class="headerlink" href="#start-here" title="Permanent link">&para;</a></h2>

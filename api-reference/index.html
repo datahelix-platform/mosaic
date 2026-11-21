@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.2">
     
     
       
@@ -2455,12 +2455,12 @@ meaningful HTTP status with the standard error body (<code>{"error": ..., "detai
 <td><code>Provenance Integrity Error</code></td>
 </tr>
 <tr>
-<td>Any other <code>HippoError</code> (recipe/migration/...)</td>
+<td>Any other <code>MosaicError</code> (recipe/migration/...)</td>
 <td>500</td>
 <td>The exception class name</td>
 </tr>
 <tr>
-<td>Any non-Hippo exception</td>
+<td>Any non-Mosaic exception</td>
 <td>500</td>
 <td><code>Internal Server Error</code> (detail withheld)</td>
 </tr>
@@ -2484,7 +2484,7 @@ meaningful HTTP status with the standard error body (<code>{"error": ..., "detai
 </thead>
 <tbody>
 <tr>
-<td><code>X-Mosaic-Actor</code></td>
+<td><code>X-DataHelix-Actor</code></td>
 <td>Required on writes</td>
 <td>Identity of the actor performing the write. Defaults to <code>"anonymous"</code> in v0.1 if omitted</td>
 </tr>
@@ -2498,7 +2498,7 @@ meaningful HTTP status with the standard error body (<code>{"error": ..., "detai
 <p><strong>Example:</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://127.0.0.1:8000/ingest<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer dev-token"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"X-Mosaic-Actor: pipeline-run-789"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"X-DataHelix-Actor: actor:pipeline-run-789"</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"X-Mosaic-Context: {\"pipeline\": \"rnaseq-v2\", \"run_id\": \"abc\"}"</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"entity_type": "Sample", "data": {...}}'</span>
@@ -2725,7 +2725,7 @@ the server runs without a storage adapter or schema registry.</p>
 <p>Pass an ISO 8601 watermark to fetch only entities modified after it. Results
 are ordered by <code>updated_at</code> ascending; persist the <code>updated_at</code> of the last
 entity processed as the watermark for the next poll. The comparison uses
-Hippo's server-side provenance timestamps (UTC), so callers never need to
+Mosaic's server-side provenance timestamps (UTC), so callers never need to
 trust their own clock. Omit <code>entity_type</code> to poll across all entity types:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>GET /entities?entity_type=Sample&amp;updated_since=2024-01-01T00:00:00Z&amp;limit=500
 </code></pre></div>
@@ -2784,7 +2784,7 @@ trust their own clock. Omit <code>entity_type</code> to poll across all entity t
 <p><em>Request Headers:</em>
 | Header | Required | Description |
 |--------|----------|-------------|
-| <code>X-Mosaic-Actor</code> | Required | Identity of the actor performing the update |
+| <code>X-DataHelix-Actor</code> | Required | Identity of the actor performing the update |
 | <code>X-Mosaic-Context</code> | Optional | JSON-encoded provenance context |</p>
 <p><em>Request Body:</em>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="p">{</span>
@@ -3138,7 +3138,7 @@ trust their own clock. Omit <code>entity_type</code> to poll across all entity t
 </tbody>
 </table>
 <p><strong>GET /xref/{system}/{value}</strong></p>
-<p>Reverse lookup over <code>hippo_external_xref</code>-annotated <code>ExternalReference</code>
+<p>Reverse lookup over <code>mosaic_external_xref</code>-annotated <code>ExternalReference</code>
 slots: returns the full envelope of the single AVAILABLE entity whose
 annotated slot carries the <code>(system, value)</code> pair. An entity's external
 references themselves are ordinary slot data on the entity endpoints.</p>
@@ -3305,7 +3305,7 @@ references themselves are ordinary slot data on the entity endpoints.</p>
 <p><em>Request Headers:</em>
 | Header | Required | Description |
 |--------|----------|-------------|
-| <code>X-Mosaic-Actor</code> | Required | Identity of the actor performing the operation |
+| <code>X-DataHelix-Actor</code> | Required | Identity of the actor performing the operation |
 | <code>X-Mosaic-Context</code> | Optional | JSON-encoded provenance context |</p>
 <p><em>Request Body:</em>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a><span class="p">{</span>

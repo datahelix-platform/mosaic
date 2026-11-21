@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.2">
     
     
       
@@ -1970,12 +1970,12 @@ as a container with a <code>.quant</code> sub-attribute and no direct accessors.
 </table>
 <p>The rule is intentionally simple — it does not attempt linguistically correct
 plurals for irregular cases. When the default is unsuitable, override it with
-the <code>hippo_accessor</code> annotation:</p>
+the <code>mosaic_accessor</code> annotation:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">classes</span><span class="p">:</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">Analysis</span><span class="p">:</span>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="nt">is_a</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Entity</span>
 <a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">annotations</span><span class="p">:</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">      </span><span class="nt">hippo_accessor</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">analytics</span><span class="w">     </span><span class="c1"># instead of default "analysises"</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">      </span><span class="nt">mosaic_accessor</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">analytics</span><span class="w">     </span><span class="c1"># instead of default "analysises"</span>
 </code></pre></div>
 <hr />
 <h2 id="accessor-api">Accessor API<a class="headerlink" href="#accessor-api" title="Permanent link">&para;</a></h2>
@@ -2060,10 +2060,10 @@ class under <code>mosaic.models.&lt;namespace&gt;</code> so you can import class
 <a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">sample</span> <span class="o">=</span> <span class="n">Sample</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">"x1"</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">"S001"</span><span class="p">)</span>
 <a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="n">client</span><span class="o">.</span><span class="n">samples</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">sample</span><span class="p">)</span>
 <a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="c1"># Non-root namespace class (hippo_namespace: tissue)</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="c1"># Non-root namespace class (mosaic_namespace: tissue)</span>
 <a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="kn">from</span><span class="w"> </span><span class="nn">mosaic.models.tissue</span><span class="w"> </span><span class="kn">import</span> <span class="n">TissueSample</span>
 <a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>
-<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="c1"># Nested namespace class (hippo_namespace: assay.quant)</span>
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="c1"># Nested namespace class (mosaic_namespace: assay.quant)</span>
 <a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="kn">from</span><span class="w"> </span><span class="nn">mosaic.models.assay.quant</span><span class="w"> </span><span class="kn">import</span> <span class="n">Measurement</span>
 </code></pre></div>
 <p>The <code>mosaic.models</code> package is populated by <code>MosaicClient.__init__</code> when a
@@ -2097,12 +2097,12 @@ ambiguous accessor surface. Four collision cases, each identified by the
 <tr>
 <td><code>"duplicate_accessor"</code></td>
 <td>Two classes in the same namespace derive the same accessor name</td>
-<td>Add <code>hippo_accessor</code> to at least one class</td>
+<td>Add <code>mosaic_accessor</code> to at least one class</td>
 </tr>
 <tr>
 <td><code>"accessor_vs_namespace"</code></td>
 <td>A class accessor conflicts with a sub-namespace segment at the same attribute level</td>
-<td>Rename the class, namespace, or add <code>hippo_accessor</code></td>
+<td>Rename the class, namespace, or add <code>mosaic_accessor</code></td>
 </tr>
 <tr>
 <td><code>"namespace_reserved"</code></td>
@@ -2117,7 +2117,7 @@ ambiguous accessor surface. Four collision cases, each identified by the
 <tr>
 <td><code>"accessor_reserved"</code></td>
 <td>A class's derived or override accessor conflicts with a public <code>MosaicClient</code> attribute</td>
-<td>Override with <code>hippo_accessor</code></td>
+<td>Override with <code>mosaic_accessor</code></td>
 </tr>
 </tbody>
 </table>
@@ -2134,7 +2134,7 @@ concrete schema fix. Example:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>SchemaRegistry load error: typed-client accessor collision.
 <a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>  Classes `tissue.DNASample` and `tissue.DnaSample` both resolve to
 <a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>  accessor `dna_samples` in namespace `tissue`.
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>  Add `hippo_accessor` to at least one class to disambiguate.
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>  Add `mosaic_accessor` to at least one class to disambiguate.
 </code></pre></div>
 <h3 id="write-time-errors-validationfailed">Write-Time Errors — <code>ValidationFailed</code><a class="headerlink" href="#write-time-errors-validationfailed" title="Permanent link">&para;</a></h3>
 <p>Write methods (<code>create</code>, <code>put</code>, <code>replace</code>) raise <code>ValidationFailed</code> when
@@ -2184,7 +2184,7 @@ entity types that are only known at runtime.</p>
 <li><strong>Compile-time schema checks.</strong> The Pydantic classes are generated from
   the schema loaded at runtime; if the schema changes between process starts,
   the accessor surface changes accordingly.</li>
-<li><strong><code>hippo_core</code> infrastructure classes.</strong> <code>ProvenanceRecord</code>, <code>Process</code>,
+<li><strong><code>mosaic_core</code> infrastructure classes.</strong> <code>ProvenanceRecord</code>, <code>Process</code>,
   <code>Validator</code>, <code>ReferenceLoader</code>, and <code>Entity</code> are system concerns and are
   not exposed as typed accessors.</li>
 </ul>

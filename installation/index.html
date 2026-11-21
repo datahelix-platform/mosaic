@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.2">
     
     
       
@@ -1662,36 +1662,33 @@
 <p>Mosaic is a LinkML runtime. This guide covers installing Mosaic in production and development environments.</p>
 <h2 id="upgrading-from-hippo">Upgrading from Hippo<a class="headerlink" href="#upgrading-from-hippo" title="Permanent link">&para;</a></h2>
 <p>Mosaic is the new name of the component previously distributed as <strong>Hippo</strong>
-(ADR-0004). Upgrading is a dependency swap — <code>pip install datahelix-mosaic</code>
-(the <code>hippo</code> distribution is retired at 0.10.x) — and nothing else has to
-change on day one:</p>
+(ADR-0004). Since v0.16.0 the <code>hippo</code> spellings are gone entirely
+(ADR-0015, platform ADR-0007), so an upgrade from a pre-0.16 release is a
+rename plus a rebuild:</p>
 <ul>
-<li><strong>Imports:</strong> <code>import hippo</code> still works; it is a shim that emits one
-  <code>DeprecationWarning</code> and aliases every <code>hippo.*</code> module to the identical
-  <code>mosaic.*</code> module object, so <code>isinstance</code> checks and module identity hold
-  across both spellings. <code>HippoClient</code> remains available as an alias of
-  <code>MosaicClient</code>.</li>
-<li><strong>CLI:</strong> the <code>hippo</code> command still works; it prints a deprecation notice to
-  stderr and delegates to <code>mosaic</code>.</li>
-<li><strong>Config:</strong> <code>mosaic.yaml</code> is preferred; an existing <code>hippo.yaml</code> /
-  <code>hippo.yml</code> is still auto-detected (with a warning). When both exist,
-  <code>mosaic.yaml</code> wins. A config-less deployment whose database lives at the
-  old default <code>data/hippo.db</code> is still picked up; new deployments default to
-  <code>data/mosaic.db</code>.</li>
-<li><strong>Environment variables:</strong> <code>MOSAIC_CACHE_DIR</code>, <code>MOSAIC_RECIPE_CACHE</code>,
-  <code>MOSAIC_TUI_TOKEN</code>, and <code>MOSAIC_DATABASE_URL</code> are preferred; the <code>HIPPO_*</code>
-  spellings are honored as a fallback (one warning per variable).</li>
-<li><strong>Plugins:</strong> entry points are read from the <code>mosaic.*</code> groups <em>and</em> the
-  legacy <code>hippo.*</code> groups (deduplicated by name), so existing
-  <code>hippo-reference-*</code> packages remain discoverable. New plugins should
-  register under <code>mosaic.*</code> and follow the <code>mosaic-reference-&lt;name&gt;</code> /
-  <code>mosaic-adapter-&lt;name&gt;</code> naming convention.</li>
-<li><strong>No data migration.</strong> Schema-layer names (<code>hippo_core</code>, <code>hippo_ext</code>,
-  <code>hippo_*</code> annotations), the <code>hippo_meta</code> table, and on-disk provenance are
-  intentionally unchanged.</li>
+<li><strong>Distribution and imports:</strong> install <code>datahelix-mosaic</code> and import
+  <code>mosaic</code>. <code>import hippo</code>, <code>HippoClient</code>, <code>HippoError</code>, <code>HippoConfig</code> and
+  <code>load_hippo_config</code> were removed; use <code>MosaicClient</code>, <code>MosaicError</code>,
+  <code>MosaicConfig</code> and <code>load_mosaic_config</code>.</li>
+<li><strong>CLI:</strong> the <code>hippo</code> console script was removed; run <code>mosaic</code>.</li>
+<li><strong>Config:</strong> only <code>config.json</code>, <code>mosaic.yaml</code> and <code>mosaic.yml</code> are
+  auto-detected; rename a <code>hippo.yaml</code>. The default SQLite database is
+  <code>data/mosaic.db</code> (a <code>data/hippo.db</code> is no longer picked up).</li>
+<li><strong>Environment variables:</strong> only the <code>MOSAIC_*</code> spellings are read
+  (<code>MOSAIC_CACHE_DIR</code>, <code>MOSAIC_RECIPE_CACHE</code>, <code>MOSAIC_TUI_TOKEN</code>,
+  <code>MOSAIC_DATABASE_URL</code>, <code>MOSAIC_CONFIG</code>, …). Cache defaults moved to
+  <code>~/.cache/mosaic/references/</code> and <code>~/.mosaic/recipe-cache/</code>.</li>
+<li><strong>Plugins:</strong> only the <code>mosaic.*</code> entry-point groups are read; a plugin
+  registered only under <code>hippo.*</code> is no longer discovered. Name loader
+  distributions <code>mosaic-reference-&lt;name&gt;</code>.</li>
+<li><strong>Schemas and data:</strong> schemas import <code>mosaic_core</code> (not <code>hippo_core</code>) and
+  use <code>mosaic_*</code> annotation keys; the internal tables are <code>mosaic_meta</code> and
+  <code>mosaic_xref_index</code>. There is no migration: rebuild the database from
+  source data. Mosaic does not detect a pre-rename database; opened, it
+  gets an empty <code>mosaic_meta</code> next to <code>hippo_meta</code> and none of the old data
+  is read. The full old → new table is in the CHANGELOG's v0.16.0
+  <code>### Upgrading</code> section.</li>
 </ul>
-<p>The <code>hippo</code> aliases will be removed no sooner than two minor releases after
-0.11.0, via a future ADR.</p>
 <h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Python 3.11 or later</li>
@@ -1710,7 +1707,7 @@ change on day one:</p>
 <li>
 <p>Clone the repository:
    <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/your-org/mosaic.git
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nb">cd</span><span class="w"> </span>hippo
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nb">cd</span><span class="w"> </span>mosaic
 </code></pre></div></p>
 </li>
 <li>

@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.2">
     
     
       
@@ -1935,7 +1935,7 @@
 <td>ISO 8601 UTC instant (<code>"2026-05-27T14:00:00Z"</code>).</td>
 </tr>
 <tr>
-<td><code>hippo_version</code></td>
+<td><code>mosaic_version</code></td>
 <td>yes</td>
 <td>string</td>
 <td>PEP 440 version specifier (e.g. <code>"&gt;=0.3,&lt;1.0"</code>). Import fails with <code>RecipeVersionIncompatibleError</code> when the running Mosaic version is excluded by this specifier.</td>
@@ -2023,7 +2023,7 @@
 </table>
 <hr />
 <h2 id="reciperef-fields"><code>RecipeRef</code> fields<a class="headerlink" href="#reciperef-fields" title="Permanent link">&para;</a></h2>
-<p>Reused for <code>parent</code>, each <code>requires.recipes[i]</code> entry, and entries stored in <code>hippo_meta.installed_recipes</code>.</p>
+<p>Reused for <code>parent</code>, each <code>requires.recipes[i]</code> entry, and entries stored in <code>mosaic_meta.installed_recipes</code>.</p>
 <table>
 <thead>
 <tr>
@@ -2057,7 +2057,7 @@
 </table>
 <hr />
 <h2 id="installed-recipe-registry">Installed recipe registry<a class="headerlink" href="#installed-recipe-registry" title="Permanent link">&para;</a></h2>
-<p><code>hippo_meta.installed_recipes</code> is a JSON object keyed by recipe <code>id</code>. Each entry extends <code>RecipeRef</code> with fields recorded at install time.</p>
+<p><code>mosaic_meta.installed_recipes</code> is a JSON object keyed by recipe <code>id</code>. Each entry extends <code>RecipeRef</code> with fields recorded at install time.</p>
 <table>
 <thead>
 <tr>
@@ -2184,7 +2184,7 @@
 </tr>
 <tr>
 <td><code>--parent &lt;installed-id&gt;</code></td>
-<td><code>id</code> of an installed recipe to declare as the lineage parent. Until <code>mosaic recipe list</code> ships (Phase 4), find installed ids in <code>hippo_meta.installed_recipes</code>.</td>
+<td><code>id</code> of an installed recipe to declare as the lineage parent. Until <code>mosaic recipe list</code> ships (Phase 4), find installed ids in <code>mosaic_meta.installed_recipes</code>.</td>
 </tr>
 <tr>
 <td><code>--db-path PATH</code></td>
@@ -2196,7 +2196,7 @@
 </tr>
 </tbody>
 </table>
-<p><strong>Selectivity:</strong> only classes and slots whose <code>provided_by</code> annotation is absent or does not start with <code>recipe.</code> or <code>loader.</code>, and whose containing schema is not a Mosaic framework schema (<code>hippo_core</code>, <code>recipe_manifest</code>), are exported. Content contributed by installed recipes or Reference Loaders is excluded.</p>
+<p><strong>Selectivity:</strong> only classes and slots whose <code>provided_by</code> annotation is absent or does not start with <code>recipe.</code> or <code>loader.</code>, and whose containing schema is not a Mosaic framework schema (<code>mosaic_core</code>, <code>recipe_manifest</code>), are exported. Content contributed by installed recipes or Reference Loaders is excluded.</p>
 <p><code>requires.recipes</code> is auto-populated from <code>is_a:</code> and slot range references to installed recipe content.</p>
 <p>The exported <code>recipe.yaml</code> contains stubs (<code>TODO.set.this</code>, <code>TODO-set-name</code>, <code>0.0.0</code>) that the author must replace before publishing.</p>
 <hr />
@@ -2208,7 +2208,7 @@
 <p>List all installed recipes.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>mosaic<span class="w"> </span>recipe<span class="w"> </span>list
 </code></pre></div>
-<p>Prints <code>id</code>, <code>version</code>, <code>source</code>, and <code>digest</code> for every entry in <code>hippo_meta.installed_recipes</code>.</p>
+<p>Prints <code>id</code>, <code>version</code>, <code>source</code>, and <code>digest</code> for every entry in <code>mosaic_meta.installed_recipes</code>.</p>
 <hr />
 <h3 id="mosaic-recipe-extend-phase-4"><code>mosaic recipe extend</code> <em>(Phase 4)</em><a class="headerlink" href="#mosaic-recipe-extend-phase-4" title="Permanent link">&para;</a></h3>
 <div class="admonition note">
@@ -2270,7 +2270,7 @@
 <p class="admonition-title">Coming in Phase 4</p>
 <p>This command is not yet available.</p>
 </div>
-<p>Serialize <code>hippo_meta.installed_recipes</code> as a portable lockfile.</p>
+<p>Serialize <code>mosaic_meta.installed_recipes</code> as a portable lockfile.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>mosaic<span class="w"> </span>recipe<span class="w"> </span>export-lockfile<span class="w"> </span><span class="o">[</span>--out<span class="w"> </span>PATH<span class="o">]</span><span class="w"> </span><span class="o">[</span>--db-path<span class="w"> </span>PATH<span class="o">]</span>
 </code></pre></div>
 <table>
@@ -2333,7 +2333,7 @@
 <tbody>
 <tr>
 <td><code>MOSAIC_RECIPE_CACHE</code></td>
-<td><code>~/.hippo/recipe-cache/</code></td>
+<td><code>~/.mosaic/recipe-cache/</code></td>
 <td>Override the cache directory used by <code>HttpsResolver</code> for fetched recipes. Useful for shared NFS mounts or CI cache volumes.</td>
 </tr>
 </tbody>
@@ -2362,7 +2362,7 @@
 </tr>
 <tr>
 <td><code>RecipeVersionIncompatibleError</code></td>
-<td>The running Mosaic version is excluded by the recipe's <code>hippo_version</code> specifier.</td>
+<td>The running Mosaic version is excluded by the recipe's <code>mosaic_version</code> specifier.</td>
 </tr>
 <tr>
 <td><code>RecipeLineageCycleError</code></td>

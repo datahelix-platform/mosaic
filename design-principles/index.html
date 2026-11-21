@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.2">
     
     
       
@@ -1641,7 +1641,7 @@
 <h2 id="4-transport-is-an-adapter-not-the-architecture">4. Transport is an adapter, not the architecture.<a class="headerlink" href="#4-transport-is-an-adapter-not-the-architecture" title="Permanent link">&para;</a></h2>
 <p><code>MosaicClient</code> is the system. When you run <code>mosaic serve</code>, the REST API spins up a FastAPI app whose route handlers call the same <code>MosaicClient</code> methods you call from a notebook — there is no separate "server code path." This means the SDK and the API surface behave identically, bugs are fixed once, and you can switch between embedded library use and REST service use without changing the code that talks to Mosaic. Adding a new transport (GraphQL, gRPC) is a new adapter on top of the SDK, not a new implementation of the business logic.</p>
 <h2 id="5-linkml-upstream-not-downstream">5. LinkML upstream, not downstream.<a class="headerlink" href="#5-linkml-upstream-not-downstream" title="Permanent link">&para;</a></h2>
-<p>Mosaic extends LinkML schemas with <code>hippo_*</code> annotations for features the engine needs — validation tiers, reference-loader hooks, provenance configuration. Outside those annotations, Mosaic uses LinkML's own toolchain: <code>linkml-validate</code>, <code>gen-sqlddl</code>, and the LinkML Python dataclasses runtime. If there is a bug in LinkML's schema parsing, the fix is a version bump in Mosaic's <code>pyproject.toml</code>, not a shim in Mosaic's source. The engine does not reimplement or override upstream LinkML behavior; it extends it at well-defined, bounded points.</p>
+<p>Mosaic extends LinkML schemas with <code>mosaic_*</code> annotations for features the engine needs — validation tiers, reference-loader hooks, provenance configuration. Outside those annotations, Mosaic uses LinkML's own toolchain: <code>linkml-validate</code>, <code>gen-sqlddl</code>, and the LinkML Python dataclasses runtime. If there is a bug in LinkML's schema parsing, the fix is a version bump in Mosaic's <code>pyproject.toml</code>, not a shim in Mosaic's source. The engine does not reimplement or override upstream LinkML behavior; it extends it at well-defined, bounded points.</p>
 <h2 id="6-mosaic-doesnt-know-about-your-domain">6. Mosaic doesn't know about your domain.<a class="headerlink" href="#6-mosaic-doesnt-know-about-your-domain" title="Permanent link">&para;</a></h2>
 <p>The only entity types the Mosaic core ships are <code>Entity</code>, <code>ProvenanceRecord</code>, <code>Process</code>, <code>Validator</code>, and <code>ReferenceLoader</code>. There are no biomedical entity types, no sample-tracking conventions, no ontology bindings, no field-naming standards in the engine. The VA National PTSD Brain Bank deployment — Mosaic's first production use — works because it supplies a schema that defines biomedical entities; that schema is not in the Mosaic repository. Domain-specific validators, reference loaders, and external adapters live in user-installed packages that register themselves via entry points. Keeping the core domain-free is what makes the same engine usable for a bibliography, a software inventory, or a clinical registry without modification.</p>
 

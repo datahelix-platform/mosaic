@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.2">
     
     
       
@@ -1919,7 +1919,7 @@ Without one, <code>--graphql</code> fails at startup with a configuration error.
 (<code>volume_ml</code> → <code>volumeMl</code>); write payloads are mapped back to slot names before
 they reach the SDK.</p>
 <p>A list query's <code>filters</code> argument accepts <strong>either</strong> spelling for its <code>field</code> —
-the LinkML slot name (<code>volume_ml</code>, as listed by <code>hippoSchema</code>) or the camelCased
+the LinkML slot name (<code>volume_ml</code>, as listed by <code>mosaicSchema</code>) or the camelCased
 field name the type exposes (<code>volumeMl</code>). A <code>field</code> that matches neither is an
 error (<code>extensions.code: UNKNOWN_FILTER_FIELD</code>) rather than an empty page, as
 are the two kinds of name that look filterable but cannot be: read-time
@@ -2097,7 +2097,7 @@ chain:</p>
 <a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="k">query</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">supersededBy</span><span class="p">(</span><span class="n">id</span><span class="p">:</span><span class="w"> </span><span class="s">"old"</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">entityId</span><span class="w"> </span><span class="n">supersededBy</span><span class="w"> </span><span class="n">chain</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">}</span>
 </code></pre></div>
 <h3 id="full-text-search">Full-text search<a class="headerlink" href="#full-text-search" title="Permanent link">&para;</a></h3>
-<p>Slots annotated <code>hippo_search</code> in your schema are searchable per type. Search
+<p>Slots annotated <code>mosaic_search</code> in your schema are searchable per type. Search
 <strong>composes with the list surface</strong> (issue #157): the twins take the same
 <code>filters</code>/<code>where</code>/<code>filterMode</code> arguments as list queries and return the same
 <code>Page</code> envelope:</p>
@@ -2149,8 +2149,8 @@ typed follow-up via the per-type queries):</p>
 <p>Beyond GraphQL's own <code>__schema</code>, the API exposes Mosaic's domain type model —
 useful for generic clients that need the LinkML classification:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="p">{</span>
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="n">hippoSchema</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="n">accessorName</span><span class="w"> </span><span class="p">}</span>
-<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">  </span><span class="n">hippoEntityType</span><span class="p">(</span><span class="n">name</span><span class="p">:</span><span class="w"> </span><span class="s">"Sample"</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="n">mosaicSchema</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="n">accessorName</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">  </span><span class="n">mosaicEntityType</span><span class="p">(</span><span class="n">name</span><span class="p">:</span><span class="w"> </span><span class="s">"Sample"</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">    </span><span class="n">fields</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="n">kind</span><span class="w"> </span><span class="n">range</span><span class="w"> </span><span class="n">role</span><span class="w"> </span><span class="n">required</span><span class="w"> </span><span class="n">multivalued</span><span class="w"> </span><span class="n">targetEntityType</span><span class="w"> </span><span class="n">enumValues</span><span class="w"> </span><span class="p">}</span>
 <a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">    </span><span class="n">relationships</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">field</span><span class="w"> </span><span class="n">targetEntityType</span><span class="w"> </span><span class="p">}</span>
 <a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="w">  </span><span class="p">}</span>

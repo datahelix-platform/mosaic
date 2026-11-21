@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.2">
     
     
       
@@ -1902,7 +1902,7 @@
 <tbody>
 <tr>
 <td><code>MOSAIC_CACHE_DIR</code></td>
-<td><code>~/.cache/hippo/references/</code></td>
+<td><code>~/.cache/mosaic/references/</code></td>
 <td>Root directory for all reference loader download caches. Set this to a shared path (e.g., an NFS mount or CI cache volume) to avoid redundant downloads across machines.</td>
 </tr>
 </tbody>
@@ -1916,7 +1916,7 @@
 <a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mosaic-reference-fma==3.3</span>
 <a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mosaic-reference-ensembl==0.1.0</span>
 </code></pre></div>
-<p>Only exact-match pins (<code>==</code>) are supported in v1, and the pin's right-hand side is matched against the <strong>installed pip package version</strong> of the loader (<code>importlib.metadata.version</code>) — not the data-version slug you pass to <code>mosaic reference install --version</code> (see <a href="#installing-a-loader-package">Installing a loader package</a> above). A future v2 surface will support pinning against the data-version slug directly via <code>hippo_meta.reference_versions</code>. If you need a minimum version, pin the lowest acceptable release and upgrade explicitly with <code>mosaic reference upgrade</code>.</p>
+<p>Only exact-match pins (<code>==</code>) are supported in v1, and the pin's right-hand side is matched against the <strong>installed pip package version</strong> of the loader (<code>importlib.metadata.version</code>) — not the data-version slug you pass to <code>mosaic reference install --version</code> (see <a href="#installing-a-loader-package">Installing a loader package</a> above). A future v2 surface will support pinning against the data-version slug directly via <code>mosaic_meta.reference_versions</code>. If you need a minimum version, pin the lowest acceptable release and upgrade explicitly with <code>mosaic reference upgrade</code>.</p>
 <p><code>mosaic validate</code> and <code>mosaic migrate</code> both check <code>requires:</code> before doing anything else — each fails fast with a clear install suggestion if a required loader is missing or its installed version disagrees with the pin.</p>
 <h3 id="getting-a-client-that-spans-your-schema-its-loaders">Getting a client that spans your schema + its loaders<a class="headerlink" href="#getting-a-client-that-spans-your-schema-its-loaders" title="Permanent link">&para;</a></h3>
 <p>When your schema declares <code>requires:</code>, Mosaic automatically merges every pinned loader's classes into the registry, so a single client knows both your own entity types <strong>and</strong> the reference loaders' types — with no registry-assembly code. Every transport (the CLI, <code>mosaic serve</code>, the TUI) does this for you.</p>
@@ -1952,7 +1952,7 @@
 <p>Use <code>--version test</code> in CI pipelines to avoid network dependencies and keep test runs hermetic and fast. The <code>"test"</code> slug is reserved — Mosaic will never use it for a real release version.</p>
 <hr />
 <h2 id="tracking-installed-loaders">Tracking installed loaders<a class="headerlink" href="#tracking-installed-loaders" title="Permanent link">&para;</a></h2>
-<p>Mosaic records installed loader versions in <code>hippo_meta</code> under the key <code>reference_versions</code>. <code>mosaic status</code> surfaces this alongside other system information:</p>
+<p>Mosaic records installed loader versions in <code>mosaic_meta</code> under the key <code>reference_versions</code>. <code>mosaic status</code> surfaces this alongside other system information:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>$ mosaic status
 <a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>...
 <a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>Reference loaders:

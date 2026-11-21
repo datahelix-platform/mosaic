@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.2">
     
     
       
@@ -1845,21 +1845,21 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>mosaic-reference-myontology/
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>├── pyproject.toml
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>├── src/
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>│   └── hippo_reference_myontology/
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>│   └── mosaic_reference_myontology/
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>│       ├── __init__.py
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>│       ├── loader.py      # ReferenceLoader subclass (required)
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>│       ├── cli.py         # Typer sub-app (optional)
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>│       └── fixtures/
 <a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>│           └── tiny.tar.gz   # bundled "test" fixture dataset
 </code></pre></div>
-<p>Use <code>hippo_reference_&lt;name&gt;</code> as the Python package name and <code>mosaic-reference-&lt;name&gt;</code> as the distribution name. This naming convention makes your loader discoverable via PyPI search.</p>
+<p>Use <code>mosaic_reference_&lt;name&gt;</code> as the Python package name and <code>mosaic-reference-&lt;name&gt;</code> as the distribution name. This naming convention makes your loader discoverable via PyPI search.</p>
 <hr />
 <h2 id="1-the-loader-class">1. The loader class<a class="headerlink" href="#1-the-loader-class" title="Permanent link">&para;</a></h2>
 <p>Subclass <code>ReferenceLoader</code> from <code>mosaic.core.loaders.reference</code>. At minimum you must implement three abstract methods: <code>versions()</code>, <code>schema_fragment()</code>, and <code>load()</code>. Declaring <code>populates_types()</code> — the classes your loader fills with <em>data</em> — is recommended for provenance/discoverability but optional.</p>
 <blockquote>
 <p><strong><code>entity_types()</code> was renamed to <code>populates_types()</code>.</strong> The name better separates the classes a package <em>defines</em> (via <code>schema_fragment()</code>) from the classes it <em>fills with data</em>. The old <code>entity_types()</code> lives on as a deprecated alias — loaders that still override it keep reporting their declared types unchanged — but new loaders should override <code>populates_types()</code>.</p>
 </blockquote>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># src/hippo_reference_myontology/loader.py</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># src/mosaic_reference_myontology/loader.py</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">mosaic.core.loaders.reference</span><span class="w"> </span><span class="kn">import</span> <span class="n">LoadResult</span><span class="p">,</span> <span class="n">ReferenceLoader</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">mosaic.core.client</span><span class="w"> </span><span class="kn">import</span> <span class="n">MosaicClient</span>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
@@ -1879,11 +1879,11 @@
 <a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>
 <a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">schema_fragment</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
 <a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>        <span class="k">return</span> <span class="p">{</span>
-<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>            <span class="s2">"id"</span><span class="p">:</span> <span class="s2">"https://example.org/hippo/myontology"</span><span class="p">,</span>
+<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>            <span class="s2">"id"</span><span class="p">:</span> <span class="s2">"https://example.org/mosaic/myontology"</span><span class="p">,</span>
 <a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"myontology"</span><span class="p">,</span>
 <a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>            <span class="s2">"default_prefix"</span><span class="p">:</span> <span class="s2">"myontology"</span><span class="p">,</span>            <span class="c1"># REQUIRED — must match name</span>
 <a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>            <span class="s2">"prefixes"</span><span class="p">:</span> <span class="p">{</span>
-<a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>                <span class="s2">"myontology"</span><span class="p">:</span> <span class="s2">"https://example.org/hippo/myontology/"</span><span class="p">,</span>
+<a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>                <span class="s2">"myontology"</span><span class="p">:</span> <span class="s2">"https://example.org/mosaic/myontology/"</span><span class="p">,</span>
 <a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>            <span class="p">},</span>
 <a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>            <span class="s2">"classes"</span><span class="p">:</span> <span class="p">{</span>
 <a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>                <span class="s2">"MyTerm"</span><span class="p">:</span> <span class="p">{</span>
@@ -1913,7 +1913,7 @@
 <a id="__codelineno-1-52" name="__codelineno-1-52" href="#__codelineno-1-52"></a>
 <a id="__codelineno-1-53" name="__codelineno-1-53" href="#__codelineno-1-53"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_load_fixture</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">client</span><span class="p">:</span> <span class="n">MosaicClient</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LoadResult</span><span class="p">:</span>
 <a id="__codelineno-1-54" name="__codelineno-1-54" href="#__codelineno-1-54"></a>        <span class="kn">import</span><span class="w"> </span><span class="nn">importlib.resources</span><span class="o">,</span><span class="w"> </span><span class="nn">tarfile</span><span class="o">,</span><span class="w"> </span><span class="nn">json</span>
-<a id="__codelineno-1-55" name="__codelineno-1-55" href="#__codelineno-1-55"></a>        <span class="n">fixture</span> <span class="o">=</span> <span class="n">importlib</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">files</span><span class="p">(</span><span class="s2">"hippo_reference_myontology.fixtures"</span><span class="p">)</span><span class="o">.</span><span class="n">joinpath</span><span class="p">(</span><span class="s2">"tiny.tar.gz"</span><span class="p">)</span>
+<a id="__codelineno-1-55" name="__codelineno-1-55" href="#__codelineno-1-55"></a>        <span class="n">fixture</span> <span class="o">=</span> <span class="n">importlib</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">files</span><span class="p">(</span><span class="s2">"mosaic_reference_myontology.fixtures"</span><span class="p">)</span><span class="o">.</span><span class="n">joinpath</span><span class="p">(</span><span class="s2">"tiny.tar.gz"</span><span class="p">)</span>
 <a id="__codelineno-1-56" name="__codelineno-1-56" href="#__codelineno-1-56"></a>        <span class="n">entity_ids</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
 <a id="__codelineno-1-57" name="__codelineno-1-57" href="#__codelineno-1-57"></a>        <span class="k">with</span> <span class="n">tarfile</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">fixture</span><span class="p">))</span> <span class="k">as</span> <span class="n">tar</span><span class="p">:</span>
 <a id="__codelineno-1-58" name="__codelineno-1-58" href="#__codelineno-1-58"></a>            <span class="k">for</span> <span class="n">member</span> <span class="ow">in</span> <span class="n">tar</span><span class="o">.</span><span class="n">getmembers</span><span class="p">():</span>
@@ -1940,15 +1940,15 @@
 <h2 id="2-declaring-entry-points">2. Declaring entry points<a class="headerlink" href="#2-declaring-entry-points" title="Permanent link">&para;</a></h2>
 <p>Both entry points are registered in <code>pyproject.toml</code>. The <code>mosaic.reference_loader_cli</code> entry point is optional; omit it if your loader has no subcommands.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">[project.entry-points.</span><span class="s2">"mosaic.reference_loaders"</span><span class="k">]</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">myontology</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"hippo_reference_myontology.loader:MyOntologyLoader"</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">myontology</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"mosaic_reference_myontology.loader:MyOntologyLoader"</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Optional — only needed if you expose a Typer sub-app:</span>
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="k">[project.entry-points.</span><span class="s2">"mosaic.reference_loader_cli"</span><span class="k">]</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">myontology</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"hippo_reference_myontology.cli:app"</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">myontology</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"mosaic_reference_myontology.cli:app"</span>
 </code></pre></div>
 <p>The entry point key (<code>myontology</code>) must match <code>ReferenceLoader.name</code>. Mosaic validates this at registration and raises <code>ReferenceLoaderRegistrationError</code> if the entry point does not resolve to a concrete <code>ReferenceLoader</code> subclass.</p>
 <h3 id="entry-point-groups-mosaicschema_packages-and-mosaicreference_loaders">Entry-point groups: <code>mosaic.schema_packages</code> and <code>mosaic.reference_loaders</code><a class="headerlink" href="#entry-point-groups-mosaicschema_packages-and-mosaicreference_loaders" title="Permanent link">&para;</a></h3>
-<p>Discovery resolves <strong>two</strong> groups and deduplicates by name: the broad genus group <code>mosaic.schema_packages</code> and its subset/alias <code>mosaic.reference_loaders</code>. The legacy <code>hippo.schema_packages</code> / <code>hippo.reference_loaders</code> spellings (pre-rename, ADR-0004) are also resolved for the deprecation window, so existing <code>hippo-reference-*</code> packages remain discoverable; new packages should register under the <code>mosaic.*</code> groups and follow the <code>mosaic-reference-&lt;name&gt;</code> naming convention. Register a reference loader under <code>mosaic.reference_loaders</code> as shown above — it remains the conventional home for external-data loaders and is found by both <code>mosaic reference</code> and the package-level discovery.</p>
+<p>Discovery resolves <strong>two</strong> groups and deduplicates by name: the broad genus group <code>mosaic.schema_packages</code> and its subset/alias <code>mosaic.reference_loaders</code>. The legacy <code>hippo.*</code> spellings are no longer read (ADR-0015); register under the <code>mosaic.*</code> groups and follow the <code>mosaic-reference-&lt;name&gt;</code> naming convention. Register a reference loader under <code>mosaic.reference_loaders</code> as shown above — it remains the conventional home for external-data loaders and is found by both <code>mosaic reference</code> and the package-level discovery.</p>
 <p>A <strong>pure-schema package</strong> (no shipped data) registers under the genus group instead, and needs no <code>load()</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">[project.entry-points.</span><span class="s2">"mosaic.schema_packages"</span><span class="k">]</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">mycore</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"mosaic_mycore.package:MyCorePackage"</span>
@@ -2026,12 +2026,12 @@
 <a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ingest_archive</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">archive</span><span class="p">)</span>
 </code></pre></div>
 <p><code>client.cached_fetch</code> returns a <code>Path</code> to the local file. It verifies the sha256 on both download and cache hit when <code>expected_sha256</code> is supplied; a mismatch raises <code>CacheIntegrityError</code> and removes the stale file so the next call re-downloads cleanly.</p>
-<p>The cache location resolves to <code>$MOSAIC_CACHE_DIR/&lt;loader_name&gt;/</code> when set, else <code>~/.cache/hippo/references/&lt;loader_name&gt;/</code>. Use <code>client.cache_dir_for(self.name)</code> if you need to inspect or pre-warm the directory.</p>
+<p>The cache location resolves to <code>$MOSAIC_CACHE_DIR/&lt;loader_name&gt;/</code> when set, else <code>~/.cache/mosaic/references/&lt;loader_name&gt;/</code>. Use <code>client.cache_dir_for(self.name)</code> if you need to inspect or pre-warm the directory.</p>
 <p><strong>Rule:</strong> loaders MUST use <code>client.cached_fetch</code> for all large network downloads. Never roll a private download path.</p>
 <hr />
 <h2 id="6-loader-specific-subcommands-optional">6. Loader-specific subcommands (optional)<a class="headerlink" href="#6-loader-specific-subcommands-optional" title="Permanent link">&para;</a></h2>
 <p>Expose a <code>typer.Typer</code> app via the <code>mosaic.reference_loader_cli</code> entry point to add subcommands under <code>mosaic reference &lt;name&gt; ...</code>.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># src/hippo_reference_myontology/cli.py</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># src/mosaic_reference_myontology/cli.py</span>
 <a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">typer</span>
 <a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
 <a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="n">app</span> <span class="o">=</span> <span class="n">typer</span><span class="o">.</span><span class="n">Typer</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"myontology"</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">"MyOntology loader commands."</span><span class="p">)</span>
@@ -2099,10 +2099,10 @@
 <a id="__codelineno-14-22" name="__codelineno-14-22" href="#__codelineno-14-22"></a>
 <a id="__codelineno-14-23" name="__codelineno-14-23" href="#__codelineno-14-23"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">schema_fragment</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <a id="__codelineno-14-24" name="__codelineno-14-24" href="#__codelineno-14-24"></a>        <span class="k">return</span> <span class="p">{</span>
-<a id="__codelineno-14-25" name="__codelineno-14-25" href="#__codelineno-14-25"></a>            <span class="s2">"id"</span><span class="p">:</span> <span class="s2">"https://example.org/hippo/fake"</span><span class="p">,</span>
+<a id="__codelineno-14-25" name="__codelineno-14-25" href="#__codelineno-14-25"></a>            <span class="s2">"id"</span><span class="p">:</span> <span class="s2">"https://example.org/mosaic/fake"</span><span class="p">,</span>
 <a id="__codelineno-14-26" name="__codelineno-14-26" href="#__codelineno-14-26"></a>            <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"fake"</span><span class="p">,</span>
 <a id="__codelineno-14-27" name="__codelineno-14-27" href="#__codelineno-14-27"></a>            <span class="s2">"default_prefix"</span><span class="p">:</span> <span class="s2">"fake"</span><span class="p">,</span>
-<a id="__codelineno-14-28" name="__codelineno-14-28" href="#__codelineno-14-28"></a>            <span class="s2">"prefixes"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"fake"</span><span class="p">:</span> <span class="s2">"https://example.org/hippo/fake/"</span><span class="p">},</span>
+<a id="__codelineno-14-28" name="__codelineno-14-28" href="#__codelineno-14-28"></a>            <span class="s2">"prefixes"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"fake"</span><span class="p">:</span> <span class="s2">"https://example.org/mosaic/fake/"</span><span class="p">},</span>
 <a id="__codelineno-14-29" name="__codelineno-14-29" href="#__codelineno-14-29"></a>            <span class="s2">"classes"</span><span class="p">:</span> <span class="p">{</span>
 <a id="__codelineno-14-30" name="__codelineno-14-30" href="#__codelineno-14-30"></a>                <span class="s2">"FakeTerm"</span><span class="p">:</span> <span class="p">{</span>
 <a id="__codelineno-14-31" name="__codelineno-14-31" href="#__codelineno-14-31"></a>                    <span class="s2">"is_a"</span><span class="p">:</span> <span class="s2">"Entity"</span><span class="p">,</span>

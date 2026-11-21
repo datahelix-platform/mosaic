@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.2">
     
     
       
@@ -1797,7 +1797,7 @@
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.2.0</span>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Single-cell RNA-seq metadata schema fragment for Mosaic.</span>
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="nt">created_at</span><span class="p">:</span><span class="w"> </span><span class="s">"2026-05-27T14:00:00Z"</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="nt">hippo_version</span><span class="p">:</span><span class="w"> </span><span class="s">"&gt;=0.3,&lt;1.0"</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="nt">mosaic_version</span><span class="p">:</span><span class="w"> </span><span class="s">"&gt;=0.3,&lt;1.0"</span>
 <a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="nt">license</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CC-BY-4.0</span>
 <a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://zenodo.org/record/12345</span>
 <a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
@@ -1806,7 +1806,7 @@
 <a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">  </span><span class="nt">email</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">genomics@broadinstitute.org</span>
 <a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">  </span><span class="nt">organization</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Broad Institute</span>
 </code></pre></div>
-<p>Required fields are <code>id</code>, <code>name</code>, <code>version</code>, <code>created_at</code>, and <code>hippo_version</code>. All others are optional but strongly recommended for any recipe you intend to share.</p>
+<p>Required fields are <code>id</code>, <code>name</code>, <code>version</code>, <code>created_at</code>, and <code>mosaic_version</code>. All others are optional but strongly recommended for any recipe you intend to share.</p>
 <h3 id="field-notes">Field notes<a class="headerlink" href="#field-notes" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -1838,7 +1838,7 @@
 <td>ISO 8601 UTC timestamp (e.g. <code>"2026-05-27T14:00:00Z"</code>).</td>
 </tr>
 <tr>
-<td><code>hippo_version</code></td>
+<td><code>mosaic_version</code></td>
 <td>yes</td>
 <td>PEP 440 version specifier. Import fails with <code>RecipeVersionIncompatibleError</code> if the running Mosaic version does not satisfy this constraint.</td>
 </tr>
@@ -1867,12 +1867,12 @@
 <hr />
 <h2 id="2-write-the-schema-fragment-schemayaml">2. Write the schema fragment (<code>schema.yaml</code>)<a class="headerlink" href="#2-write-the-schema-fragment-schemayaml" title="Permanent link">&para;</a></h2>
 <p><code>schema.yaml</code> is a standard <a href="https://linkml.io/">LinkML</a> schema document. Keep it focused on what your recipe contributes — do not redeclare classes or slots from an upstream recipe or from Mosaic's own core schema.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://example.org/hippo/scrnaseq</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://example.org/mosaic/scrnaseq</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">scrnaseq</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nt">default_prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">scrnaseq</span>
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="nt">prefixes</span><span class="p">:</span>
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span><span class="nt">linkml</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://w3id.org/linkml/</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="nt">scrnaseq</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://example.org/hippo/scrnaseq/</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="nt">scrnaseq</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://example.org/mosaic/scrnaseq/</span>
 <a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
 <a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="nt">imports</span><span class="p">:</span>
 <a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">linkml:types</span>
@@ -1942,7 +1942,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>id:           org.broad.scrnaseq
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>name:         scrnaseq
 <a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>version:      1.2.0
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>hippo:        &gt;=0.3,&lt;1.0
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>mosaic:       &gt;=0.3,&lt;1.0
 <a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>created_at:   2026-05-27T14:00:00Z
 <a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>digest:       sha256:f3a8c9b...
 <a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>classes:      3
@@ -1962,9 +1962,9 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TODO.set.this</span><span class="w">       </span><span class="c1"># ← replace with your reverse-DNS id</span>
 <a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TODO-set-name</span><span class="w">     </span><span class="c1"># ← replace with a short slug</span>
 <a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0.0</span><span class="w">          </span><span class="c1"># ← replace with your version</span>
-<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="nt">hippo_version</span><span class="p">:</span><span class="w"> </span><span class="s">"&gt;=0.3"</span><span class="w">  </span><span class="c1"># ← adjust compatibility range</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="nt">mosaic_version</span><span class="p">:</span><span class="w"> </span><span class="s">"&gt;=0.3"</span><span class="w">  </span><span class="c1"># ← adjust compatibility range</span>
 </code></pre></div>
-<p>To declare a parent lineage on the export, pass the <code>id</code> of an already-installed recipe with <code>--parent</code>. Until <code>mosaic recipe list</code> ships in Phase 4, find installed recipe ids by reading <code>hippo_meta.installed_recipes</code> directly from the database:</p>
+<p>To declare a parent lineage on the export, pass the <code>id</code> of an already-installed recipe with <code>--parent</code>. Until <code>mosaic recipe list</code> ships in Phase 4, find installed recipe ids by reading <code>mosaic_meta.installed_recipes</code> directly from the database:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>mosaic<span class="w"> </span>recipe<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--parent<span class="w"> </span>org.broad.base-omics<span class="w"> </span>--out<span class="w"> </span>./my-recipe/
 </code></pre></div>
 <hr />
