@@ -2,10 +2,20 @@
 
 ## [Unreleased]
 
+## v0.16.0 — 2026-11-20 (BREAKING: the `hippo` data-contract identifiers retired (platform ADR-0007), families' raw-id fallback dropped; families as GraphQL interfaces, concrete-parent closure, reverse edges over multivalued and forward-declared `inverse`, traversal `columns`)
+
+**Breaking release.** Two changes break existing clients: the `hippo` →
+`mosaic` rename of every data-contract identifier, with ADR-0004's aliases
+removed and no compatibility window (#284), and the removal of GraphQL's raw
+`<slot>Id` / `<slot>Ids` fallback on references into a family (#278).
+Collections on a concrete parent also grow by their subclasses' rows
+(#276). Read `### Upgrading` before deploying, and rebuild every database
+from source data.
+
 ### Added
 
-- **Traversal paths in `QuerySpec.columns`, hydrated server-side** (issue
-  #236, ADR-0009 note of 2026-10-27, datahelix#113 M6). A column path may now
+- **Traversal paths in `QuerySpec.columns`, hydrated server-side** (PR #273,
+  issue #236, ADR-0009 note of 2026-10-27, datahelix#113 M6). A column path may now
   follow **one or two reference hops** — forward, or an `inverse_of` reverse
   edge — before its leaf slot, spelled as LinkML slot names like `criteria`:
   `{"path": ["donor", "age_at_death"]}`. A to-many hop needs `"mode"`:
@@ -38,7 +48,7 @@
   unaffected.
 
 - **Families: abstract classes as GraphQL interfaces and read-only anchors**
-  (issue #228, ADR-0014 Decisions 2–6). An abstract class with exposed
+  (PR #278, issue #228, ADR-0014 Decisions 2–6). An abstract class with exposed
   concrete kinds (`Sample` with `Brain`, `Blood`, …) is a *family*:
   - **One GraphQL interface per family**, implemented by its kinds, carrying
     the fields every kind stores alike (references included: `Sample.donor`,
@@ -71,7 +81,7 @@
     is the expected user of `mosaic_anchor: false`.
 
 - **Reverse edges over multivalued (relationship-row) forward slots**
-  (issue #231, ADR-0013 and its 2026-11-10 amendment). ADR-0011 rejected an
+  (PR #275, issue #231, ADR-0013 and its 2026-11-10 amendment). ADR-0011 rejected an
   `inverse` whose forward slot is multivalued at load; that rejection is
   gone. Such a reverse (`Cohort.members: {inverse: cohort}` over a
   multivalued `Person.cohort`, or `Sample.assays` synthesized from
@@ -101,7 +111,7 @@
   the concrete closure — that is #241 / ADR-0014, not changed here.
 
 - **`inverse` declared on the forward slot synthesizes the reverse edge**
-  (issue #230, ADR-0012). ADR-0011 read `inverse` only on the derived,
+  (PR #240, issue #230, ADR-0012). ADR-0011 read `inverse` only on the derived,
   multivalued side, which in an import-layered schema forces a lower module
   to name a class from a higher one (brain bank's `person.yaml` cannot range
   `Donor.samples` on `Sample` from `tissue.yaml`; upstream `linkml-lint`
@@ -134,8 +144,8 @@
   DataHelix certification fixture (1) all declare on the reverse side and
   load unchanged, with zero synthesized slots.
 
-- **`entityType: String!` on a concrete parent's GraphQL type** (ADR-0014
-  Decision 1). Every concrete class with concrete subclasses (`Process`
+- **`entityType: String!` on a concrete parent's GraphQL type** (PR #276,
+  ADR-0014 Decision 1). Every concrete class with concrete subclasses (`Process`
   with `BankBrain`, `Person` with `Donor`) gains a non-null
   `entityType` system field naming the row's concrete class, since a
   subclass row reached through the parent renders as the parent type
@@ -144,7 +154,7 @@
   its own GraphQL type still gets its rows named. Leaf types are
   unchanged. A slot whose GraphQL field would be `entityType`
   (`entity_type`, `entityType`) on such a class is a build-time error.
-- **`include_subclasses` on `MosaicClient.query` / `count`** (default
+- **`include_subclasses` on `MosaicClient.query` / `count`** (PR #276; default
   `True`; public SDK API per the ADR-0014 2026-11-17 amendment, not exposed
   by the transports). `False` reads exactly the named class's rows — the pre-ADR-0014
   behaviour, for code that walks one class at a time. The migration gate
@@ -153,7 +163,7 @@
 ### Changed
 
 - **BREAKING: the `hippo` data-contract identifiers are renamed**
-  (issue #124, platform ADR-0007, ADR-0015). The bundled schemas are
+  (PR #284, issue #124, platform ADR-0007, ADR-0015). The bundled schemas are
   `mosaic_core` / `mosaic_ext` (files `mosaic_core.yaml` / `mosaic_ext.yaml`)
   with ids `https://w3id.org/datahelix/mosaic/<name>` and the CURIE prefix
   `mosaic:`, and `recipe_manifest` moves under the same namespace. Every
@@ -172,8 +182,8 @@
   (`hippo:ref_check` → `mosaic:ref_check`, and so on). See
   `### Upgrading`.
 
-- **GraphQL: references into a family drop their raw-id fallback**
-  (issue #228). A reference ranged on an abstract class with an exposed kind
+- **BREAKING — GraphQL: references into a family drop their raw-id
+  fallback** (PR #278, issue #228). A reference ranged on an abstract class with an exposed kind
   used to keep a raw `<slot>Id` / `<slot>Ids` field and warn at build time;
   it is now the resolved edge to the family's interface, like every other
   reference (ADR-0005 edge-only). **Breaking for clients selecting those raw
@@ -183,7 +193,7 @@
   one accessor per family (`samples`, `namedThings`, …).
 
 - **Behaviour change — a concrete parent's collection now includes its
-  subclasses' rows** (ADR-0014 Decision 1, issue #241). `query("Process")`,
+  subclasses' rows** (PR #276, ADR-0014 Decision 1, issue #241). `query("Process")`,
   `count("Process")`, `facet_counts`/`field_range` on `Process`, the GraphQL
   `processes` list with its `total` and `processesCount`, REST and MCP
   listings, and a `QuerySpec` anchored on `Process` resolve over
@@ -229,7 +239,8 @@
   Postgres, an unknown field inside a nested edge's `where` is now an
   error, as on SQLite (it used to match nothing).
 
-- **CI and the image install from `uv.lock`** (issue #242). Local
+- **CI and the image install from `uv.lock`** (PR #277, superseding #272;
+  issue #242). Local
   `uv run pytest`, CI and the release image now test the same dependency
   versions; before, CI and the image resolved unlocked (linkml-runtime 1.12)
   while the lock pinned 1.10. The lock is refreshed to linkml /
@@ -245,7 +256,7 @@
 ### Fixed
 
 - **Family anchors: a requested kind-only field reads as `null` in `data`**
-  (issue #281, ADR-0014 Decision 3, 2026-11-17 ratification). With
+  (PR #283, issue #281, ADR-0014 Decision 3, 2026-11-17 ratification). With
   `MosaicClient.query(<family>, fields=[...])`, and in `execute_query_spec`
   items whether or not a column traverses, a requested slot that a row's
   kind lacks (or leaves unset) now appears in that row's `data` as `null`.
@@ -254,7 +265,8 @@
   returns the row's stored slots only.
 
 - **Rows lost through concrete parents and forward abstract edges**
-  (issue #241, ADR-0014 Decision 1). Every reference now resolves over the
+  (PR #276, issue #241, ADR-0014 Decision 1; the cases were first pinned as
+  strict xfails in #274). Every reference now resolves over the
   concrete closure of its range class, on SQLite and Postgres:
   - GraphQL forward references ranged on a concrete parent render a subclass
     row as the parent type instead of `null` (`Brain.producedBy` →
@@ -272,7 +284,7 @@
 
 ### Removed
 
-- **ADR-0004's deprecated `hippo` aliases** (ADR-0015, platform ADR-0007
+- **ADR-0004's deprecated `hippo` aliases** (PR #284, ADR-0015, platform ADR-0007
   Q4): the `hippo` import shim, the `hippo` console script, the `hippo.*`
   entry-point groups (`storage_adapters`, `write_validators`,
   `schema_packages`, `reference_loaders`, `reference_loader_cli`), the
@@ -283,6 +295,16 @@
   move from `~/.cache/hippo/references/`, `~/.hippo/recipe-cache/` and
   `~/.hippo/data/` to `~/.cache/mosaic/references/`,
   `~/.mosaic/recipe-cache/` and `~/.mosaic/data/`.
+
+### Decisions
+
+- **Accepted in the 2026-11-10 decision pass** (docs only): ADR-0010 (MCP
+  outbound delegation to a planning service), ADR-0002, ADR-0003 and
+  ADR-0008 ratified (#267, #270); ADR-0013 amended (implemented above, #275);
+  ADR-0014 widened and accepted (#267).
+- **ADR-0014 Decisions 2–6:** #282 records the implementation choices #278
+  made as dated notes on the ADR.
+- **ADR-0015** (new, #284): ends ADR-0004's deprecation window.
 
 ### Upgrading
 
@@ -320,6 +342,15 @@
 - **Proxies must send `X-DataHelix-Actor`.** Mosaic no longer reads
   `X-Hippo-Actor`; a proxy that still sets it records writes under the
   default actor.
+- **GraphQL clients selecting a family reference's raw id** (`samplesIds`,
+  `inputsIds`, `producedById`, …) must select the edge's `id` instead
+  (`samples { id }`) (#278).
+- **Counts and lists on a concrete parent grow by its subclasses' rows**
+  (#276). Code that needs one class's rows only passes
+  `include_subclasses=False` to the SDK.
+- **A forward-side `inverse` is no longer ignored** (#240): it synthesizes
+  the reverse edge on the range class. The known deployment schemas declare
+  `inverse` on the reverse side only and load unchanged.
 
 ## v0.15.0 — 2026-10-27 (anchor-owned `columns` projection, inverse edges over abstract ranges, domain classes named like infrastructure, images under datahelix-platform)
 
