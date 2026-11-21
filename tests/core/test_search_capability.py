@@ -38,7 +38,7 @@ class TestStartupValidation:
                             "id": {"identifier": True},
                             "name": {
                                 "range": "string",
-                                "annotations": {"hippo_search": "fts"},
+                                "annotations": {"mosaic_search": "fts"},
                             },
                         }
                     }
@@ -61,7 +61,7 @@ class TestStartupValidation:
                             "id": {"identifier": True},
                             "description": {
                                 "range": "string",
-                                "annotations": {"hippo_search": "embedding"},
+                                "annotations": {"mosaic_search": "embedding"},
                             },
                         }
                     }
@@ -82,7 +82,7 @@ class TestStartupValidation:
                         "id": {"identifier": True},
                         "description": {
                             "range": "string",
-                            "annotations": {"hippo_search": "embedding"},
+                            "annotations": {"mosaic_search": "embedding"},
                         },
                     }
                 }

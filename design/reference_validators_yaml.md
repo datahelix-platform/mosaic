@@ -21,7 +21,7 @@ where a new rule belongs without round-tripping.
 |---|---|---|
 | `linkml` | Static shape: types, patterns, enums, ranges, `required`, multivalued, `unique_keys`. | User schema YAML. Enforced by `SchemaRegistry.validate_envelope()`. |
 | `cel` | Dynamic, pure-function predicates over entity data. Optionally pre-fetches via `expand`. | `validators.yaml` — this file. |
-| `python` | Escape hatch for rules neither tier above can express (network calls, stateful checks, cross-cluster consistency). | `hippo.write_validators` entry-point plugins. |
+| `python` | Escape hatch for rules neither tier above can express (network calls, stateful checks, cross-cluster consistency). | `mosaic.write_validators` entry-point plugins. |
 
 Execution: cheapest first, `fail_fast=True` by default. Batch ingest can
 opt into `collect_all=True` to aggregate failures across tiers.
@@ -32,7 +32,7 @@ If LinkML can express it, it MUST be in LinkML. If CEL can express it
 references), it MUST be in CEL. Python plugins are the last resort.
 
 **Result envelope.** Every tier returns a `ValidationResult` (defined in
-`hippo.core.validation.validators`) carrying a list of `ValidationFailure`
+`mosaic.core.validation.validators`) carrying a list of `ValidationFailure`
 objects. Each failure records its producing `tier` so the REST layer and
 typed client can render tier-aware errors uniformly.
 
@@ -48,7 +48,7 @@ class ValidationFailure:
 
 REST surface: `ValidationFailed` maps to HTTP 422 with a structured body
 (`passed`, `failures[].tier`, `failures[].rule`, `failures[].field`,
-`failures[].message`, `failures[].details`). See `src/hippo/api/factory.py`.
+`failures[].message`, `failures[].details`). See `src/mosaic/api/factory.py`.
 
 ---
 

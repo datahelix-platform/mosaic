@@ -119,7 +119,7 @@ class TestReferenceLoaderDeprovision:
 class TestDependentsGuard:
     def test_find_installed_dependents_unit(self, hippo_workspace, monkeypatch):
         db = hippo_workspace["db"]
-        # Install fake (creates hippo_meta + records fake@v1), then mark a
+        # Install fake (creates mosaic_meta + records fake@v1), then mark a
         # dependent package as installed too.
         install_reference(
             "fake", "v1", db_path=db, schema_dir=hippo_workspace["schemas"]

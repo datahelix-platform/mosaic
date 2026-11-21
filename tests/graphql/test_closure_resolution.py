@@ -49,8 +49,8 @@ class TestUnexposedSubclassConsistency:
     """ADR-0014 Decision 1, #276 WP3: one closure for storage and GraphQL.
 
     A concrete subclass without its own GraphQL type (today: none can be,
-    since only hippo_core infrastructure and value types are unexposed;
-    Decision 5's ``hippo_anchor: false`` will add real ones) still has its
+    since only mosaic_core infrastructure and value types are unexposed;
+    Decision 5's ``mosaic_anchor: false`` will add real ones) still has its
     rows listed through the parent. The parent's SDK totals, GraphQL list
     and ``entityType`` must agree on that, and ``entityType`` must exist.
     """
@@ -100,7 +100,7 @@ prefixes:
   linkml: https://w3id.org/linkml/
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 default_range: string
 classes:
   Process:

@@ -51,8 +51,7 @@ def _resolve_token(token: str | None) -> str:
     """Resolve the auth token.
 
     Priority: explicit *token* argument > ``MOSAIC_TUI_TOKEN`` env variable
-    (legacy ``HIPPO_TUI_TOKEN`` honored with a ``DeprecationWarning`` —
-    ADR-0004) > ``dev-token``.
+    > ``dev-token``.
     """
     if token is not None:
         return token
@@ -86,8 +85,7 @@ class RESTBackend:
 
     Args:
         url: Base URL of the REST API server.
-        token: Bearer token. Falls back to ``MOSAIC_TUI_TOKEN`` (legacy
-            ``HIPPO_TUI_TOKEN``) env var, then
+        token: Bearer token. Falls back to the ``MOSAIC_TUI_TOKEN`` env var, then
             ``dev-token``.
         status_callback: Optional ``callable(message: str)`` invoked on
             connection errors so the UI can display an error without crashing.

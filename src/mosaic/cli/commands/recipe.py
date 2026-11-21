@@ -81,7 +81,7 @@ def recipe_inspect(
     typer.echo(f"id:           {manifest.id}")
     typer.echo(f"name:         {manifest.name}")
     typer.echo(f"version:      {manifest.version}")
-    typer.echo(f"mosaic:       {manifest.hippo_version}")
+    typer.echo(f"mosaic:       {manifest.mosaic_version}")
     typer.echo(f"created_at:   {manifest.created_at}")
     if manifest.description:
         typer.echo(f"description:  {manifest.description}")
@@ -181,7 +181,7 @@ def recipe_import(
         typer.echo(f"Error: unsatisfied requires: {e.message}", err=True)
         raise typer.Exit(1)
     except RecipeVersionIncompatibleError as e:
-        typer.echo(f"Error: incompatible hippo_version: {e.message}", err=True)
+        typer.echo(f"Error: incompatible mosaic_version: {e.message}", err=True)
         raise typer.Exit(1)
     except RecipeDigestMismatchError as e:
         typer.echo(f"Error: digest mismatch: {e.message}", err=True)
@@ -506,7 +506,7 @@ def recipe_install_from_lockfile(
         typer.echo(f"Error: unsatisfied requires: {e.message}", err=True)
         raise typer.Exit(1)
     except RecipeVersionIncompatibleError as e:
-        typer.echo(f"Error: incompatible hippo_version: {e.message}", err=True)
+        typer.echo(f"Error: incompatible mosaic_version: {e.message}", err=True)
         raise typer.Exit(1)
     except RecipeDigestMismatchError as e:
         typer.echo(f"Error: digest mismatch: {e.message}", err=True)

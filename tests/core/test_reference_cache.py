@@ -67,9 +67,9 @@ def fixture_server():
 
 @pytest.fixture()
 def isolated_cache(tmp_path, monkeypatch):
-    """Pin ``$HIPPO_CACHE_DIR`` to a tmp path for the duration of a test."""
+    """Pin ``$MOSAIC_CACHE_DIR`` to a tmp path for the duration of a test."""
     cache_root = tmp_path / "cache"
-    monkeypatch.setenv("HIPPO_CACHE_DIR", str(cache_root))
+    monkeypatch.setenv("MOSAIC_CACHE_DIR", str(cache_root))
     return cache_root
 
 
@@ -78,18 +78,18 @@ def isolated_cache(tmp_path, monkeypatch):
 
 class TestCacheDirFor:
     def test_env_override_wins(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HIPPO_CACHE_DIR", str(tmp_path / "envcache"))
+        monkeypatch.setenv("MOSAIC_CACHE_DIR", str(tmp_path / "envcache"))
         client = MosaicClient()
         path = client.cache_dir_for("ensembl")
         assert path == tmp_path / "envcache" / "ensembl"
         assert path.is_dir()
 
     def test_default_resolves_under_home(self, tmp_path, monkeypatch):
-        monkeypatch.delenv("HIPPO_CACHE_DIR", raising=False)
+        monkeypatch.delenv("MOSAIC_CACHE_DIR", raising=False)
         monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
         client = MosaicClient()
         path = client.cache_dir_for("fma")
-        assert path == tmp_path / ".cache" / "hippo" / "references" / "fma"
+        assert path == tmp_path / ".cache" / "mosaic" / "references" / "fma"
         assert path.is_dir()
 
     def test_per_loader_directories_are_disjoint(self, isolated_cache):

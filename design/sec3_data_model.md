@@ -44,7 +44,7 @@ in schema config and cannot be overridden by users.
 | `updated_at` | datetime (UTC) | No | Timestamp of most recent change, derived from the provenance log |
 | `schema_version` | string | No | Schema config version at most recent change, derived from the provenance log |
 
-`superseded_by` is a system column present on all entity types (applied generically by `hippo migrate`, not declared per-schema). It is set atomically alongside the availability change when `client.supersede_entity()` is called. `client.get()` returns the `superseded_by` field on all entities; it is `None` when not superseded. The authoritative record of the supersession is the `EntitySuperseded` provenance event — the column is a fast-read cache.
+`superseded_by` is a system column present on all entity types (applied generically by `mosaic migrate`, not declared per-schema). It is set atomically alongside the availability change when `client.supersede_entity()` is called. `client.get()` returns the `superseded_by` field on all entities; it is `None` when not superseded. The authoritative record of the supersession is the `EntitySuperseded` provenance event — the column is a fast-read cache.
 
 **On computed fields:** `created_at` is the timestamp of the first provenance event for an
 entity. `updated_at` is the timestamp of the most recent provenance event. `schema_version`
@@ -160,7 +160,7 @@ returns `list[ScoredMatch]` — see sec2 §2.3 for the type definition.
 **`ref` type validation:** The `ref` format encodes the target entity type and UUID
 (e.g. `"sample:abc-123"`). The SDK validates at write time that (a) the referenced entity
 type exists in the current schema config, and (b) the referenced entity UUID exists and is
-available. If a schema migration renames an entity type, `hippo migrate` rewrites all `ref`
+available. If a schema migration renames an entity type, `mosaic migrate` rewrites all `ref`
 values in affected fields as part of the migration plan — this is a data migration step
 that requires explicit confirmation.
 
@@ -175,7 +175,7 @@ code generation (Pydantic models, storage adapter models, JSON Schema for API va
 and provides interoperability with other data systems.
 
 ```yaml
-# hippo.yaml
+# mosaic.yaml
 schema:
   path: ./schema.yaml           # LinkML format
 ```
@@ -286,23 +286,23 @@ relationships:
 
 #### Schema `requires:` block
 
-A schema may declare dependencies on reference loader packages. `hippo validate` fails fast
+A schema may declare dependencies on reference loader packages. `mosaic validate` fails fast
 with a clear install suggestion if any required loader is absent.
 
 ```yaml
 version: "1.0"
 
 requires:
-  - hippo-reference-fma>=3.3
-  - hippo-reference-ensembl>=GRCh38.109
-  - hippo-reference-go>=2024-01-01
+  - mosaic-reference-fma>=3.3
+  - mosaic-reference-ensembl>=GRCh38.109
+  - mosaic-reference-go>=2024-01-01
 
 entities:
   Sample:
     fields:
       tissue_region:
         type: ref
-        target: AnatomyTerm    # provided by hippo-reference-fma
+        target: AnatomyTerm    # provided by mosaic-reference-fma
         search: fts
 ```
 
@@ -369,9 +369,9 @@ See sec3b_relational_storage.md §3b.4 for the relational table schema.
 ### 3.8 Schema Versioning and Migration
 
 Every schema config carries a `version` string. Hippo tracks the deployed version in internal
-metadata. When versions differ, `hippo migrate` must run before the server starts.
+metadata. When versions differ, `mosaic migrate` must run before the server starts.
 
-`hippo migrate` steps:
+`mosaic migrate` steps:
 1. Load and validate the LinkML schema
 2. Diff schema against deployed version
 3. Generate and print migration plan for human review
@@ -402,7 +402,7 @@ programmatic discovery. Callers can explicitly request deprecated fields via an
 `include_deprecated=True` flag, which returns them with a `_deprecated` suffix to prevent
 silent breakage.
 
-See sec3b_relational_storage.md §3b.5 for the `hippo_meta` table schema and §3b.6 for
+See sec3b_relational_storage.md §3b.5 for the `mosaic_meta` table schema and §3b.6 for
 migration DDL mechanics.
 
 ---
@@ -442,7 +442,7 @@ Built-in field validators for v0.1: `required`, `unique`, `range`, `uri_scheme`,
 
 For cross-field and cross-entity business rule validation, see sec2 §2.13 (Validation
 Infrastructure) — config-driven `validators.yaml` rules (CEL-based) and Python plugin
-validators (`hippo.write_validators` entry points) are a separate, complementary system
+validators (`mosaic.write_validators` entry points) are a separate, complementary system
 that runs in the write path after field validators.
 
 ---
@@ -476,7 +476,7 @@ relationships:
     cardinality: many-to-one
 ```
 
-Run `hippo migrate` to apply. The new entity type is immediately queryable and ingestable
+Run `mosaic migrate` to apply. The new entity type is immediately queryable and ingestable
 with no further changes.
 
 ---
@@ -626,7 +626,7 @@ SchemaValidationError: Circular namespace dependency detected: tissue → omics 
 #### Backwards compatibility
 
 Existing single-file `schema.yaml` deployments require no changes. The `namespace:` key is
-optional. `HippoClient` method signatures are unchanged — callers pass FQNs as strings to the
+optional. `MosaicClient` method signatures are unchanged — callers pass FQNs as strings to the
 same `entity_type` parameter they already use. No data migration is required for any existing
 deployment.
 

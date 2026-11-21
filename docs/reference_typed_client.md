@@ -94,14 +94,14 @@ Within a namespace, the attribute name for a class follows a deterministic rule:
 
 The rule is intentionally simple — it does not attempt linguistically correct
 plurals for irregular cases. When the default is unsuitable, override it with
-the `hippo_accessor` annotation:
+the `mosaic_accessor` annotation:
 
 ```yaml
 classes:
   Analysis:
     is_a: Entity
     annotations:
-      hippo_accessor: analytics     # instead of default "analysises"
+      mosaic_accessor: analytics     # instead of default "analysises"
 ```
 
 ---
@@ -163,10 +163,10 @@ from mosaic.models import Sample
 sample = Sample(id="x1", name="S001")
 client.samples.create(sample)
 
-# Non-root namespace class (hippo_namespace: tissue)
+# Non-root namespace class (mosaic_namespace: tissue)
 from mosaic.models.tissue import TissueSample
 
-# Nested namespace class (hippo_namespace: assay.quant)
+# Nested namespace class (mosaic_namespace: assay.quant)
 from mosaic.models.assay.quant import Measurement
 ```
 
@@ -198,11 +198,11 @@ ambiguous accessor surface. Four collision cases, each identified by the
 
 | `.case` | Trigger | Resolution |
 |---|---|---|
-| `"duplicate_accessor"` | Two classes in the same namespace derive the same accessor name | Add `hippo_accessor` to at least one class |
-| `"accessor_vs_namespace"` | A class accessor conflicts with a sub-namespace segment at the same attribute level | Rename the class, namespace, or add `hippo_accessor` |
+| `"duplicate_accessor"` | Two classes in the same namespace derive the same accessor name | Add `mosaic_accessor` to at least one class |
+| `"accessor_vs_namespace"` | A class accessor conflicts with a sub-namespace segment at the same attribute level | Rename the class, namespace, or add `mosaic_accessor` |
 | `"namespace_reserved"` | A namespace segment uses an SDK-reserved name (`query`, `storage`, …) | Rename the namespace |
 | `"reserved_root"` | A class declares `namespace: root` | Use a different namespace name — `root` is reserved |
-| `"accessor_reserved"` | A class's derived or override accessor conflicts with a public `MosaicClient` attribute | Override with `hippo_accessor` |
+| `"accessor_reserved"` | A class's derived or override accessor conflicts with a public `MosaicClient` attribute | Override with `mosaic_accessor` |
 
 ```python
 from mosaic.core.typed_client import TypedClientError
@@ -221,7 +221,7 @@ concrete schema fix. Example:
 SchemaRegistry load error: typed-client accessor collision.
   Classes `tissue.DNASample` and `tissue.DnaSample` both resolve to
   accessor `dna_samples` in namespace `tissue`.
-  Add `hippo_accessor` to at least one class to disambiguate.
+  Add `mosaic_accessor` to at least one class to disambiguate.
 ```
 
 ### Write-Time Errors — `ValidationFailed`
@@ -285,6 +285,6 @@ The typed client does not provide:
 - **Compile-time schema checks.** The Pydantic classes are generated from
   the schema loaded at runtime; if the schema changes between process starts,
   the accessor surface changes accordingly.
-- **`hippo_core` infrastructure classes.** `ProvenanceRecord`, `Process`,
+- **`mosaic_core` infrastructure classes.** `ProvenanceRecord`, `Process`,
   `Validator`, `ReferenceLoader`, and `Entity` are system concerns and are
   not exposed as typed accessors.

@@ -97,8 +97,8 @@ def populate(typed_root: "Namespace") -> None:
     registers each level as a synthetic module in ``sys.modules``.
 
     - Root-namespace classes land on ``mosaic.models`` itself.
-    - A class with ``hippo_namespace: tissue`` lands on ``mosaic.models.tissue``.
-    - A class with ``hippo_namespace: assay.quant`` lands on
+    - A class with ``mosaic_namespace: tissue`` lands on ``mosaic.models.tissue``.
+    - A class with ``mosaic_namespace: assay.quant`` lands on
       ``mosaic.models.assay.quant``; an empty ``mosaic.models.assay`` module
       is also registered so the dotted import chain resolves.
 

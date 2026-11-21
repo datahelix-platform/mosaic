@@ -85,7 +85,7 @@ def sample_registry() -> SchemaRegistry:
                     "name": {
                         "range": "string",
                         "required": True,
-                        "annotations": {"hippo_unique": True},
+                        "annotations": {"mosaic_unique": True},
                     },
                     "status": {"range": "string", "required": True},
                 }

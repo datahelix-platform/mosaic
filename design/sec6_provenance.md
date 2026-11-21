@@ -46,7 +46,7 @@ Every provenance event shares a common structure:
 | `process_id` | UUID | FK to `Process` — associates the record with a workflow run |
 
 **Immutability:** Provenance records are written once and never modified. The `ProvenanceRecord`
-class carries the `hippo_append_only` LinkML annotation; the storage adapter enforces this via
+class carries the `mosaic_append_only` LinkML annotation; the storage adapter enforces this via
 SQL triggers (see §6.6 and sec9 Decision 9.6.C).
 
 **Actor:** `actor_id` is resolved in priority order: (1) explicit `actor_id` kwarg to
@@ -61,7 +61,7 @@ require a real actor identity (sec9 §9.5 identity model).
 ### 6.3 Event Types
 
 > **Post-migration note:** The `event_type` string taxonomy below predates the
-> `provenance-migration` change. The production `Operation` enum in `hippo_core` uses
+> `provenance-migration` change. The production `Operation` enum in `mosaic_core` uses
 > lowercase values: `create`, `update`, `supersede`, `availability_change`,
 > `relationship_add`, `relationship_remove`, `external_id_add`, `external_id_remove`.
 > See sec9 §9.6 and Decision 9.6.B for the per-site mapping from legacy strings to
@@ -222,7 +222,7 @@ added).
 
 #### MigrationApplied
 
-Fired once per `hippo migrate` run. Recorded at the instance level (not entity-specific).
+Fired once per `mosaic migrate` run. Recorded at the instance level (not entity-specific).
 `entity_id` and `entity_type` are `null` for this event type.
 
 ```json
@@ -245,7 +245,7 @@ Fired when a reference loader completes installation or update.
 {
   "event_type": "ReferenceDataInstalled",
   "payload": {
-    "loader": "hippo-reference-fma",
+    "loader": "mosaic-reference-fma",
     "version": "3.3",
     "entities_created": 15234,
     "entities_updated": 0
@@ -321,11 +321,11 @@ documented as conventions, not enforced constraints.
 ### 6.6 Relational Storage for Provenance
 
 Provenance records are stored in the `ProvenanceRecord` table. The DDL is **LinkML-generated**
-via the `hippo_core` schema (Decision 9.6.D) — there is no hand-coded `CREATE TABLE` block
+via the `mosaic_core` schema (Decision 9.6.D) — there is no hand-coded `CREATE TABLE` block
 for this table in the adapter. The representative shape is:
 
 ```sql
--- Representative shape only; authoritative DDL is LinkML-generated from hippo_core.ProvenanceRecord
+-- Representative shape only; authoritative DDL is LinkML-generated from mosaic_core.ProvenanceRecord
 CREATE TABLE "ProvenanceRecord" (
     id              TEXT PRIMARY KEY,
     operation       TEXT NOT NULL,       -- Operation enum value (e.g. 'create', 'update')
@@ -353,7 +353,7 @@ CREATE INDEX idx_provenance_operation
 ON "ProvenanceRecord" (operation, timestamp);
 ```
 
-**No `UPDATE` or `DELETE` permitted** on `ProvenanceRecord`. The `hippo_append_only`
+**No `UPDATE` or `DELETE` permitted** on `ProvenanceRecord`. The `mosaic_append_only`
 annotation drives SQL trigger generation (Decision 9.6.C). The triggers are generic —
 any update to any column is rejected:
 
@@ -362,14 +362,14 @@ any update to any column is rejected:
 CREATE TRIGGER IF NOT EXISTS prevent_ProvenanceRecord_update
 BEFORE UPDATE ON "ProvenanceRecord"
 BEGIN
-    SELECT RAISE(ABORT, 'Cannot update ProvenanceRecord: hippo_append_only class');
+    SELECT RAISE(ABORT, 'Cannot update ProvenanceRecord: mosaic_append_only class');
 END;
 
 -- Block DELETE operations
 CREATE TRIGGER IF NOT EXISTS prevent_ProvenanceRecord_delete
 BEFORE DELETE ON "ProvenanceRecord"
 BEGIN
-    SELECT RAISE(ABORT, 'Cannot delete ProvenanceRecord: hippo_append_only class');
+    SELECT RAISE(ABORT, 'Cannot delete ProvenanceRecord: mosaic_append_only class');
 END;
 ```
 
@@ -379,7 +379,7 @@ even to direct SQL access outside the SDK.
 **Provenance summary view** (REQUIRED — not optional):
 
 The `entity_provenance_summary` view is **required** for correct operation of `client.query()`
-with provenance-derived `created_at` and `updated_at` fields. `hippo migrate` creates this
+with provenance-derived `created_at` and `updated_at` fields. `mosaic migrate` creates this
 view before any entity table migrations so it is always available.
 
 Expected columns and derivation logic:
@@ -551,7 +551,7 @@ Reconstruction is provenance-driven and leans on the existing log and indexes (�
 formalizes methods the SQLite/Postgres adapters already implement de facto:
 
 ```python
-# HippoClient / QueryService
+# MosaicClient / QueryService
 client.query("Sample", filters=[...], as_of="2026-06-01T00:00:00Z")          # set + state at T
 client.relationships.traverse(source_id, ..., as_of="2026-06-01T00:00:00Z")  # edges live at T
 
@@ -600,7 +600,7 @@ sub-question 5 — sequence via OpenSpec, after the current surface; not a v0.1 
    `state_version_at`, provenance-driven relationship `traverse(as_of=)`, and the
    `idx_ProvenanceRecord_type_timestamp` index, all mirrored from the SQLite path. Verified by
    compile + the gated `tests/integration/test_postgres_asof.py` (runs only with a live
-   PostgreSQL / `HIPPO_DATABASE_URL`). The §6.8.4 snapshot/cache **performance tier** remains
+   PostgreSQL / `MOSAIC_DATABASE_URL`). The §6.8.4 snapshot/cache **performance tier** remains
    deliberately deferred ("only if profiling demands"); both adapters carry the type-scoped index.
 
 #### 6.8.7 Deferred

@@ -1,27 +1,27 @@
 # Omics Reference Application
 
-This directory contains the schema for Hippo's first production deployment at the **VA National PTSD Brain Bank**. It is one application of the Hippo engine — the same engine, loaded with a different schema, would run a completely different application.
+This directory contains the schema for Mosaic's first production deployment at the **VA National PTSD Brain Bank**. It is one application of the Mosaic engine — the same engine, loaded with a different schema, would run a completely different application.
 
 ## What's here
 
 | File | Purpose |
 |------|---------|
 | `schema.yaml` | The LinkML schema defining entity types, fields, and relationships for an omics metadata deployment |
-| `hippo.yaml` | Minimal Hippo configuration pointing at this schema with SQLite storage |
+| `mosaic.yaml` | Minimal Mosaic configuration pointing at this schema with SQLite storage |
 
 ## Running this example
 
-Initialize a Hippo project from this directory:
+Initialize a Mosaic project from this directory:
 
 ```bash
-hippo init --schema schema.yaml
-hippo serve
+mosaic init --schema schema.yaml
+mosaic serve
 ```
 
-Or point an existing Hippo install at this config:
+Or point an existing Mosaic install at this config:
 
 ```bash
-hippo --config hippo.yaml serve
+mosaic --config mosaic.yaml serve
 ```
 
 ## Schema overview

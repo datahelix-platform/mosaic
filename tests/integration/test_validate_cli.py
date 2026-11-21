@@ -22,11 +22,11 @@ from mosaic.cli.main import app
 runner = CliRunner()
 
 
-# Minimal LinkML schema used across happy-path tests. Imports hippo_core so
+# Minimal LinkML schema used across happy-path tests. Imports mosaic_core so
 # concrete classes (Project, Sample) extend Entity and the tree-root bundle
 # carries the matching multivalued slots.
 VALID_SCHEMA_YAML = """\
-id: https://example.org/hippo/test/validate_cli
+id: https://example.org/mosaic/test/validate_cli
 name: validate_cli_schema
 description: Minimal LinkML schema for validate CLI tests.
 
@@ -35,7 +35,7 @@ prefixes:
 
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 
 default_range: string
 

@@ -36,7 +36,7 @@ prefixes:
   ex: https://example.org/quantity-repro/
 default_prefix: ex
 default_range: string
-imports: [linkml:types, hippo_core]
+imports: [linkml:types, mosaic_core]
 enums:
   MassUnit:
     permissible_values: {g: {}, mg: {}}
@@ -88,7 +88,7 @@ class TestDetection:
         vts = registry.value_type_classes()
         # Widget is_a Entity -> inherits the `id` identifier.
         assert "Widget" not in vts
-        # hippo_core entity classes carry identity (id / name).
+        # mosaic_core entity classes carry identity (id / name).
         assert "Entity" not in vts
         assert "ProvenanceRecord" not in vts
 

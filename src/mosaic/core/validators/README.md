@@ -1,6 +1,6 @@
 # CEL Validator Engine
 
-This module provides the CEL (Common Expression Language) validator engine for Hippo, enabling config-driven business rule validation through `validators.yaml`.
+This module provides the CEL (Common Expression Language) validator engine for Mosaic, enabling config-driven business rule validation through `validators.yaml`.
 
 ## Overview
 
@@ -24,7 +24,7 @@ pip install common-expression-language
 ### Basic Usage
 
 ```python
-from hippo.core.validators import ValidatorEngine
+from mosaic.core.validators import ValidatorEngine
 
 # Create and load validator engine
 engine = ValidatorEngine()
@@ -42,17 +42,17 @@ if not result.is_valid:
         print(f"Validation failed: {error['message']}")
 ```
 
-### Integration with HippoClient
+### Integration with MosaicClient
 
 ```python
-from hippo.core.client import HippoClient
-from hippo.core.validators import CELWriteValidator
+from mosaic.core.client import MosaicClient
+from mosaic.core.validators import CELWriteValidator
 
 # Create CEL validator
 validator = CELWriteValidator(validators_path="path/to/validators.yaml")
 
 # Create client with validator
-client = HippoClient()
+client = MosaicClient()
 client.add_validator(validator)
 
 # Create entity - validation runs automatically
@@ -123,7 +123,7 @@ engine.validate(entity_type, operation, entity_data)  # Validate
 
 ```python
 validator = CELWriteValidator(validators_path="validators.yaml")
-client.add_validator(validator)  # Add to HippoClient
+client.add_validator(validator)  # Add to MosaicClient
 ```
 
 ## Testing

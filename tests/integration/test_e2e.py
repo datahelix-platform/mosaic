@@ -43,7 +43,7 @@ _SCHEMA_CLASSES = {
             "tissue": {"range": "string", "required": True},
             "notes": {
                 "range": "string",
-                "annotations": {"hippo_search": "fts5"},
+                "annotations": {"mosaic_search": "fts5"},
             },
         }
     }
@@ -266,7 +266,7 @@ class TestAdditiveFieldAddition:
 class TestRESTAPI:
     def _app(self, tmp_hippo):
         hippo_client = _make_client(tmp_hippo)
-        return create_app(hippo_client=hippo_client, routers=[health_router])
+        return create_app(mosaic_client=hippo_client, routers=[health_router])
 
     def test_health_endpoint_returns_200(self, tmp_hippo):
         tc = TestClient(self._app(tmp_hippo))

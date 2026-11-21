@@ -30,17 +30,17 @@ from mosaic.linkml_bridge import SchemaRegistry, _bundled_importmap
 def _build_registry(extra_classes: dict, extra_slots: dict | None = None) -> SchemaRegistry:
     """Build a SchemaRegistry whose deployed view contains the given
     classes (and optional top-level slots), each carrying its declared
-    ``provided_by`` annotation. Imports ``hippo_core`` so ``is_a: Entity``
+    ``provided_by`` annotation. Imports ``mosaic_core`` so ``is_a: Entity``
     keeps working.
     """
     doc = {
-        "id": "https://example.org/hippo/test/override_guard",
+        "id": "https://example.org/mosaic/test/override_guard",
         "name": "override_guard_test",
         "prefixes": {
             "linkml": "https://w3id.org/linkml/",
             "upstream": "https://example.org/upstream/",
         },
-        "imports": ["linkml:types", "hippo_core"],
+        "imports": ["linkml:types", "mosaic_core"],
         "default_range": "string",
         "classes": extra_classes,
     }
@@ -78,7 +78,7 @@ def deployed_with_loader_class() -> SchemaRegistry:
         extra_classes={
             "LoaderThing": {
                 "is_a": "Entity",
-                "annotations": _provided_by("loader.hippo-reference-ensembl@115"),
+                "annotations": _provided_by("loader.mosaic-reference-ensembl@115"),
                 "attributes": {
                     "gene": {"range": "string", "required": True},
                 },
@@ -134,7 +134,7 @@ class TestRejection:
         }
         with pytest.raises(RecipeSchemaError) as excinfo:
             sm.check_no_inplace_override(fragment)
-        assert excinfo.value.provided_by == "loader.hippo-reference-ensembl@115"
+        assert excinfo.value.provided_by == "loader.mosaic-reference-ensembl@115"
 
     def test_redefines_recipe_provided_slot(self) -> None:
         registry = _build_registry(

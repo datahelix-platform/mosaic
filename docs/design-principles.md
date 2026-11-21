@@ -22,7 +22,7 @@ There is no `client.delete()`. Removing an entity means setting `is_available = 
 
 ## 5. LinkML upstream, not downstream.
 
-Mosaic extends LinkML schemas with `hippo_*` annotations for features the engine needs — validation tiers, reference-loader hooks, provenance configuration. Outside those annotations, Mosaic uses LinkML's own toolchain: `linkml-validate`, `gen-sqlddl`, and the LinkML Python dataclasses runtime. If there is a bug in LinkML's schema parsing, the fix is a version bump in Mosaic's `pyproject.toml`, not a shim in Mosaic's source. The engine does not reimplement or override upstream LinkML behavior; it extends it at well-defined, bounded points.
+Mosaic extends LinkML schemas with `mosaic_*` annotations for features the engine needs — validation tiers, reference-loader hooks, provenance configuration. Outside those annotations, Mosaic uses LinkML's own toolchain: `linkml-validate`, `gen-sqlddl`, and the LinkML Python dataclasses runtime. If there is a bug in LinkML's schema parsing, the fix is a version bump in Mosaic's `pyproject.toml`, not a shim in Mosaic's source. The engine does not reimplement or override upstream LinkML behavior; it extends it at well-defined, bounded points.
 
 ## 6. Mosaic doesn't know about your domain.
 

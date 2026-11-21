@@ -331,7 +331,7 @@ class GraphQLTypeBuilder:
         #: write surface (Decision 6).
         self.families: dict[str, EntityGraphQLInfo] = {}
         #: Families with their own read-only collection (accessor, page,
-        #: filter, search): ``hippo_anchor`` not false, and no accessor
+        #: filter, search): ``mosaic_anchor`` not false, and no accessor
         #: collision (Decision 3/5).
         self.family_anchors: list[str] = []
         self._built = False
@@ -472,7 +472,7 @@ class GraphQLTypeBuilder:
                 warnings.warn(
                     f"{name}: family accessor {sorted(clash)} collides with "
                     f"another class's; no read-only collection is generated "
-                    f"for it (ADR-0014 Decision 3). Set hippo_accessor on "
+                    f"for it (ADR-0014 Decision 3). Set mosaic_accessor on "
                     f"{name} to name it.",
                     stacklevel=2,
                 )
@@ -535,7 +535,7 @@ class GraphQLTypeBuilder:
             description = f"Inline {slot.target_class or slot.range} value."
             if slot.is_external_xref:
                 description += (
-                    " Reverse-lookup key (hippo_external_xref): "
+                    " Reverse-lookup key (mosaic_external_xref): "
                     "(system, value) is globally unique among available "
                     "entities; see the findByXref query."
                 )

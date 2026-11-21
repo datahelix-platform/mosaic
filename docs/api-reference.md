@@ -305,8 +305,8 @@ meaningful HTTP status with the standard error body (`{"error": ..., "detail":
 | `SchemaError` | 400 | `Schema Error` |
 | `AdapterError` | 500 | `Storage Adapter Error` |
 | `ProvenanceIntegrityError` | 500 | `Provenance Integrity Error` |
-| Any other `HippoError` (recipe/migration/...) | 500 | The exception class name |
-| Any non-Hippo exception | 500 | `Internal Server Error` (detail withheld) |
+| Any other `MosaicError` (recipe/migration/...) | 500 | The exception class name |
+| Any non-Mosaic exception | 500 | `Internal Server Error` (detail withheld) |
 
 All 5xx responses are logged server-side with full tracebacks.
 
@@ -326,7 +326,7 @@ All write endpoints (`POST`, `PUT`, `DELETE`) accept the following optional head
 
 | Header | Required | Description |
 |--------|----------|-------------|
-| `X-Mosaic-Actor` | Required on writes | Identity of the actor performing the write. Defaults to `"anonymous"` in v0.1 if omitted |
+| `X-DataHelix-Actor` | Required on writes | Identity of the actor performing the write. Defaults to `"anonymous"` in v0.1 if omitted |
 | `X-Mosaic-Context` | Optional | JSON-encoded provenance context (e.g., `{"pipeline": "rnaseq-v2", "run_id": "abc"}`) |
 
 **Example:**
@@ -334,7 +334,7 @@ All write endpoints (`POST`, `PUT`, `DELETE`) accept the following optional head
 ```bash
 curl -X POST http://127.0.0.1:8000/ingest \
   -H "Authorization: Bearer dev-token" \
-  -H "X-Mosaic-Actor: pipeline-run-789" \
+  -H "X-DataHelix-Actor: actor:pipeline-run-789" \
   -H "X-Mosaic-Context: {\"pipeline\": \"rnaseq-v2\", \"run_id\": \"abc\"}" \
   -H "Content-Type: application/json" \
   -d '{"entity_type": "Sample", "data": {...}}'
@@ -511,7 +511,7 @@ The CEL expression context provides the following variables:
 Pass an ISO 8601 watermark to fetch only entities modified after it. Results
 are ordered by `updated_at` ascending; persist the `updated_at` of the last
 entity processed as the watermark for the next poll. The comparison uses
-Hippo's server-side provenance timestamps (UTC), so callers never need to
+Mosaic's server-side provenance timestamps (UTC), so callers never need to
 trust their own clock. Omit `entity_type` to poll across all entity types:
 
 ```
@@ -589,7 +589,7 @@ Explicit update of an existing entity. Unlike the `POST /ingest` upsert endpoint
 *Request Headers:*
 | Header | Required | Description |
 |--------|----------|-------------|
-| `X-Mosaic-Actor` | Required | Identity of the actor performing the update |
+| `X-DataHelix-Actor` | Required | Identity of the actor performing the update |
 | `X-Mosaic-Context` | Optional | JSON-encoded provenance context |
 
 *Request Body:*
@@ -928,7 +928,7 @@ Get superseded external IDs for an entity.
 
 **GET /xref/{system}/{value}**
 
-Reverse lookup over `hippo_external_xref`-annotated `ExternalReference`
+Reverse lookup over `mosaic_external_xref`-annotated `ExternalReference`
 slots: returns the full envelope of the single AVAILABLE entity whose
 annotated slot carries the `(system, value)` pair. An entity's external
 references themselves are ordinary slot data on the entity endpoints.
@@ -1091,7 +1091,7 @@ Set the availability status on multiple entities of the same type in a single re
 *Request Headers:*
 | Header | Required | Description |
 |--------|----------|-------------|
-| `X-Mosaic-Actor` | Required | Identity of the actor performing the operation |
+| `X-DataHelix-Actor` | Required | Identity of the actor performing the operation |
 | `X-Mosaic-Context` | Optional | JSON-encoded provenance context |
 
 *Request Body:*

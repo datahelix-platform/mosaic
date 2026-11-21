@@ -24,12 +24,6 @@ def substitute_env_vars(value: Any, max_depth: int = 10) -> Any:
                 break
             var_name = match.group(1)
             env_value = os.environ.get(var_name)
-            if env_value is None and var_name.startswith("MOSAIC_"):
-                # ADR-0004: a config referencing ${MOSAIC_X} still works in
-                # an environment that only sets the legacy HIPPO_X spelling.
-                from .env import get_env
-
-                env_value = get_env(var_name[len("MOSAIC_"):])
             if env_value is None:
                 raise ConfigError(
                     f"Environment variable '{var_name}' is not defined",

@@ -1,0 +1,4 @@
+# Mosaic configuration — omics reference application
+schema_path: schema.yaml
+storage_backend: sqlite
+# database_url: data/mosaic.db

@@ -49,7 +49,7 @@ class TestExtraDetection:
 
     def test_create_default_app_requires_registry_for_mcp(self):
         with pytest.raises(ConfigError, match="schema-backed"):
-            create_default_app(hippo_client=MosaicClient(), mcp=True)
+            create_default_app(mosaic_client=MosaicClient(), mcp=True)
 
 
 @pytest.mark.anyio
@@ -93,7 +93,7 @@ class TestCapabilitiesResource:
         assert donor_id["filter_ops"] == []
         assert donor_id["predicate"] is True
 
-    async def test_search_available_reflects_hippo_search_annotation(self, hippo_client):
+    async def test_search_available_reflects_mosaic_search_annotation(self, hippo_client):
         server = create_mcp_server(hippo_client)
         payload = await _read_json(server, "mosaic://capabilities")
         assert payload["Sample"]["search_available"] is True

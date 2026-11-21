@@ -6,7 +6,7 @@ and whose values are lists of instance dicts. Identity is by the
 ``id`` slot on each instance; re-ingest of an existing id updates that
 entity in place. There is no separate wrapper format and no top-level
 ``external_id`` field — register external IDs by including ``external_ids:``
-entries in the same bundle (see ``hippo_core.ExternalID``).
+entries in the same bundle (see ``mosaic_core.ExternalID``).
 
 CSV/JSON operational data files are not accepted here; those belong to
 Cappella.

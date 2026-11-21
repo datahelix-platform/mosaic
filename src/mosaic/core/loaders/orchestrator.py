@@ -102,7 +102,7 @@ def _populated_classes(packages: Sequence["SchemaPackage"]) -> list[str]:
     """Union of the data classes the packages populate (for the gate scope).
 
     Domain/extension classes only — pure-schema packages contribute none,
-    and hippo_core system classes (provenance, process, …) are never in any
+    and mosaic_core system classes (provenance, process, …) are never in any
     package's ``populates_types``, so the end-to-end gate validates the
     deployment's *domain + extension* records, not system infrastructure.
     """
@@ -219,7 +219,7 @@ class OrchestrationResult:
     """Outcome of a :func:`migrate_to_bundle` run.
 
     :attr:`target_versions` is the ``{package → version}`` the caller should
-    persist to ``hippo_meta`` once the data has committed — the staged scope
+    persist to ``mosaic_meta`` once the data has committed — the staged scope
     already committed the *data* atomically; the version pointer is written
     after a clean return (matching mosaic's existing evolve-then-record
     pattern; the data migration itself is the atomic unit).
@@ -245,7 +245,7 @@ def migrate_to_bundle(
     ``packages`` are the installed packages of the deployment (used both to
     topologically sort the ``depends_on`` graph and to scope the end-to-end
     gate). ``current_versions`` is the ``{name: version}`` read from
-    ``hippo_meta`` **before** the staged scope opens (a separate read
+    ``mosaic_meta`` **before** the staged scope opens (a separate read
     connection, so it must not run inside the scope's write lock).
 
     The whole chain runs inside one :meth:`MosaicClient.staged_transaction`:

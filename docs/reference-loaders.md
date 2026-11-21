@@ -113,7 +113,7 @@ Clearing the cache does not uninstall any data from the Mosaic database — it o
 
 | Variable | Default | Description |
 |---|---|---|
-| `MOSAIC_CACHE_DIR` | `~/.cache/hippo/references/` | Root directory for all reference loader download caches. Set this to a shared path (e.g., an NFS mount or CI cache volume) to avoid redundant downloads across machines. |
+| `MOSAIC_CACHE_DIR` | `~/.cache/mosaic/references/` | Root directory for all reference loader download caches. Set this to a shared path (e.g., an NFS mount or CI cache volume) to avoid redundant downloads across machines. |
 
 Each loader gets its own subdirectory under the cache root: `$MOSAIC_CACHE_DIR/<loader_name>/`.
 
@@ -130,7 +130,7 @@ requires:
   - mosaic-reference-ensembl==0.1.0
 ```
 
-Only exact-match pins (`==`) are supported in v1, and the pin's right-hand side is matched against the **installed pip package version** of the loader (`importlib.metadata.version`) — not the data-version slug you pass to `mosaic reference install --version` (see [Installing a loader package](#installing-a-loader-package) above). A future v2 surface will support pinning against the data-version slug directly via `hippo_meta.reference_versions`. If you need a minimum version, pin the lowest acceptable release and upgrade explicitly with `mosaic reference upgrade`.
+Only exact-match pins (`==`) are supported in v1, and the pin's right-hand side is matched against the **installed pip package version** of the loader (`importlib.metadata.version`) — not the data-version slug you pass to `mosaic reference install --version` (see [Installing a loader package](#installing-a-loader-package) above). A future v2 surface will support pinning against the data-version slug directly via `mosaic_meta.reference_versions`. If you need a minimum version, pin the lowest acceptable release and upgrade explicitly with `mosaic reference upgrade`.
 
 `mosaic validate` and `mosaic migrate` both check `requires:` before doing anything else — each fails fast with a clear install suggestion if a required loader is missing or its installed version disagrees with the pin.
 
@@ -187,7 +187,7 @@ Use `--version test` in CI pipelines to avoid network dependencies and keep test
 
 ## Tracking installed loaders
 
-Mosaic records installed loader versions in `hippo_meta` under the key `reference_versions`. `mosaic status` surfaces this alongside other system information:
+Mosaic records installed loader versions in `mosaic_meta` under the key `reference_versions`. `mosaic status` surfaces this alongside other system information:
 
 ```
 $ mosaic status

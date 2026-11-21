@@ -19,8 +19,8 @@ async def get_client(request: Request) -> MosaicClient:
     Returns:
         MosaicClient instance.
     """
-    if hasattr(request.app.state, "hippo_client"):
-        return request.app.state.hippo_client
+    if hasattr(request.app.state, "mosaic_client"):
+        return request.app.state.mosaic_client
     return MosaicClient()
 
 

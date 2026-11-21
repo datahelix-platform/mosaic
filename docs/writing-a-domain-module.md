@@ -29,7 +29,7 @@ They are complementary. Reach for a `DomainModule` migration only when the *data
 mosaic-domain-mylab/
 ├── pyproject.toml
 └── src/
-    └── hippo_domain_mylab/
+    └── mosaic_domain_mylab/
         ├── __init__.py
         └── module.py      # DomainModule subclass (required)
 ```
@@ -41,7 +41,7 @@ mosaic-domain-mylab/
 Subclass `DomainModule` from `mosaic.core.loaders.domain_module`. Implement the two genus abstract methods (`versions()`, `schema_fragment()`) plus `migration_steps()`. `provision` is an inherited genus no-op — domain data arrives via `mosaic ingest`, not at schema-install time. `deprovision` is overridden to **refuse by default** when the module owns live data (see §7).
 
 ```python
-# src/hippo_domain_mylab/module.py
+# src/mosaic_domain_mylab/module.py
 from mosaic.core.loaders.domain_module import (
     DomainModule,
     MigrationContext,
@@ -62,10 +62,10 @@ class MyLabModule(DomainModule):
 
     def schema_fragment(self) -> dict:
         return {
-            "id": "https://example.org/hippo/mylab",
+            "id": "https://example.org/mosaic/mylab",
             "name": "mylab",
             "default_prefix": "mylab",   # REQUIRED — must match name
-            "prefixes": {"mylab": "https://example.org/hippo/mylab/"},
+            "prefixes": {"mylab": "https://example.org/mosaic/mylab/"},
             "classes": {
                 "Specimen": {
                     "is_a": "Entity",
@@ -169,7 +169,7 @@ Register the module under the genus group `mosaic.schema_packages` (a `DomainMod
 
 ```toml
 [project.entry-points."mosaic.schema_packages"]
-mylab = "hippo_domain_mylab.module:MyLabModule"
+mylab = "mosaic_domain_mylab.module:MyLabModule"
 ```
 
 The entry-point key must match `DomainModule.name`.

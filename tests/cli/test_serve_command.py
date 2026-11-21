@@ -33,7 +33,7 @@ def _capture_app(monkeypatch):
 
 
 def test_serve_injects_configured_client(tmp_path, monkeypatch):
-    cfg = tmp_path / "hippo.yaml"
+    cfg = tmp_path / "mosaic.yaml"
     cfg.write_text(
         f"schema_path: {_FIXTURE_SCHEMA}\n"
         "storage_backend: sqlite\n"
@@ -45,9 +45,9 @@ def test_serve_injects_configured_client(tmp_path, monkeypatch):
 
     assert result.exit_code == 0, result.output
     application = captured["app"]
-    assert application.state.hippo_client is not None
+    assert application.state.mosaic_client is not None
     # Real, persistent storage — not the storage=None echo stub.
-    assert application.state.hippo_client.storage is not None
+    assert application.state.mosaic_client.storage is not None
 
 
 def test_serve_default_fallback_without_config(tmp_path, monkeypatch):
@@ -59,7 +59,7 @@ def test_serve_default_fallback_without_config(tmp_path, monkeypatch):
 
     assert result.exit_code == 0, result.output
     assert "default SQLite" in result.output
-    assert captured["app"].state.hippo_client.storage is not None
+    assert captured["app"].state.mosaic_client.storage is not None
 
 
 def test_serve_explicit_bad_config_fails_loudly(tmp_path, monkeypatch):
@@ -130,7 +130,7 @@ def test_serve_no_reload_or_workers_still_passes_app_object(tmp_path, monkeypatc
     result = runner.invoke(app, ["serve"])
 
     assert result.exit_code == 0, result.output
-    assert captured["target"].state.hippo_client is not None
+    assert captured["target"].state.mosaic_client is not None
     assert "factory" not in captured["kwargs"]
 
 
@@ -216,5 +216,5 @@ def test_create_app_from_env_rebuilds_configured_client(tmp_path, monkeypatch):
 
     application = create_app_from_env()
 
-    assert application.state.hippo_client is not None
-    assert application.state.hippo_client.storage is not None
+    assert application.state.mosaic_client is not None
+    assert application.state.mosaic_client.storage is not None

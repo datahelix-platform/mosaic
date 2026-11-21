@@ -26,14 +26,14 @@ from mosaic.serve import create_default_app
 # comparable in intent even though this package builds its own registry
 # instance (session-scoped instances must not cross package boundaries).
 MCP_TEST_SCHEMA = """
-id: https://example.org/hippo/test_mcp
+id: https://example.org/mosaic/test_mcp
 name: test_mcp
 description: Schema exercising the MCP resource generation.
 prefixes:
   linkml: https://w3id.org/linkml/
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 default_range: string
 
 classes:
@@ -52,7 +52,7 @@ classes:
       name:
         required: true
         annotations:
-          hippo_search: fts5
+          mosaic_search: fts5
       donor_id:
         range: Donor
       volume_ml:
@@ -95,4 +95,4 @@ def hippo_client(registry: SchemaRegistry):
 
 @pytest.fixture
 def mcp_app(hippo_client: MosaicClient):
-    return create_default_app(hippo_client=hippo_client, mcp=True)
+    return create_default_app(mosaic_client=hippo_client, mcp=True)

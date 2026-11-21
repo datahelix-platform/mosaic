@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Component Overview
 
-**Mosaic** (formerly **Hippo** — renamed per ADR-0004; distributed as `datahelix-mosaic`, imported as `mosaic`) is the **LinkML runtime** for the BASS platform — the engine that reads a LinkML schema and *becomes* the typed knowledge graph it describes. In a deployment it is the platform's **structured domain graph** (see the platform `../platform/design/domain-graph.md`): every query returns a knowledge subgraph whose semantics are the schema's. Tracking *where data lives* and *what it describes* is **one role** it plays (file cataloging), not its essence — Mosaic is not a "metadata store," it runs whatever schema you give it. Historical documents under `design/` keep the Hippo name (forward-only convention); data-contract identifiers (`hippo_core`, `hippo_ext`, `hippo_*` annotation keys, the `hippo_meta` table) are deliberately **not** renamed. See the root `../CLAUDE.md` for repo-wide conventions.
+**Mosaic** (formerly **Hippo** — renamed per ADR-0004; distributed as `datahelix-mosaic`, imported as `mosaic`) is the **LinkML runtime** for the BASS platform — the engine that reads a LinkML schema and *becomes* the typed knowledge graph it describes. In a deployment it is the platform's **structured domain graph** (see the platform `../platform/design/domain-graph.md`): every query returns a knowledge subgraph whose semantics are the schema's. Tracking *where data lives* and *what it describes* is **one role** it plays (file cataloging), not its essence — Mosaic is not a "metadata store," it runs whatever schema you give it. Historical documents under `design/` keep the Hippo name (forward-only convention). The data-contract identifiers were renamed by platform ADR-0007 in v0.16.0: `mosaic_core` / `mosaic_ext`, `mosaic_*` annotation keys, the `mosaic_meta` / `mosaic_xref_index` tables, and the `mosaic:` prefix under `https://w3id.org/datahelix/mosaic/`. A `hippo_*` key in a schema is a validation error. Never rename `hippocampus` (a brain region). See the root `../CLAUDE.md` for repo-wide conventions.
 
 ## Spec Structure
 
@@ -25,7 +25,7 @@ Mosaic has three concentric layers — only the Core SDK is required:
 2. **Transport Layer** (optional): REST via FastAPI (`mosaic serve`), GraphQL (future). These are thin wrappers calling the SDK directly.
 3. **Infrastructure Layer** (adapters): Storage backends (SQLite v0.1, PostgreSQL future) and external system adapters (STARLIMS, HALO, Donor DB — all future stubs).
 
-Adapters are registered via entry points: `mosaic.storage_adapters`, `mosaic.external_adapters` (legacy `hippo.*` group spellings remain resolved during the ADR-0004 deprecation window).
+Adapters are registered via entry points: `mosaic.storage_adapters`, `mosaic.external_adapters` (the legacy `hippo.*` groups were removed by ADR-0015).
 
 ## Data Model Essentials
 

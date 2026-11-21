@@ -91,11 +91,8 @@ def _strip_digest_prefix(digest: str) -> str:
 def default_recipe_cache_dir() -> Path:
     """Resolve the recipe cache root (sec10 §10.4.2).
 
-    ``MOSAIC_RECIPE_CACHE`` wins when set (the legacy
-    ``HIPPO_RECIPE_CACHE`` spelling is honored with a
-    ``DeprecationWarning`` — ADR-0004); otherwise defaults to
-    ``~/.hippo/recipe-cache/`` (the pre-rename on-disk location, kept so
-    fetched recipes stay cached). The directory is created on demand by
+    ``MOSAIC_RECIPE_CACHE`` wins when set; otherwise defaults to
+    ``~/.mosaic/recipe-cache/``. The directory is created on demand by
     :class:`HttpsResolver`, not here.
     """
     from mosaic.config.env import get_env
@@ -103,7 +100,7 @@ def default_recipe_cache_dir() -> Path:
     env = get_env("RECIPE_CACHE")
     if env:
         return Path(env)
-    return Path.home() / ".hippo" / "recipe-cache"
+    return Path.home() / ".mosaic" / "recipe-cache"
 
 
 class RecipeResolver(ABC):

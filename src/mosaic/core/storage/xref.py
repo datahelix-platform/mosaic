@@ -1,14 +1,14 @@
 """External-reference (xref) side-index helpers (issue #48).
 
-The ``hippo_external_xref`` slot annotation opts an ``ExternalReference``-
+The ``mosaic_external_xref`` slot annotation opts an ``ExternalReference``-
 ranged slot into reverse-lookup behavior. The behavior is implemented as an
 annotation-driven side table — the same pattern the codebase uses for FTS5
-sync (``hippo_search``) — maintained by the storage adapter's write path in
+sync (``mosaic_search``) — maintained by the storage adapter's write path in
 the SAME SQL transaction as the entity write:
 
-    hippo_xref_index(entity_id, entity_type, slot, system, value)
+    mosaic_xref_index(entity_id, entity_type, slot, system, value)
 
-Availability semantics (mirrors the ``hippo_unique`` partial-index
+Availability semantics (mirrors the ``mosaic_unique`` partial-index
 precedent from PTS-348, "unique among live records"): index rows exist
 ONLY for available (``is_available = 1``) entities. Every write-path hook
 re-derives the entity's rows from its just-written state — rows are
@@ -24,7 +24,7 @@ import json
 from typing import Any
 
 #: Name of the side-index table.
-XREF_TABLE = "hippo_xref_index"
+XREF_TABLE = "mosaic_xref_index"
 
 #: DDL for the side table + its indexes. Emitted by the DDL generators
 #: only when at least one slot in the schema carries the annotation.

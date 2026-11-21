@@ -19,7 +19,7 @@ Recipes are identified by a stable reverse-DNS `id` (e.g., `org.broad.scrnaseq`)
 
 #### 10.1.2 How Recipes Generalise Reference Loaders
 
-Hippo's existing **Reference Loader** system ships imperative Python code that runs data ingestion logic and registers itself via the `hippo.reference_loaders` entry point. Reference Loaders handle bulk reference-data loading and are distributed as Python packages.
+Hippo's existing **Reference Loader** system ships imperative Python code that runs data ingestion logic and registers itself via the `mosaic.reference_loaders` entry point. Reference Loaders handle bulk reference-data loading and are distributed as Python packages.
 
 Recipes occupy a complementary, lower-level role: they carry **schema**, not code. Where a Reference Loader brings data into a running deployment, a recipe brings the schema fragment that gives that data its shape. The two systems coexist in v1 — Reference Loaders remain unchanged; recipes are not yet their schema-publishing mechanism. That convergence is a future phase.
 
@@ -27,12 +27,12 @@ The distinction matters for reproducibility: a deployment's schema state is not 
 
 #### 10.1.3 The Reproducibility Problem
 
-A Hippo deployment's operational schema — the union of `hippo_core`, user-authored classes, and any imported fragments — can diverge across peer instances when schema fragments are loaded manually or evolved in place. There is no portable artifact that describes "exactly the schema this instance uses and where each fragment came from."
+A Hippo deployment's operational schema — the union of `mosaic_core`, user-authored classes, and any imported fragments — can diverge across peer instances when schema fragments are loaded manually or evolved in place. There is no portable artifact that describes "exactly the schema this instance uses and where each fragment came from."
 
 Recipes solve this by introducing two primitives:
 
 1. **Content addressing:** every recipe is identified by a sha256 digest over its canonical content. Installing a recipe by URI plus digest is a reproducible, tamper-evident act.
-2. **Lockfile:** the `hippo_meta.installed_recipes` registry captures the full installation record. `hippo recipe export-lockfile` serialises it as `recipe.lock.yaml`; `hippo recipe install-from-lockfile` replays it on a peer instance, verifying each digest. A deployment's exact schema state can be transferred as a single file.
+2. **Lockfile:** the `mosaic_meta.installed_recipes` registry captures the full installation record. `mosaic recipe export-lockfile` serialises it as `recipe.lock.yaml`; `mosaic recipe install-from-lockfile` replays it on a peer instance, verifying each digest. A deployment's exact schema state can be transferred as a single file.
 
 ---
 
@@ -40,10 +40,10 @@ Recipes solve this by introducing two primitives:
 
 #### 10.2.1 Service Composition
 
-`RecipeService` is a service facade that follows the same pattern as `IngestionService`, `ProvenanceService`, and `QueryService`. It is instantiated once in `HippoClient.__init__` and holds references to `SchemaManager` and `ProvenanceService`. It never touches `SchemaView` directly for merging — all schema writes flow through `SchemaManager`.
+`RecipeService` is a service facade that follows the same pattern as `IngestionService`, `ProvenanceService`, and `QueryService`. It is instantiated once in `MosaicClient.__init__` and holds references to `SchemaManager` and `ProvenanceService`. It never touches `SchemaView` directly for merging — all schema writes flow through `SchemaManager`.
 
 ```
-HippoClient
+MosaicClient
 │
 ├── SchemaManager          (schema access, merge, validation)
 ├── ProvenanceService      (audit trail)
@@ -55,7 +55,7 @@ HippoClient
         └── holds resolvers           →  [FileResolver, HttpsResolver]
 ```
 
-`HippoClient` exposes one thin delegating wrapper per `RecipeService` public method, named `recipe_<verb>` (e.g., `client.recipe_import(source)`). CLI commands call `HippoClient` delegators; they never reach `RecipeService` directly.
+`MosaicClient` exposes one thin delegating wrapper per `RecipeService` public method, named `recipe_<verb>` (e.g., `client.recipe_import(source)`). CLI commands call `MosaicClient` delegators; they never reach `RecipeService` directly.
 
 #### 10.2.2 Install Pipeline
 
@@ -72,7 +72,7 @@ The install pipeline for a single recipe proceeds in the following stages. Botto
         │  raw bytes / directory
         ▼
  ┌─────────────┐
- │  Cache      │  ~/.hippo/recipe-cache/<sha256>/
+ │  Cache      │  ~/.mosaic/recipe-cache/<sha256>/
  │  (https     │  Cache hit → skip network on subsequent calls
  │  only)      │
  └──────┬──────┘
@@ -113,7 +113,7 @@ class RecipeService:
         storage: SQLiteAdapter,
         schema_manager: SchemaManager,
         provenance_service: ProvenanceService,
-        cache_dir: Path | None = None,        # default: ~/.hippo/recipe-cache/
+        cache_dir: Path | None = None,        # default: ~/.mosaic/recipe-cache/
         resolvers: Sequence[RecipeResolver] | None = None,
     ) -> None: ...
 
@@ -143,7 +143,7 @@ Tarball form: `tar -czf my-recipe.tar.gz my-recipe/` — the contained directory
 
 #### 10.3.2 RecipeManifest Fields
 
-Defined in `src/hippo/schemas/recipe_manifest.yaml`. The LinkML schema is the authoritative field spec.
+Defined in `src/mosaic/schemas/recipe_manifest.yaml`. The LinkML schema is the authoritative field spec.
 
 | Field | Required | Notes |
 |---|---|---|
@@ -154,7 +154,7 @@ Defined in `src/hippo/schemas/recipe_manifest.yaml`. The LinkML schema is the au
 | `author` | no | Sub-object: `name`, `email`, `organization`. |
 | `license` | no | SPDX identifier. |
 | `created_at` | yes | ISO 8601 UTC instant. |
-| `hippo_version` | yes | PEP 440 version specifier (e.g. `">=0.3,<0.5"`). Parsed with `packaging.specifiers.SpecifierSet`. Import fails with `RecipeVersionIncompatibleError` when the running Hippo version is excluded. |
+| `mosaic_version` | yes | PEP 440 version specifier (e.g. `">=0.3,<0.5"`). Parsed with `packaging.specifiers.SpecifierSet`. Import fails with `RecipeVersionIncompatibleError` when the running Hippo version is excluded. |
 | `source` | no | Author-declared canonical origin URI (e.g. a Zenodo DOI). Metadata only — Hippo never fetches from it. Distinct from per-`RecipeRef` `source` fields. |
 | `parent` | no | `RecipeRef`. Present on extended recipes. Auto-resolved as a dependency at install time (see §10.4.4). |
 | `requires.recipes` | no | List of `RecipeRef`. Peer dependencies, not ancestors. |
@@ -173,7 +173,7 @@ Defined in `src/hippo/schemas/recipe_manifest.yaml`. The LinkML schema is the au
 
 #### 10.3.4 Installed Recipes Registry
 
-`hippo_meta.installed_recipes` is a JSON object keyed by recipe `id`. Each entry extends `RecipeRef` with additional fields captured at install time:
+`mosaic_meta.installed_recipes` is a JSON object keyed by recipe `id`. Each entry extends `RecipeRef` with additional fields captured at install time:
 
 | Field | Notes |
 |---|---|
@@ -184,11 +184,11 @@ Defined in `src/hippo/schemas/recipe_manifest.yaml`. The LinkML schema is the au
 | `installed_at` | ISO 8601 UTC instant. |
 | `parent` | Embedded `RecipeRef` sub-object, or null. Carried from the manifest for audit. |
 
-This registry is the input to `hippo recipe export-lockfile` and the source of truth for `hippo recipe list`.
+This registry is the input to `mosaic recipe export-lockfile` and the source of truth for `mosaic recipe list`.
 
 #### 10.3.5 Lineage via Parent
 
-The `parent` field establishes explicit recipe lineage. Only `hippo recipe extend` creates lineage; editing the live schema after a recipe import does NOT retroactively attach those edits to any recipe (invariant 5). The `parent` pointer in an installed recipe's manifest is preserved in `installed_recipes` for audit.
+The `parent` field establishes explicit recipe lineage. Only `mosaic recipe extend` creates lineage; editing the live schema after a recipe import does NOT retroactively attach those edits to any recipe (invariant 5). The `parent` pointer in an installed recipe's manifest is preserved in `installed_recipes` for audit.
 
 ---
 
@@ -207,9 +207,9 @@ No other URI schemes are supported in v1. Attempts to resolve a `git:` or `oci:`
 
 #### 10.4.2 Content-Addressable Cache
 
-The cache lives at `~/.hippo/recipe-cache/<sha256>/`. The cache key is the recipe's sha256 canonical-content-hash digest. A cache hit skips network fetch entirely; the cached directory is used directly. Cache eviction is out of scope for v1.
+The cache lives at `~/.mosaic/recipe-cache/<sha256>/`. The cache key is the recipe's sha256 canonical-content-hash digest. A cache hit skips network fetch entirely; the cached directory is used directly. Cache eviction is out of scope for v1.
 
-The cache directory can be overridden with the `HIPPO_RECIPE_CACHE` environment variable (resolution: open question 3 — adopted; see §10.4.6). This is parallel to Hippo's existing cache-override conventions.
+The cache directory can be overridden with the `MOSAIC_RECIPE_CACHE` environment variable (resolution: open question 3 — adopted; see §10.4.6). This is parallel to Hippo's existing cache-override conventions.
 
 #### 10.4.3 Digest Algorithm
 
@@ -222,7 +222,7 @@ Algorithm:
 3. Build a buffer by concatenating, for each file in sorted order: `<relative-path-as-utf8>\n<lowercase-hex-sha256-of-file-bytes>\n`.
 4. The recipe digest is `sha256(buffer)`, lowercase hex. No files are excluded.
 
-The reference implementation lives in `core/recipe/digest.py` as a single ~20-line function. `hippo recipe inspect` prints the computed digest so recipe authors can verify it before publishing.
+The reference implementation lives in `core/recipe/digest.py` as a single ~20-line function. `mosaic recipe inspect` prints the computed digest so recipe authors can verify it before publishing.
 
 #### 10.4.4 Dependency Resolution
 
@@ -242,7 +242,7 @@ Cycle detection is mandatory across both `parent` and `requires.recipes`. Implem
 
 #### 10.4.6 Cache Directory Override
 
-**Open question 3 (resolved):** The `HIPPO_RECIPE_CACHE` environment variable overrides the default cache directory `~/.hippo/recipe-cache/`. This is adopted from the handoff recommendation and is consistent with Hippo's existing conventions for cache path overrides. When set, the env var value is used as the cache root for all `HttpsResolver` fetches in that process.
+**Open question 3 (resolved):** The `MOSAIC_RECIPE_CACHE` environment variable overrides the default cache directory `~/.mosaic/recipe-cache/`. This is adopted from the handoff recommendation and is consistent with Hippo's existing conventions for cache path overrides. When set, the env var value is used as the cache root for all `HttpsResolver` fetches in that process.
 
 #### 10.4.7 Atomicity
 
@@ -252,7 +252,7 @@ The schema merge and provenance write execute in a single storage transaction. A
 
 ### 10.5 Export Semantics
 
-`hippo recipe export` packages the locally-authored content of the live schema into a new recipe directory or tarball.
+`mosaic recipe export` packages the locally-authored content of the live schema into a new recipe directory or tarball.
 
 #### 10.5.1 Selectivity
 
@@ -272,7 +272,7 @@ The `requires.recipes` list is populated automatically from the set of installed
 
 - Classes and slots with `provided_by` starting `recipe.` or `loader.` (upstream content).
 - Reference data (seed rows). Controlled vocabularies that live as LinkML `permissible_values:` inside `schema.yaml` ARE included; bulk reference data continues to ship via Reference Loaders.
-- Runtime state (`hippo_meta`, entity data, provenance records).
+- Runtime state (`mosaic_meta`, entity data, provenance records).
 
 ---
 
@@ -282,11 +282,11 @@ The `requires.recipes` list is populated automatically from the set of installed
 
 **Content addressing.** A recipe is identified by its sha256 canonical-content-hash digest (§10.4.3). The declared digest in a `RecipeRef` is verified against freshly-fetched bytes at install time; mismatch aborts with `RecipeDigestMismatchError`. For `file:` sources where no digest is declared, the digest is computed and recorded in `installed_recipes`. Tag drift, link rot of mutable URLs, and substitution attacks are all caught loudly.
 
-**Lockfile.** `hippo recipe export-lockfile` serialises `hippo_meta.installed_recipes` as `recipe.lock.yaml`. `hippo recipe install-from-lockfile` re-fetches each entry by its `source`, verifies each `digest`, and installs in dependency order. Together these provide a full reproducibility round-trip: a deployment's exact schema state can be recreated on a peer instance from a single file, provided each entry's `source` URI is still resolvable.
+**Lockfile.** `mosaic recipe export-lockfile` serialises `mosaic_meta.installed_recipes` as `recipe.lock.yaml`. `mosaic recipe install-from-lockfile` re-fetches each entry by its `source`, verifies each `digest`, and installs in dependency order. Together these provide a full reproducibility round-trip: a deployment's exact schema state can be recreated on a peer instance from a single file, provided each entry's `source` URI is still resolvable.
 
 #### 10.6.2 Lockfile Format
 
-`recipe.lock.yaml` is a YAML document. It carries `lockfile_version: 1` at the top level for forward-compatibility parsing. Each entry under `installed_recipes` corresponds to one entry in the `hippo_meta.installed_recipes` registry and includes `id`, `version`, `source`, `digest`, `installed_at`, and `parent` (if set).
+`recipe.lock.yaml` is a YAML document. It carries `lockfile_version: 1` at the top level for forward-compatibility parsing. Each entry under `installed_recipes` corresponds to one entry in the `mosaic_meta.installed_recipes` registry and includes `id`, `version`, `source`, `digest`, `installed_at`, and `parent` (if set).
 
 **Open question 2 (resolved):** `recipe.lock.yaml` carries `lockfile_version: 1`. This is adopted from the handoff recommendation. The version key allows future parsers to branch on lockfile format without breaking existing lockfiles.
 
@@ -340,12 +340,12 @@ The rationale: in-place override of upstream classes creates hidden dependencies
 
 #### 10.7.3 The `extend` Workflow
 
-`hippo recipe extend <installed-id> --out <dir>` scaffolds a new recipe directory pre-populated with:
+`mosaic recipe extend <installed-id> --out <dir>` scaffolds a new recipe directory pre-populated with:
 
 - A `recipe.yaml` manifest with `parent` set to a `RecipeRef` for `<installed-id>` (resolved from `installed_recipes`).
 - An empty `schema.yaml` importing the parent's prefix, ready for local additions.
 
-The extended recipe's manifest carries explicit `parent` lineage. When installed, the parent is auto-resolved and installed first (§10.4.4). Lineage is explicit and traceable: `hippo recipe list` shows the `parent` field for each installed recipe.
+The extended recipe's manifest carries explicit `parent` lineage. When installed, the parent is auto-resolved and installed first (§10.4.4). Lineage is explicit and traceable: `mosaic recipe list` shows the `parent` field for each installed recipe.
 
 No implicit lineage is created by any other operation (invariant 5). Editing the live schema after a recipe import does not retroactively attach those edits to the recipe.
 
@@ -362,7 +362,7 @@ All recipe errors are defined in `core/exceptions.py` and inherit from Hippo's e
 | `RecipeManifestError` | Manifest fails LinkML validation against `recipe_manifest.yaml`. |
 | `RecipePrefixCollisionError` | Incoming recipe's `name`/`default_prefix` collides with an installed prefix from any source (recipe, loader, or hand-authored). |
 | `RecipeRequiresUnsatisfiedError` | A declared `requires.recipes` or `requires.reference_loaders` dep cannot be resolved. Message includes the unresolved `RecipeRef.source` URI. |
-| `RecipeVersionIncompatibleError` | `hippo_version` SpecifierSet excludes the running Hippo version. |
+| `RecipeVersionIncompatibleError` | `mosaic_version` SpecifierSet excludes the running Hippo version. |
 | `RecipeLineageCycleError` | Parent / requires graph contains a cycle. |
 | `RecipeSchemaError` | Embedded `schema.yaml` fails LinkML validation, or `SchemaManager.merge_fragment` rejects the fragment (including the no-in-place-override check, invariant 6). |
 | `RecipeFetchError` | Resolver could not retrieve the artifact (404, network error, unreadable tarball, unsupported URI scheme). |
@@ -370,7 +370,7 @@ All recipe errors are defined in `core/exceptions.py` and inherit from Hippo's e
 
 #### 10.8.2 Provenance Event: `recipe_imported`
 
-One new provenance event kind is introduced. Its schema lives in `hippo_core.yaml` alongside existing event kinds. Exactly one `recipe_imported` event is emitted per top-level `import_()` call; bottom-up dependency installs each emit their own event in the same transaction.
+One new provenance event kind is introduced. Its schema lives in `mosaic_core.yaml` alongside existing event kinds. Exactly one `recipe_imported` event is emitted per top-level `import_()` call; bottom-up dependency installs each emit their own event in the same transaction.
 
 | Field | Notes |
 |---|---|
@@ -392,15 +392,15 @@ The following capabilities are explicitly deferred. Each entry names the rationa
 
 | Feature | Rationale | v2 pointer |
 |---|---|---|
-| **Federation / HTTP `/recipe` endpoint** | Serving recipes over HTTP from a Hippo instance requires auth, versioning, and discovery design that is premature before adoption patterns are clear. | `hippo serve` will expose a `/recipes` read endpoint in a future phase. |
-| **Overlay / harmonize import modes** | Bootstrap-only install (schema must be additive) keeps the merge logic simple and safe. Overlay (modifying existing schema elements via import) requires a 3-way merge and conflict-resolution semantics not yet designed. | `hippo recipe import --mode overlay` in v2. |
+| **Federation / HTTP `/recipe` endpoint** | Serving recipes over HTTP from a Hippo instance requires auth, versioning, and discovery design that is premature before adoption patterns are clear. | `mosaic serve` will expose a `/recipes` read endpoint in a future phase. |
+| **Overlay / harmonize import modes** | Bootstrap-only install (schema must be additive) keeps the merge logic simple and safe. Overlay (modifying existing schema elements via import) requires a 3-way merge and conflict-resolution semantics not yet designed. | `mosaic recipe import --mode overlay` in v2. |
 | **Data sidecar / seed rows** | Separating schema from data keeps recipes portable and avoids conflating schema install with data migration. Controlled vocabularies expressible as `permissible_values:` are included in `schema.yaml`; bulk reference data ships via Reference Loaders. | Recipe-bundled seed rows (`data.yaml`) in a future phase. |
 | **Signing / authorship trust** | v1 verifies byte integrity via sha256. Signing requires a trust model (sigstore, minisign) and key distribution not yet designed. | Recipe signing in v2, likely via sigstore. |
-| **Recipe uninstall** | Consistent with Hippo's no-hard-deletes principle. Schema elements contributed by a recipe cannot be removed without potentially breaking entities that reference those types. Workaround: rebuild the instance from a lockfile that omits the unwanted recipe. | A future `hippo recipe uninstall --force` with explicit cascade warnings may be scoped in v2. |
-| **Discovery / search** | No `hippo recipe search`. Users find recipes via READMEs, lab wikis, and DOI-minted releases. A public registry is a community governance problem, not a core Hippo feature. | Community registry in a future phase, if adoption warrants it. |
+| **Recipe uninstall** | Consistent with Hippo's no-hard-deletes principle. Schema elements contributed by a recipe cannot be removed without potentially breaking entities that reference those types. Workaround: rebuild the instance from a lockfile that omits the unwanted recipe. | A future `mosaic recipe uninstall --force` with explicit cascade warnings may be scoped in v2. |
+| **Discovery / search** | No `mosaic recipe search`. Users find recipes via READMEs, lab wikis, and DOI-minted releases. A public registry is a community governance problem, not a core Hippo feature. | Community registry in a future phase, if adoption warrants it. |
 | **`git:` / `oci:` URI schemes** | `file:` + `https:` cover the primary distribution patterns. Git and OCI add significant resolver complexity. | `git:` and `oci:` resolvers in v2. |
 | **Reference Loader internals using RecipeService** | Reference Loaders continue on their existing code path. Convergence (RL as recipe producer) is a design task for a later phase once both systems are stable. | Convergence phase in a future sprint. |
-| **`recipe rebase` / 3-way schema merge** | Rebasing a recipe against an updated parent requires semantic understanding of schema-level diffs that is deferred until `hippo recipe diff` and `linkml-diff` integration are proven at scale. | `hippo recipe rebase` in v2. |
+| **`recipe rebase` / 3-way schema merge** | Rebasing a recipe against an updated parent requires semantic understanding of schema-level diffs that is deferred until `mosaic recipe diff` and `linkml-diff` integration are proven at scale. | `mosaic recipe rebase` in v2. |
 
 ---
 
@@ -412,7 +412,7 @@ These invariants must remain true after every PR in the recipe work. An implemen
 2. **All recipe schema writes flow through `SchemaManager.merge_fragment(...)`** (or whichever exact method the implementer chooses to add/use) so future invariants added to `SchemaManager` apply to recipes automatically.
 3. **Provenance is unconditional.** Every successful recipe import writes exactly one `recipe_imported` provenance entry in the same transaction as the schema merge. Failed imports leave no state change in either store.
 4. **Digest is the source of truth.** When a `RecipeRef` declares a `digest`, the install path verifies it against the freshly fetched bytes and aborts on mismatch with `RecipeDigestMismatchError`. When no digest is declared (only legal for `file:` sources in v1), the install path computes one and records it in `installed_recipes`.
-5. **No implicit lineage.** Editing the live schema after a recipe import does not retroactively attach those edits to the recipe. Lineage is created only by `hippo recipe extend` and propagated only by an explicit subsequent `import` of the extended recipe.
+5. **No implicit lineage.** Editing the live schema after a recipe import does not retroactively attach those edits to the recipe. Lineage is created only by `mosaic recipe extend` and propagated only by an explicit subsequent `import` of the extended recipe.
 6. **No in-place override of upstream classes.** The merge layer rejects a recipe whose schema modifies a class or slot whose `provided_by` annotation names a different recipe or loader. Users override by subclassing (`is_a:`). The implementing agent must add a check for this in the `SchemaManager` seam.
 7. **`provided_by` is set, not inferred.** `recipe.<id>@<version>` is injected by the merge layer. `loader.<name>@<version>` continues to be injected by the Reference Loader path. `provided_by` values a recipe author hand-writes are overwritten — the manifest identity wins.
 
@@ -421,17 +421,17 @@ These invariants must remain true after every PR in the recipe work. An implemen
 ### 10.11 CLI Surface
 
 ```
-hippo recipe list                              # list installed recipes with id, version, source
-hippo recipe inspect <path-or-uri>             # parse + validate manifest; print computed digest; no DB writes
-hippo recipe import <path-or-uri> [--dry-run]  # bootstrap-only install
-hippo recipe export [--out PATH] [--parent <installed-id>]
-hippo recipe extend <installed-id> --out PATH  # scaffold derivative recipe directory
-hippo recipe diff <a> <b>                      # structural diff between two recipes (paths or URIs)
-hippo recipe export-lockfile [--out PATH]      # write recipe.lock.yaml from installed_recipes
-hippo recipe install-from-lockfile <file>      # re-fetch + verify + install from lockfile
+mosaic recipe list                              # list installed recipes with id, version, source
+mosaic recipe inspect <path-or-uri>             # parse + validate manifest; print computed digest; no DB writes
+mosaic recipe import <path-or-uri> [--dry-run]  # bootstrap-only install
+mosaic recipe export [--out PATH] [--parent <installed-id>]
+mosaic recipe extend <installed-id> --out PATH  # scaffold derivative recipe directory
+mosaic recipe diff <a> <b>                      # structural diff between two recipes (paths or URIs)
+mosaic recipe export-lockfile [--out PATH]      # write recipe.lock.yaml from installed_recipes
+mosaic recipe install-from-lockfile <file>      # re-fetch + verify + install from lockfile
 ```
 
-CLI is implemented in `hippo/cli/recipe.py`, mirroring the structure of other subcommand modules. CLI calls `HippoClient` delegators; it never reaches `RecipeService` directly.
+CLI is implemented in `hippo/cli/recipe.py`, mirroring the structure of other subcommand modules. CLI calls `MosaicClient` delegators; it never reaches `RecipeService` directly.
 
 ---
 
@@ -443,4 +443,4 @@ This section records the three open questions flagged in the handoff document an
 |---|---|---|
 | 1 | `requires.reference_loaders` resolution | **Precondition only.** v1 does not install Reference Loaders as a side effect of recipe import. Hippo checks that each pinned RL is installed at the declared version before proceeding; failure raises `RecipeRequiresUnsatisfiedError`. Adopted from handoff recommendation. See §10.4.5. |
 | 2 | Lockfile schema versioning | **Yes — `lockfile_version: 1`.** `recipe.lock.yaml` carries `lockfile_version: 1` at the top level for forward-compatible parsing. Adopted from handoff recommendation. See §10.6.2. |
-| 3 | Cache-dir override | **Yes — `HIPPO_RECIPE_CACHE` env var.** Overrides the default `~/.hippo/recipe-cache/` directory, parallel to existing Hippo cache conventions. Adopted from handoff recommendation. See §10.4.2 and §10.4.6. |
+| 3 | Cache-dir override | **Yes — `MOSAIC_RECIPE_CACHE` env var.** Overrides the default `~/.mosaic/recipe-cache/` directory, parallel to existing Hippo cache conventions. Adopted from handoff recommendation. See §10.4.2 and §10.4.6. |

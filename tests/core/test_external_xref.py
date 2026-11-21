@@ -1,9 +1,9 @@
-"""Tests for the ExternalReference value type + hippo_external_xref
+"""Tests for the ExternalReference value type + mosaic_external_xref
 annotation (issue #48, non-breaking phase).
 
 Covers:
 - DDL: inline JSON TEXT storage for ExternalReference-ranged slots
-  (single- and multivalued), hippo_xref_index side table emission, and
+  (single- and multivalued), mosaic_xref_index side table emission, and
   startup failure for a misplaced annotation.
 - Index maintenance across create / update / replace / availability-off /
   availability-on / delete / supersede, in the same transaction as the
@@ -35,13 +35,13 @@ from mosaic.core.storage.xref import XREF_TABLE, extract_xref_pairs
 from mosaic.linkml_bridge import SchemaRegistry
 
 XREF_TEST_SCHEMA = """
-id: https://example.org/hippo/test_xref
+id: https://example.org/mosaic/test_xref
 name: test_xref
 prefixes:
   linkml: https://w3id.org/linkml/
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 default_range: string
 
 classes:
@@ -56,7 +56,7 @@ classes:
         range: ExternalReference
         inlined: true
         annotations:
-          hippo_external_xref: true
+          mosaic_external_xref: true
       other_refs:
         description: Multivalued reverse-lookup keys.
         range: ExternalReference
@@ -64,7 +64,7 @@ classes:
         inlined: true
         inlined_as_list: true
         annotations:
-          hippo_external_xref: true
+          mosaic_external_xref: true
       note_ref:
         description: Plain structured value — NOT a lookup key.
         range: ExternalReference
@@ -80,7 +80,7 @@ classes:
         range: ExternalReference
         inlined: true
         annotations:
-          hippo_external_xref: true
+          mosaic_external_xref: true
 """
 
 
@@ -192,11 +192,11 @@ class TestDDL:
     def test_no_xref_table_without_annotation(self):
         plain = SchemaRegistry.from_yaml(
             """
-id: https://example.org/hippo/test_plain
+id: https://example.org/mosaic/test_plain
 name: test_plain
 prefixes:
   linkml: https://w3id.org/linkml/
-imports: [linkml:types, hippo_core]
+imports: [linkml:types, mosaic_core]
 default_range: string
 classes:
   Thing:
@@ -211,11 +211,11 @@ classes:
     def test_annotation_on_wrong_range_fails_at_startup(self):
         bad = SchemaRegistry.from_yaml(
             """
-id: https://example.org/hippo/test_bad
+id: https://example.org/mosaic/test_bad
 name: test_bad
 prefixes:
   linkml: https://w3id.org/linkml/
-imports: [linkml:types, hippo_core]
+imports: [linkml:types, mosaic_core]
 default_range: string
 classes:
   Thing:
@@ -223,10 +223,10 @@ classes:
     attributes:
       name:
         annotations:
-          hippo_external_xref: true
+          mosaic_external_xref: true
 """
         )
-        with pytest.raises(SchemaError, match="hippo_external_xref"):
+        with pytest.raises(SchemaError, match="mosaic_external_xref"):
             DDLGenerator().generate(bad)
 
 

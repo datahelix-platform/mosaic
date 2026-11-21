@@ -10,7 +10,7 @@
 
 Hippo's auth story has two distinct modes that coexist by design:
 
-1. **SDK mode (no auth):** The `HippoClient` accepts an `actor` string parameter with no
+1. **SDK mode (no auth):** The `MosaicClient` accepts an `actor` string parameter with no
    validation. There is no Bridge, no credential check, and no middleware. This is correct for
    local single-user deployments where auth friction is unwanted.
 
@@ -77,14 +77,14 @@ class PassThroughAuthMiddleware(AuthMiddleware):
     """
 
     def authenticate(self, request: Request) -> str:
-        return request.headers.get("X-Hippo-Actor", "anonymous")
+        return request.headers.get("X-DataHelix-Actor", "anonymous")
 
     def authorize(self, actor: str, operation: str, entity_type: str) -> bool:
         return True
 ```
 
 The stub (`PassThroughAuthMiddleware`) is registered as the default in the FastAPI app. The
-`BridgeAuthMiddleware` replaces it when `bridge.enabled: true` is set in `hippo.yaml`.
+`BridgeAuthMiddleware` replaces it when `bridge.enabled: true` is set in `mosaic.yaml`.
 
 ---
 
@@ -104,7 +104,7 @@ Bridge strips the original `Authorization` header and injects two verified heade
 # hippo/rest/auth_bridge.py
 
 from fastapi import Request, HTTPException
-from hippo.rest.auth import AuthMiddleware
+from mosaic.core.middleware import AuthMiddleware
 
 # Maps Bridge roles to permitted Hippo operations.
 _ROLE_PERMISSIONS: dict[str, set[str]] = {
@@ -162,18 +162,18 @@ network:
 - If Hippo receives a request directly (bypassing Bridge) that contains `X-DataHelix-Actor`,
   it must be rejected with `403 Forbidden` — components must not be exposed on the public
   network when Bridge auth is expected
-- The `hippo.yaml` `bridge.trust_proxy` configuration key (CIDR list) controls which source
+- The `mosaic.yaml` `bridge.trust_proxy` configuration key (CIDR list) controls which source
   IPs are allowed to set these headers; requests from outside this range that carry
   `X-DataHelix-Actor` are rejected
 
-#### 8.3.2 Backwards Compatibility: `X-Hippo-Actor` Header
+#### 8.3.2 Backwards Compatibility: `X-DataHelix-Actor` Header
 
-The v0.1 `X-Hippo-Actor` header (caller-supplied actor) is superseded when Bridge auth is
-active. `BridgeAuthMiddleware.authenticate()` ignores `X-Hippo-Actor` entirely and reads only
+The v0.1 `X-DataHelix-Actor` header (caller-supplied actor) is superseded when Bridge auth is
+active. `BridgeAuthMiddleware.authenticate()` ignores `X-DataHelix-Actor` entirely and reads only
 `X-DataHelix-Actor`. This prevents actor spoofing — a caller behind Bridge cannot override the
-authenticated identity by setting `X-Hippo-Actor`.
+authenticated identity by setting `X-DataHelix-Actor`.
 
-In `PassThroughAuthMiddleware` (standalone mode), `X-Hippo-Actor` continues to be read as
+In `PassThroughAuthMiddleware` (standalone mode), `X-DataHelix-Actor` continues to be read as
 before, for backwards compatibility.
 
 ---
@@ -183,7 +183,7 @@ before, for backwards compatibility.
 The FastAPI app registers auth middleware as a startup-time dependency:
 
 ```yaml
-# hippo.yaml (relevant keys)
+# mosaic.yaml (relevant keys)
 bridge:
   enabled: true                        # Activates BridgeAuthMiddleware
   trust_proxy: ["10.0.0.0/8"]         # CIDRs allowed to set X-DataHelix-* headers
@@ -221,7 +221,7 @@ Incoming request
 ```
 
 The actor string stored on `request.state.actor` is the single value passed into every
-`HippoClient` call made during that request. There is no ambient global state — the actor is
+`MosaicClient` call made during that request. There is no ambient global state — the actor is
 threaded explicitly through the call chain.
 
 ---
@@ -333,7 +333,7 @@ appropriate role.
 ### 8.8 Configuration Reference
 
 ```yaml
-# hippo.yaml — auth section (new in Phase 3)
+# mosaic.yaml — auth section (new in Phase 3)
 
 bridge:
   enabled: false                     # Default: standalone mode (PassThroughAuthMiddleware)
@@ -347,7 +347,7 @@ Deployment tiers:
 
 | Tier | `bridge.enabled` | Auth middleware | Actor source |
 |---|---|---|---|
-| **Local dev (standalone)** | `false` | `PassThroughAuthMiddleware` | `X-Hippo-Actor` header or `"anonymous"` |
+| **Local dev (standalone)** | `false` | `PassThroughAuthMiddleware` | `X-DataHelix-Actor` header or `"anonymous"` |
 | **Team server (Bridge-enabled)** | `true` | `BridgeAuthMiddleware` | `X-DataHelix-Actor` from Bridge |
 | **SDK direct** | N/A | None | `actor=` parameter on SDK calls |
 

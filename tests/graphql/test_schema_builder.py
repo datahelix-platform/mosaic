@@ -48,7 +48,7 @@ class TestObjectTypeGeneration:
             assert f"type {name} {{" not in sdl
 
     def test_external_id_is_exposed_like_typed_client(self, sdl):
-        # ExternalID is a concrete hippo_core class exposed by the
+        # ExternalID is a concrete mosaic_core class exposed by the
         # schema-typing core (issues #47/#48) — same class set as the
         # typed client; GraphQL mirrors that.
         assert "type ExternalID" in sdl
@@ -165,8 +165,8 @@ class TestRootTypes:
 
     def test_hippo_schema_introspection_queries(self, sdl):
         query = _block(sdl, "type Query")
-        assert "hippoSchema: [MosaicEntityTypeInfo!]!" in query
-        assert "hippoEntityType(name: String!): MosaicEntityTypeInfo" in query
+        assert "mosaicSchema: [MosaicEntityTypeInfo!]!" in query
+        assert "mosaicEntityType(name: String!): MosaicEntityTypeInfo" in query
         info = _block(sdl, "type MosaicEntityTypeInfo")
         assert "fields: [MosaicSlotInfo!]!" in info
         assert "relationships: [MosaicReferenceInfo!]!" in info
@@ -269,7 +269,7 @@ class TestBuilder:
         assert builder.entities == first
 
     def test_empty_schema_raises(self):
-        # hippo_core alone has exactly one concrete non-infrastructure
+        # mosaic_core alone has exactly one concrete non-infrastructure
         # class (ExternalID); a registry can never really be empty, so
         # exercise the guard through a builder with no entities.
         from mosaic.graphql.resolvers import build_graphql_schema as build_with_builder
@@ -282,13 +282,13 @@ class TestBuilder:
 
 
 GRAPHQL_CORE_ONLY = """
-id: https://example.org/hippo/test_graphql_core_only
+id: https://example.org/mosaic/test_graphql_core_only
 name: test_graphql_core_only
 prefixes:
   linkml: https://w3id.org/linkml/
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 default_range: string
 """
 
@@ -296,13 +296,13 @@ default_range: string
 #: A reference whose range is an ABSTRACT polymorphic base (ADR-0003). The
 #: base has no generated object type, so the reference can't resolve to an edge.
 EDGE_ONLY_POLYMORPHIC_SCHEMA = """
-id: https://example.org/hippo/test_edge_only_polymorphic
+id: https://example.org/mosaic/test_edge_only_polymorphic
 name: test_edge_only_polymorphic
 prefixes:
   linkml: https://w3id.org/linkml/
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 default_range: string
 
 classes:
@@ -325,13 +325,13 @@ classes:
 
 #: A resolved relationship field name that collides with a sibling scalar slot.
 EDGE_ONLY_COLLISION_SCHEMA = """
-id: https://example.org/hippo/test_edge_only_collision
+id: https://example.org/mosaic/test_edge_only_collision
 name: test_edge_only_collision
 prefixes:
   linkml: https://w3id.org/linkml/
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 default_range: string
 
 classes:

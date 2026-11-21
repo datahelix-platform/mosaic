@@ -2,7 +2,7 @@
 
 Exercises PTS-227 acceptance criteria end-to-end through the Typer CLI.
 The Python-distribution lookup is patched so tests stay hermetic — no
-real ``hippo-reference-*`` package needs to be on the test environment.
+real ``mosaic-reference-*`` package needs to be on the test environment.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from mosaic.cli.main import app
 
 
 SCHEMA_TEMPLATE = """\
-id: https://example.org/hippo/test/requires_cli
+id: https://example.org/mosaic/test/requires_cli
 name: requires_cli_schema
 
 prefixes:
@@ -25,7 +25,7 @@ prefixes:
 
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 
 default_range: string
 
@@ -59,7 +59,7 @@ class TestValidateRequiresCLI:
         self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
         monkeypatch.setattr("mosaic.requires._dist_version", lambda name: "3.3")
-        schema = _write_schema(tmp_path, ["hippo-reference-fma==3.3"])
+        schema = _write_schema(tmp_path, ["mosaic-reference-fma==3.3"])
         result = runner.invoke(app, ["validate", "--schema", str(schema)])
         assert result.exit_code == 0, result.output
         assert "requires" in result.output.lower()
@@ -76,7 +76,7 @@ class TestValidateRequiresCLI:
     def test_range_comparator_rejected(
         self, runner: CliRunner, tmp_path: Path
     ):
-        schema = _write_schema(tmp_path, ["hippo-reference-fma>=3.3"])
+        schema = _write_schema(tmp_path, ["mosaic-reference-fma>=3.3"])
         result = runner.invoke(app, ["validate", "--schema", str(schema)])
         assert result.exit_code == 1
         assert "exact-match" in result.output
@@ -88,10 +88,10 @@ class TestValidateRequiresCLI:
             raise PackageNotFoundError(name)
 
         monkeypatch.setattr("mosaic.requires._dist_version", _missing)
-        schema = _write_schema(tmp_path, ["hippo-reference-fma==3.3"])
+        schema = _write_schema(tmp_path, ["mosaic-reference-fma==3.3"])
         result = runner.invoke(app, ["validate", "--schema", str(schema)])
         assert result.exit_code == 1
-        assert "hippo-reference-fma" in result.output
+        assert "mosaic-reference-fma" in result.output
         assert "not installed" in result.output
         assert "mosaic reference install fma --version 3.3" in result.output
 
@@ -99,9 +99,9 @@ class TestValidateRequiresCLI:
         self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
         monkeypatch.setattr("mosaic.requires._dist_version", lambda name: "3.2")
-        schema = _write_schema(tmp_path, ["hippo-reference-fma==3.3"])
+        schema = _write_schema(tmp_path, ["mosaic-reference-fma==3.3"])
         result = runner.invoke(app, ["validate", "--schema", str(schema)])
         assert result.exit_code == 1
-        assert "hippo-reference-fma==3.3" in result.output
+        assert "mosaic-reference-fma==3.3" in result.output
         assert "version 3.2 is installed" in result.output
         assert "mosaic reference install fma --version 3.3" in result.output

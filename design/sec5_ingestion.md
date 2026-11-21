@@ -12,8 +12,8 @@ Hippo provides three ingestion mechanisms, each serving a distinct use case:
 
 | Tier | Mechanism | Use case |
 |---|---|---|
-| **Flat-file** | `hippo ingest` CLI + `IngestionPipeline` SDK | One-off or batch loads from CSV/JSON/JSONL; config data; re-ingestion |
-| **Reference data** | `hippo reference install` CLI + `ReferenceLoader` plugins | Community-standard ontologies (FMA, Ensembl, GO, etc.) |
+| **Flat-file** | `mosaic ingest` CLI + `IngestionPipeline` SDK | One-off or batch loads from CSV/JSON/JSONL; config data; re-ingestion |
+| **Reference data** | `mosaic reference install` CLI + `ReferenceLoader` plugins | Community-standard ontologies (FMA, Ensembl, GO, etc.) |
 | **External systems** | `ExternalSourceAdapter` implementations (lives in Cappella) | STARLIMS, HALO, REDCap, partner systems |
 
 All three tiers write through the same SDK write path — schema validation, business rule
@@ -35,25 +35,25 @@ validation, and provenance recording apply uniformly regardless of ingestion sou
 
 ```bash
 # Ingest a CSV of Sample entities
-hippo ingest Sample samples.csv
+mosaic ingest Sample samples.csv
 
 # Ingest from JSONL
-hippo ingest Subject subjects.jsonl
+mosaic ingest Subject subjects.jsonl
 
 # Dry run — validate without writing
-hippo ingest Sample samples.csv --dry-run
+mosaic ingest Sample samples.csv --dry-run
 
 # Supply provenance context
-hippo ingest Sample samples.csv --actor "data-team" --context '{"notes": "batch load Q4 2024"}'
+mosaic ingest Sample samples.csv --actor "data-team" --context '{"notes": "batch load Q4 2024"}'
 
 # Fail on first error (default: continue and report all errors at end)
-hippo ingest Sample samples.csv --fail-fast
+mosaic ingest Sample samples.csv --fail-fast
 ```
 
 #### `IngestionPipeline` SDK
 
 ```python
-from hippo.core.ingestion import IngestionPipeline, IngestOptions
+from mosaic.core.ingestion import IngestionPipeline, IngestOptions
 
 pipeline = IngestionPipeline(client)
 result = pipeline.ingest_file(
@@ -104,51 +104,51 @@ class IngestError:
 
 ### 5.3 Reference Data Ingestion
 
-Reference data loaders are distributed as `hippo-reference-<name>` pip packages. See
+Reference data loaders are distributed as `mosaic-reference-<name>` pip packages. See
 sec2 §2.14 for the `ReferenceLoader` ABC and plugin system.
 
 #### Install lifecycle
 
 ```bash
 # Install at latest available version
-hippo reference install fma
+mosaic reference install fma
 
 # Install at specific version
-hippo reference install ensembl --version GRCh38.112
+mosaic reference install ensembl --version GRCh38.112
 
 # Update to latest
-hippo reference update go
+mosaic reference update go
 
 # List all installed loaders and their versions
-hippo reference list
+mosaic reference list
 ```
 
 **Install steps (automated):**
-1. Resolve loader from `hippo.reference_loaders` entry points
+1. Resolve loader from `mosaic.reference_loaders` entry points
 2. Call `loader.schema_fragment()` — merge entity type definitions into deployed schema
-3. Run `hippo migrate` automatically (additive changes only; any structural conflict is an
+3. Run `mosaic migrate` automatically (additive changes only; any structural conflict is an
    error that requires manual resolution before proceeding)
 4. Call `loader.load(client, version)` — ingest the reference data using the standard
    `IngestionPipeline` with `upsert=True`
-5. Record `{loader_name: version}` in `hippo_meta` under key `reference_versions`
+5. Record `{loader_name: version}` in `mosaic_meta` under key `reference_versions`
 6. Write a `ReferenceDataInstalled` provenance event (see sec6 §6.3)
 
-**Idempotency:** Re-running `hippo reference install` on an already-installed loader performs
+**Idempotency:** Re-running `mosaic reference install` on an already-installed loader performs
 an upsert — existing reference entities are updated if the ontology data changed in the new
 version, unchanged entities produce no write (and no provenance event). See §5.4.
 
-**Version tracking:** The installed version of each reference loader is stored in `hippo_meta`:
+**Version tracking:** The installed version of each reference loader is stored in `mosaic_meta`:
 
 ```json
-// hippo_meta key: "reference_versions"
+// mosaic_meta key: "reference_versions"
 {
-  "hippo-reference-fma": "3.3",
-  "hippo-reference-ensembl": "GRCh38.109",
-  "hippo-reference-go": "2024-01-01"
+  "mosaic-reference-fma": "3.3",
+  "mosaic-reference-ensembl": "GRCh38.109",
+  "mosaic-reference-go": "2024-01-01"
 }
 ```
 
-`hippo reference list` reads this and compares against available versions from each loader.
+`mosaic reference list` reads this and compares against available versions from each loader.
 
 ---
 
@@ -199,8 +199,8 @@ writes.
 transaction, rolling back all writes if any record fails. Deferred from v0.1.
 
 > **Batch unit-of-work (issue #84).** The flat-file `--atomic` idea generalizes to an SDK-level
-> **batch unit-of-work**: `HippoClient.validate_batch()` (whole-set dry-run validation, no writes)
-> and `HippoClient.batch_put()` (atomic multi-entity commit via the existing
+> **batch unit-of-work**: `MosaicClient.validate_batch()` (whole-set dry-run validation, no writes)
+> and `MosaicClient.batch_put()` (atomic multi-entity commit via the existing
 > `staged_transaction()`, with intra-batch reference resolution). Exposed over the transports as
 > REST `POST /ingest/validate` + `POST /ingest/batch` and GraphQL `validateBatch` / `ingestBatch`.
 > Driven by the Aperture write loop (`aperture/design/portal-requirements.md` X4). See

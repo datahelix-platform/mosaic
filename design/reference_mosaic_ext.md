@@ -1,25 +1,25 @@
-## Reference: `hippo_ext` Annotation Vocabulary
+## Reference: `mosaic_ext` Annotation Vocabulary
 
 **Document status:** Draft v0.1
-**Depends on:** sec9_linkml_redesign.md §9.4, `src/hippo/schemas/hippo_ext.yaml`
+**Depends on:** sec9_linkml_redesign.md §9.4, `src/mosaic/schemas/mosaic_ext.yaml`
 
-This document is the authoritative per-annotation reference for `hippo_ext.yaml` —
-Hippo's formal declaration of every `hippo_*` annotation recognized by the schema
-pipeline. Every `hippo_*` annotation used in any Hippo-managed schema MUST be
+This document is the authoritative per-annotation reference for `mosaic_ext.yaml` —
+Hippo's formal declaration of every `mosaic_*` annotation recognized by the schema
+pipeline. Every `mosaic_*` annotation used in any Hippo-managed schema MUST be
 declared here; undeclared annotations, value-type mismatches, and wrong-target
 attachments fail at schema load. See sec9 §9.4 for the design rationale.
 
-The live schema lives at `src/hippo/schemas/hippo_ext.yaml` and ships with the
+The live schema lives at `src/mosaic/schemas/mosaic_ext.yaml` and ships with the
 Hippo Python package. `SchemaRegistry` loads it at startup and validates every
-`hippo_*` annotation in the merged user schema against the declarations below.
+`mosaic_*` annotation in the merged user schema against the declarations below.
 
 ---
 
 ### Modeling note
 
 LinkML has no native metamodel for declaring a vocabulary of allowed annotation
-tags. `hippo_ext` repurposes LinkML's `slot` declaration as the container for
-each annotation's metadata. Each `hippo_*` annotation is declared as a slot with:
+tags. `mosaic_ext` repurposes LinkML's `slot` declaration as the container for
+each annotation's metadata. Each `mosaic_*` annotation is declared as a slot with:
 
 - `range` — the annotation's value type (boolean, string, enum, etc.)
 - `description` — human-readable semantics
@@ -29,22 +29,22 @@ each annotation's metadata. Each `hippo_*` annotation is declared as a slot with
   to a `class`.
 
 User schemas do not import these slots as data slots. `SchemaRegistry`
-introspects `hippo_ext` to obtain the vocabulary; user schemas use the
+introspects `mosaic_ext` to obtain the vocabulary; user schemas use the
 annotations via the standard `annotations:` block on their own classes / slots.
 
 ---
 
 ### Vocabulary
 
-`hippo_unique`, `hippo_index`, `hippo_index_partial`, and `hippo_search`
-landed with Wave 1 (`hippo-ext-vocabulary`); `hippo_append_only` landed
+`mosaic_unique`, `mosaic_index`, `mosaic_index_partial`, and `mosaic_search`
+landed with Wave 1 (`hippo-ext-vocabulary`); `mosaic_append_only` landed
 with Wave 2 (`provenance-as-linkml-class`) as a declaration — adapter
-enforcement follows in `provenance-migration`. `hippo_accessor` joins the
+enforcement follows in `provenance-migration`. `mosaic_accessor` joins the
 vocabulary with Wave 3's `typed-client` — see *Deferred annotations*
-below. `hippo_external_xref` landed with issue #48 (ExternalReference
+below. `mosaic_external_xref` landed with issue #48 (ExternalReference
 value type).
 
-#### `hippo_unique`
+#### `mosaic_unique`
 
 | Attribute | Value |
 |---|---|
@@ -65,10 +65,10 @@ classes:
       barcode:
         range: string
         annotations:
-          hippo_unique: true
+          mosaic_unique: true
 ```
 
-#### `hippo_index`
+#### `mosaic_index`
 
 | Attribute | Value |
 |---|---|
@@ -78,7 +78,7 @@ classes:
 | Consumer | DDL generators |
 
 Emit a single-column index for the annotated slot. Interacts with
-`hippo_index_partial`.
+`mosaic_index_partial`.
 
 **Example.**
 ```yaml
@@ -88,10 +88,10 @@ classes:
       collected_at:
         range: datetime
         annotations:
-          hippo_index: true
+          mosaic_index: true
 ```
 
-#### `hippo_index_partial`
+#### `mosaic_index_partial`
 
 | Attribute | Value |
 |---|---|
@@ -99,10 +99,10 @@ classes:
 | Value type | boolean |
 | Default | `false` |
 | Consumer | DDL generators |
-| Requires | `hippo_index: true` on the same slot |
+| Requires | `mosaic_index: true` on the same slot |
 
-When `hippo_index` is true on the same slot, emit the index as partial with
-the predicate `WHERE is_available = 1`. Has no effect when `hippo_index` is
+When `mosaic_index` is true on the same slot, emit the index as partial with
+the predicate `WHERE is_available = 1`. Has no effect when `mosaic_index` is
 false (but SchemaRegistry does not currently warn about this combination).
 
 **Example.**
@@ -113,11 +113,11 @@ classes:
       external_id:
         range: string
         annotations:
-          hippo_index: true
-          hippo_index_partial: true
+          mosaic_index: true
+          mosaic_index_partial: true
 ```
 
-#### `hippo_search`
+#### `mosaic_search`
 
 | Attribute | Value |
 |---|---|
@@ -141,10 +141,10 @@ classes:
       description:
         range: string
         annotations:
-          hippo_search: fts5
+          mosaic_search: fts5
 ```
 
-#### `hippo_append_only`
+#### `mosaic_append_only`
 
 | Attribute | Value |
 |---|---|
@@ -153,10 +153,10 @@ classes:
 | Default | `false` |
 | Consumer | Storage adapter (SQL triggers for relational adapters) |
 
-Classes annotated `hippo_append_only: true` are append-only: the storage
+Classes annotated `mosaic_append_only: true` are append-only: the storage
 adapter MUST reject `UPDATE` and `DELETE` against rows of the class. Only
-`INSERT` is permitted. Applied in `hippo_core` to `ProvenanceRecord`
-(see `reference_hippo_core.md`).
+`INSERT` is permitted. Applied in `mosaic_core` to `ProvenanceRecord`
+(see `reference_mosaic_core.md`).
 
 **Enforcement.** SQLite and Postgres adapters emit `BEFORE UPDATE` and
 `BEFORE DELETE` triggers on the backing table that raise at the SQL
@@ -173,25 +173,25 @@ classes:
   ProvenanceRecord:
     is_a: Entity
     annotations:
-      hippo_append_only: true
+      mosaic_append_only: true
 ```
 
-#### `hippo_external_xref`
+#### `mosaic_external_xref`
 
 | Attribute | Value |
 |---|---|
 | Applies to | slot |
 | Value type | boolean |
 | Default | `false` |
-| Consumer | DDL generators + storage adapter write path; `HippoClient.find_by_xref` / `list_xrefs`; REST `GET /xref/{system}/{value}`; GraphQL `findByXref` |
+| Consumer | DDL generators + storage adapter write path; `MosaicClient.find_by_xref` / `list_xrefs`; REST `GET /xref/{system}/{value}`; GraphQL `findByXref` |
 | Requires | `range: ExternalReference` on the same slot (DDL generation fails at startup otherwise) |
 
 Marks an `ExternalReference`-ranged slot as a **reverse-lookup key**
 (issue #48). The slot's `(system, value)` pairs are maintained in the
-`hippo_xref_index` side table:
+`mosaic_xref_index` side table:
 
 ```
-hippo_xref_index(entity_id, entity_type, slot, system, value)
+mosaic_xref_index(entity_id, entity_type, slot, system, value)
 UNIQUE (system, value)
 ```
 
@@ -203,7 +203,7 @@ UNIQUE (system, value)
   inline JSON either way).
 - **Availability semantics.** Index rows exist ONLY for available
   (`is_available = 1`) entities — the same "unique among live records"
-  semantics as `hippo_unique`'s partial index (PTS-348), realised by row
+  semantics as `mosaic_unique`'s partial index (PTS-348), realised by row
   lifecycle instead of a `WHERE` predicate. Turning an entity unavailable
   frees its pairs; turning it back available re-claims them (and fails
   with a clear conflict if another live entity took a pair in between).
@@ -230,14 +230,14 @@ classes:
         range: ExternalReference
         inlined: true
         annotations:
-          hippo_external_xref: true
+          mosaic_external_xref: true
       donor_refs:                 # multivalued works the same way
         range: ExternalReference
         multivalued: true
         inlined: true
         inlined_as_list: true
         annotations:
-          hippo_external_xref: true
+          mosaic_external_xref: true
 ```
 
 ---
@@ -250,9 +250,9 @@ per Decision 9.4.B in `sec9_decisions.md`.
 
 | Annotation | Applies to | Introduced by | Wave |
 |---|---|---|---|
-| `hippo_accessor` | class | `typed-client` | 3 |
+| `mosaic_accessor` | class | `typed-client` | 3 |
 
-Not currently declared in `hippo_ext.yaml`. Using it in a user schema
+Not currently declared in `mosaic_ext.yaml`. Using it in a user schema
 before `typed-client` lands will fail at schema load with an
 undeclared-annotation error.
 
@@ -260,19 +260,19 @@ undeclared-annotation error.
 
 ### Version discipline
 
-`hippo_ext` declares a `version:` attribute (currently `0.2.0`). Bump rules
+`mosaic_ext` declares a `version:` attribute (currently `0.2.0`). Bump rules
 (per sec9 §9.3):
 
 | Change | Bump |
 |---|---|
 | Add an annotation | Minor |
-| Add a permissible value to `hippo_search_mode` or another enum | Minor |
+| Add a permissible value to `mosaic_search_mode` or another enum | Minor |
 | Refine or clarify description text | Patch |
 | Rename or remove an annotation | Major — requires an OpenSpec proposal scoping the migration |
 | Change an annotation's value type, `applies_to`, cardinality, or default | Major |
 
-`hippo_core` declares which `hippo_ext` major version it targets. A running
-Hippo instance pins a specific `(hippo_ext, hippo_core)` pair; user schemas
+`mosaic_core` declares which `mosaic_ext` major version it targets. A running
+Hippo instance pins a specific `(mosaic_ext, mosaic_core)` pair; user schemas
 are validated against that pair before any data operation.
 
 ---
@@ -282,12 +282,12 @@ are validated against that pair before any data operation.
 Per sec9 §9.4 *Extensibility*, adding a new annotation is a four-step change,
 scoped in an OpenSpec proposal:
 
-1. Declare the annotation in `hippo_ext.yaml` — add a slot with `range`,
+1. Declare the annotation in `mosaic_ext.yaml` — add a slot with `range`,
    `description`, `ifabsent`, and `in_subset`.
 2. Implement the consumer in the subsystem that reads the annotation
    (DDL generator, validator, typed-client generator, etc.).
 3. Add the annotation to this reference document with its usage example.
-4. Bump `hippo_ext`'s minor version.
+4. Bump `mosaic_ext`'s minor version.
 
 Removing or renaming an annotation bumps the major version and requires the
 OpenSpec proposal to scope the migration path for user schemas using the
@@ -295,11 +295,11 @@ affected annotation.
 
 ---
 
-### What `hippo_ext` does NOT declare
+### What `mosaic_ext` does NOT declare
 
-Some capabilities intentionally have no `hippo_*` annotation because LinkML
+Some capabilities intentionally have no `mosaic_*` annotation because LinkML
 covers them natively. An agent implementing a user schema should reach for
-the LinkML-native attribute first and only use a `hippo_*` annotation when no
+the LinkML-native attribute first and only use a `mosaic_*` annotation when no
 LinkML equivalent exists.
 
 | Concept | LinkML-native mechanism |

@@ -1,5 +1,5 @@
 """Adapter tests for the ``reference_write_log`` table and the one-time
-backfill from ``hippo_meta.reference_entity_ids`` (sec2 §2.14.9,
+backfill from ``mosaic_meta.reference_entity_ids`` (sec2 §2.14.9,
 Decision 2.14.J).
 
 Covers the SQLite adapter unconditionally. Postgres parity is covered by
@@ -83,7 +83,7 @@ def _meta_value(db_path: str, key: str) -> str | None:
     conn = sqlite3.connect(db_path)
     try:
         row = conn.execute(
-            "SELECT value FROM hippo_meta WHERE key = ?", (key,)
+            "SELECT value FROM mosaic_meta WHERE key = ?", (key,)
         ).fetchone()
     finally:
         conn.close()
@@ -100,7 +100,7 @@ def _simulate_v1_state(db_path: str) -> None:
     conn = sqlite3.connect(db_path)
     try:
         conn.execute(
-            "DELETE FROM hippo_meta WHERE key = ?", (_MIGRATION_MARKER,)
+            "DELETE FROM mosaic_meta WHERE key = ?", (_MIGRATION_MARKER,)
         )
         conn.commit()
     finally:

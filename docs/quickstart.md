@@ -56,7 +56,7 @@ The default `schema.yaml` is the full bibliography schema (with `JournalArticle`
 Open `biblio_qs/schema.yaml` and replace its contents with this trimmed three-class schema:
 
 ```yaml
-id: https://example.org/hippo/quickstart/bibliography
+id: https://example.org/mosaic/quickstart/bibliography
 name: bibliography
 
 prefixes:
@@ -64,7 +64,7 @@ prefixes:
 
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 
 default_range: string
 
@@ -216,7 +216,7 @@ HERE = Path(__file__).parent
 registry = SchemaRegistry.from_path(HERE / "schema.yaml")
 storage = SQLiteAdapter(str(HERE / "data" / "mosaic.db"), schema_registry=registry)
 client = MosaicClient(storage=storage, registry=registry, pipeline=ValidationPipeline())
-app = create_default_app(hippo_client=client)
+app = create_default_app(mosaic_client=client)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8000, log_level="warning")

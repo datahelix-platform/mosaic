@@ -14,7 +14,7 @@ pytest.register_assert_rewrite("tests.support.closure_fixture")
 
 
 def _build_minimal_schema_registry():
-    """Return a SchemaRegistry over hippo_core plus generic test classes.
+    """Return a SchemaRegistry over mosaic_core plus generic test classes.
 
     Plain helper (not a fixture) so that adapter constructions inside
     legacy test fixtures — which take ``db_path`` but no
@@ -40,13 +40,13 @@ def _build_minimal_schema_registry():
     from mosaic.linkml_bridge import SchemaRegistry, _bundled_importmap
 
     overlay = {
-        "id": "https://example.org/hippo/test_minimal",
+        "id": "https://example.org/mosaic/test_minimal",
         "name": "test_minimal",
         "prefixes": {
             "linkml": "https://w3id.org/linkml/",
-            "hippo": "https://w3id.org/hippo/",
+            "mosaic": "https://w3id.org/datahelix/mosaic/",
         },
-        "imports": ["linkml:types", "hippo_core"],
+        "imports": ["linkml:types", "mosaic_core"],
         "default_range": "string",
         "classes": {
             cls: {
@@ -88,7 +88,7 @@ def _build_minimal_schema_registry():
 
 @pytest.fixture
 def minimal_schema_registry():
-    """Provide a minimal SchemaRegistry using the bundled hippo_core schema.
+    """Provide a minimal SchemaRegistry using the bundled mosaic_core schema.
 
     This fixture is useful for adapter tests that need a SchemaRegistry
     but don't require a custom user schema.

@@ -52,7 +52,7 @@ def entity_type_model_to_dict(entity: EntityTypeModel) -> dict[str, Any]:
     }
     if isinstance(entity, FamilyTypeModel):
         # A family (ADR-0014 Decision 4, #228): its fields are the ones
-        # every kind shares, as on hippoSchema.
+        # every kind shares, as on mosaicSchema.
         out.update(abstract=True, parent=entity.parent, kinds=list(entity.kinds))
     return out
 

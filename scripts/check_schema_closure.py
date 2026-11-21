@@ -11,7 +11,7 @@ if any check fails.
 
 Checks
 ------
-1. hippo_core base schema — every class's induced-slot set resolves.
+1. mosaic_core base schema — every class's induced-slot set resolves.
 2. Valid synthetic fragment merges cleanly — the merge path exercises all
    three merge layers without errors.
 3. Incoherent fragment is caught (negative gate) — a class with a dangling
@@ -24,7 +24,7 @@ Why class_induced_slots?
 ------------------------
 ``mosaic validate --schema`` calls ``SchemaRegistry.from_path`` which loads
 the LinkML schema but does not resolve every class's inheritance chain.
-``_validate_hippo_annotations`` wraps ``class_induced_slots`` in a
+``_validate_mosaic_annotations`` wraps ``class_induced_slots`` in a
 try/except that skips failures so the annotation checker stays tolerant.
 Iterating ``class_induced_slots`` for every class is the reliable call that
 surfaces a dangling ``is_a`` (or missing-range class) with a clear message
@@ -48,10 +48,10 @@ from mosaic.linkml_bridge import LoaderFragmentSpec, SchemaRegistry, merge_loade
 
 
 def _load_base_registry() -> SchemaRegistry:
-    hippo_core_path = str(
-        importlib.resources.files("mosaic.schemas").joinpath("hippo_core.yaml")
+    mosaic_core_path = str(
+        importlib.resources.files("mosaic.schemas").joinpath("mosaic_core.yaml")
     )
-    sv = SchemaView(hippo_core_path)
+    sv = SchemaView(mosaic_core_path)
     return SchemaRegistry(sv)
 
 
@@ -87,8 +87,8 @@ def _validate_closure(registry: SchemaRegistry) -> list[str]:
 
 
 def check_base_schema() -> bool:
-    """hippo_core base schema — all class induced-slot chains resolve."""
-    print("--- Check 1: hippo_core base schema ---")
+    """mosaic_core base schema — all class induced-slot chains resolve."""
+    print("--- Check 1: mosaic_core base schema ---")
     reg = _load_base_registry()
     failures = _validate_closure(reg)
     if failures:

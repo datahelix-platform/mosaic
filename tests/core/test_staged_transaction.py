@@ -32,13 +32,13 @@ from mosaic.linkml_bridge import SchemaRegistry, _bundled_importmap
 
 def _registry() -> SchemaRegistry:
     overlay = {
-        "id": "https://example.org/hippo/test_staged_txn",
+        "id": "https://example.org/mosaic/test_staged_txn",
         "name": "test_staged_txn",
         "prefixes": {
             "linkml": "https://w3id.org/linkml/",
-            "hippo": "https://w3id.org/hippo/",
+            "mosaic": "https://w3id.org/datahelix/mosaic/",
         },
-        "imports": ["linkml:types", "hippo_core"],
+        "imports": ["linkml:types", "mosaic_core"],
         "default_range": "string",
         "classes": {
             "Widget": {

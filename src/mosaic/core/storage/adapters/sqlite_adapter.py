@@ -7,7 +7,7 @@ The SQLite adapter provides:
 
 ## ProvenanceRecord Immutability Triggers
 
-Enforces ``hippo_append_only: true`` on the ``ProvenanceRecord`` table
+Enforces ``mosaic_append_only: true`` on the ``ProvenanceRecord`` table
 (sec9 §9.6 / Decision 9.6.C) at the SQL level:
 
 - ``prevent_provenance_update``: rejects any UPDATE on ProvenanceRecord
@@ -120,7 +120,7 @@ def _normalize_operation(op: Any) -> str:
 class ProvenanceStore:
     """Store for ``ProvenanceRecord`` rows (sec9 §9.6).
 
-    Writes the table generated from the ``hippo_core.ProvenanceRecord``
+    Writes the table generated from the ``mosaic_core.ProvenanceRecord``
     LinkML declaration; the DDL is emitted by the shared DDL generator.
     The adapter's SQL triggers enforce append-only semantics at the DB
     level (Decision 9.6.C).
@@ -952,7 +952,7 @@ class SQLiteAdapter(EntityStore):
         self._provenance_store: Optional[ProvenanceStore] = None
         self._relationship_store: Optional[RelationshipStore] = None
         self._fts_store: Optional[FTSStore] = None
-        # Per-class cache of hippo_external_xref slot names (issue #48).
+        # Per-class cache of mosaic_external_xref slot names (issue #48).
         self._xref_slots_cache: dict[str, list[str]] = {}
         # Per-class cache of multivalued reference slot names (issue #79).
         self._mv_ref_slots_cache: dict[str, list[str]] = {}
@@ -1107,7 +1107,7 @@ class SQLiteAdapter(EntityStore):
             cursor = conn.cursor()
 
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS hippo_meta (
+                CREATE TABLE IF NOT EXISTS mosaic_meta (
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL,
                     updated_at TEXT NOT NULL
@@ -1115,7 +1115,7 @@ class SQLiteAdapter(EntityStore):
             """)
 
             # ProvenanceRecord — shape stamped inline here to match what the
-            # LinkML DDL generator produces from hippo_core.ProvenanceRecord
+            # LinkML DDL generator produces from mosaic_core.ProvenanceRecord
             # (verified by tests/core/test_ddl_generator.py::
             # TestHippoCoreProvenanceRecordDDL). Per Decision 9.6.D, this
             # table replaces the legacy hand-coded `provenance` table.
@@ -1728,7 +1728,7 @@ class SQLiteAdapter(EntityStore):
     _REFERENCE_WRITE_LOG_MIGRATION_KEY = "_reference_write_log_v1_migrated"
 
     def _migrate_reference_entity_ids(self, cursor: sqlite3.Cursor) -> None:
-        """One-time backfill from ``hippo_meta.reference_entity_ids`` JSON
+        """One-time backfill from ``mosaic_meta.reference_entity_ids`` JSON
         blob to the ``reference_write_log`` table (sec2 §2.14.9).
 
         v1 stored ``{loader_name: {version: [entity_id, ...]}}`` under the
@@ -1751,14 +1751,14 @@ class SQLiteAdapter(EntityStore):
         inserting some rows but before stamping the marker.
         """
         cursor.execute(
-            "SELECT 1 FROM hippo_meta WHERE key = ?",
+            "SELECT 1 FROM mosaic_meta WHERE key = ?",
             (self._REFERENCE_WRITE_LOG_MIGRATION_KEY,),
         )
         if cursor.fetchone() is not None:
             return
 
         cursor.execute(
-            "SELECT value FROM hippo_meta WHERE key = 'reference_entity_ids'"
+            "SELECT value FROM mosaic_meta WHERE key = 'reference_entity_ids'"
         )
         row = cursor.fetchone()
         if row is not None:
@@ -1797,12 +1797,12 @@ class SQLiteAdapter(EntityStore):
                             )
 
             cursor.execute(
-                "DELETE FROM hippo_meta WHERE key = 'reference_entity_ids'"
+                "DELETE FROM mosaic_meta WHERE key = 'reference_entity_ids'"
             )
 
         now = datetime.now(timezone.utc).isoformat()
         cursor.execute(
-            "INSERT INTO hippo_meta (key, value, updated_at) "
+            "INSERT INTO mosaic_meta (key, value, updated_at) "
             "VALUES (?, ?, ?) "
             "ON CONFLICT(key) DO UPDATE SET value = excluded.value, "
             "                                updated_at = excluded.updated_at",
@@ -2315,9 +2315,9 @@ class SQLiteAdapter(EntityStore):
             )
             self._refresh_xref_rows(cursor, entity_type, entity_id)
 
-    # -- hippo_external_xref side index (issue #48) ---------------------------
+    # -- mosaic_external_xref side index (issue #48) ---------------------------
     #
-    # Index rows exist ONLY for available entities (the `hippo_unique`
+    # Index rows exist ONLY for available entities (the `mosaic_unique`
     # "unique among live records" semantics from PTS-348, realised here by
     # deleting/recreating rows on availability transitions instead of a
     # partial-index predicate). Every write-path hook re-derives the
@@ -2326,7 +2326,7 @@ class SQLiteAdapter(EntityStore):
     # whole write back.
 
     def _xref_slot_names(self, entity_type: str) -> list[str]:
-        """Names of ``hippo_external_xref``-annotated slots for a class.
+        """Names of ``mosaic_external_xref``-annotated slots for a class.
 
         Cached per class. Empty when the registry is absent, the class is
         unknown/abstract, or no slot carries the annotation.
@@ -2348,7 +2348,7 @@ class SQLiteAdapter(EntityStore):
     def _refresh_xref_rows(
         self, cursor: sqlite3.Cursor, entity_type: str, entity_id: str
     ) -> None:
-        """Re-derive an entity's ``hippo_xref_index`` rows from its stored row.
+        """Re-derive an entity's ``mosaic_xref_index`` rows from its stored row.
 
         Idempotent delete-then-insert: existing rows for the entity are
         removed, then re-inserted from the entity's current slot values —
@@ -2409,7 +2409,7 @@ class SQLiteAdapter(EntityStore):
                     raise XrefUniquenessError(
                         f"External reference (system={system!r}, "
                         f"value={value!r}) on {entity_type}.{slot} is "
-                        f"{detail}; hippo_external_xref requires "
+                        f"{detail}; mosaic_external_xref requires "
                         f"(system, value) to be globally unique among "
                         f"available entities.",
                         system=system,
@@ -2451,7 +2451,7 @@ class SQLiteAdapter(EntityStore):
             }
 
     def list_xrefs(self, entity_id: str) -> list[dict[str, Any]]:
-        """All indexed ``hippo_external_xref`` pairs for an entity.
+        """All indexed ``mosaic_external_xref`` pairs for an entity.
 
         Returns ``[{"slot", "system", "value"}, ...]`` (empty when the
         entity is unavailable, unknown, or has no annotated slots). The

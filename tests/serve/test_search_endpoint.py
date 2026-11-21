@@ -53,7 +53,7 @@ def hippo_client(registry):
 @pytest.fixture
 def client(hippo_client):
     app = create_app(
-        routers=[health.router, search.router], hippo_client=hippo_client
+        routers=[health.router, search.router], mosaic_client=hippo_client
     )
     return TestClient(app)
 

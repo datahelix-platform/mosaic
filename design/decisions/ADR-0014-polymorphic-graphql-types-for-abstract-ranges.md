@@ -144,6 +144,12 @@ parent:
    / `hippo_search` naming. Under datahelix#57's pending `hippo_*` → `mosaic_*` rename they become
    `mosaic_anchor` / `mosaic_manifest`, read under both spellings for the deprecation window like
    every other annotation key.
+
+   > **Note (2026-11-20, platform ADR-0007 / #124):** the rename landed in v0.16.0 without a
+   > deprecation window. The keys are now **`mosaic_anchor`** / **`mosaic_manifest`**, declared
+   > in `mosaic_ext.yaml`; `hippo_anchor` / `hippo_manifest` are not read, and a schema that
+   > still uses them fails validation with an error naming the new key. The text above is kept as
+   > ratified; read `hippo_*` in it as `mosaic_*`.
 6. **Writes are unchanged.** No create/update input is generated for an abstract class; the
    abstract accessor is read-only. Ingest already dispatches on `designates_type` (ADR-0003).
 

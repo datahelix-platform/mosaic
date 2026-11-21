@@ -132,7 +132,7 @@ class SchemaManager:
         ]
 
     def fts_entity_types(self) -> list[str]:
-        """Entity types with at least one ``hippo_search``-annotated slot —
+        """Entity types with at least one ``mosaic_search``-annotated slot —
         the classes cross-class search fans over (issue #158)."""
         return sorted(self._fts_table_metadata)
 

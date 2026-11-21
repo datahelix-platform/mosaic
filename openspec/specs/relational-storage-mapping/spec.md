@@ -15,10 +15,10 @@ The relational storage section SHALL define the physical table structure for ent
 - **THEN** it finds a clear specification of what columns exist on entity tables: `id`, `is_available`, and schema-config-driven user-defined field columns
 
 ### Requirement: Partial index strategy is defined in the relational storage section
-The relational storage section SHALL specify that `hippo migrate` creates partial indexes on every `indexed: true` field, scoped to `is_available = true`. The SQL pattern SHALL be included.
+The relational storage section SHALL specify that `mosaic migrate` creates partial indexes on every `indexed: true` field, scoped to `is_available = true`. The SQL pattern SHALL be included.
 
 #### Scenario: Partial index SQL pattern
-- **WHEN** a coding agent implements `hippo migrate` for the relational adapter
+- **WHEN** a coding agent implements `mosaic migrate` for the relational adapter
 - **THEN** it finds the exact SQL index pattern: `CREATE INDEX idx_{entity_type}_{field}_available ON {entity_type}s ({field}) WHERE is_available = true`
 
 ### Requirement: External IDs table schema is defined in the relational storage section
@@ -35,18 +35,18 @@ The relational storage section SHALL define the `entity_relationships` edge tabl
 - **WHEN** a coding agent implements the relational adapter's relationship storage
 - **THEN** it finds the complete table schema for `entity_relationships` in the relational storage section
 
-### Requirement: hippo_meta table is defined in the relational storage section
-The relational storage section SHALL define the `hippo_meta` key-value table and its standard keys (`schema_version`, `schema_hash`, `deprecated_fields`, `migration_history`).
+### Requirement: mosaic_meta table is defined in the relational storage section
+The relational storage section SHALL define the `mosaic_meta` key-value table and its standard keys (`schema_version`, `schema_hash`, `deprecated_fields`, `migration_history`).
 
-#### Scenario: hippo_meta table structure
+#### Scenario: mosaic_meta table structure
 - **WHEN** a coding agent implements schema versioning for the relational adapter
-- **THEN** it finds the `hippo_meta` table schema and standard key definitions in the relational storage section
+- **THEN** it finds the `mosaic_meta` table schema and standard key definitions in the relational storage section
 
 ### Requirement: Migration DDL mechanics are defined in the relational storage section
 The relational storage section SHALL specify the DDL operations for each migration rule type (new entity type → CREATE TABLE, new field → ALTER TABLE ADD COLUMN, etc.). The conceptual migration rules (what changes are allowed/rejected) SHALL remain in sec3.
 
 #### Scenario: Migration DDL for new entity type
-- **WHEN** a coding agent implements `hippo migrate` for the relational adapter
+- **WHEN** a coding agent implements `mosaic migrate` for the relational adapter
 - **THEN** it finds DDL-level instructions (CREATE TABLE with columns, CREATE INDEX) in the relational storage section, cross-referencing the conceptual rules in sec3
 
 ### Requirement: Computed field derivation is documented

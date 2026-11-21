@@ -2,8 +2,8 @@
 
 Delegates base DDL generation to LinkML's ``SQLTableGenerator``, then
 post-processes for Mosaic-specific extras: ``superseded_by`` column,
-partial indexes (``hippo_index_partial``), FTS5 virtual tables
-(``hippo_search: fts5``), and append-only triggers (``hippo_append_only``).
+partial indexes (``mosaic_index_partial``), FTS5 virtual tables
+(``mosaic_search: fts5``), and append-only triggers (``mosaic_append_only``).
 """
 
 from __future__ import annotations
@@ -19,10 +19,10 @@ from linkml.generators.sqltablegen import SQLTableGenerator
 from mosaic.core.storage.fts import FTSFieldMetadata, FTSTableMetadata
 from mosaic.core.storage.xref import XREF_TABLE_DDL
 from mosaic.linkml_bridge import (
-    HIPPO_APPEND_ONLY,
-    HIPPO_INDEX,
-    HIPPO_INDEX_PARTIAL,
-    HIPPO_UNIQUE,
+    MOSAIC_APPEND_ONLY,
+    MOSAIC_INDEX,
+    MOSAIC_INDEX_PARTIAL,
+    MOSAIC_UNIQUE,
     SchemaRegistry,
     annotation_value,
     slot_default,
@@ -138,14 +138,14 @@ class DDLGenerator:
                 index_statements.append(stmt)
 
         # Step 6: Add Mosaic-specific indexes, unique constraints, triggers
-        hippo_extras = self._generate_hippo_extras(registry, concrete_classes)
+        mosaic_extras = self._generate_mosaic_extras(registry, concrete_classes)
 
         # Step 7: Add FTS5 virtual tables
         fts_planner = FTSMigrationPlanner()
         fts_planner.add_registry(registry)
         fts_statements = fts_planner.generate_fts_ddl()
 
-        # Step 8: hippo_external_xref side-index table (issue #48) —
+        # Step 8: mosaic_external_xref side-index table (issue #48) —
         # emitted once when any concrete class carries an annotated slot.
         # ``external_xref_slots`` also validates annotation placement
         # (range must be ExternalReference), failing DDL generation —
@@ -158,7 +158,7 @@ class DDLGenerator:
 
         return (
             table_statements
-            + hippo_extras
+            + mosaic_extras
             + index_statements
             + fts_statements
             + xref_statements
@@ -422,7 +422,7 @@ class DDLGenerator:
 
         return stmt
 
-    def _generate_hippo_extras(
+    def _generate_mosaic_extras(
         self, registry: SchemaRegistry, concrete_classes: set[str]
     ) -> list[str]:
         """Generate Mosaic-specific indexes, unique constraints, triggers."""
@@ -434,10 +434,10 @@ class DDLGenerator:
             if cls is None:
                 continue
 
-            # hippo_index / hippo_index_partial annotations
+            # mosaic_index / mosaic_index_partial annotations
             for slot in registry.induced_slots(class_name):
-                if annotation_value(slot, HIPPO_INDEX):
-                    partial = bool(annotation_value(slot, HIPPO_INDEX_PARTIAL))
+                if annotation_value(slot, MOSAIC_INDEX):
+                    partial = bool(annotation_value(slot, MOSAIC_INDEX_PARTIAL))
                     idx_name = f"idx_{class_name}_{slot.name}"
                     idx_sql = f'CREATE INDEX "{idx_name}" ON "{class_name}" ("{slot.name}")'
                     if partial:
@@ -445,25 +445,25 @@ class DDLGenerator:
                     idx_sql += ";"
                     statements.append(idx_sql)
 
-                # hippo_unique: emit a *partial* CREATE UNIQUE INDEX scoped to
-                # live rows (``WHERE is_available = 1``). hippo_unique means
+                # mosaic_unique: emit a *partial* CREATE UNIQUE INDEX scoped to
+                # live rows (``WHERE is_available = 1``). mosaic_unique means
                 # "unique among live records", not across every historical
                 # revision: a superseded predecessor (is_available = 0) keeps
                 # its business key, and a migration replacement re-uses that key
                 # on a fresh row. A non-partial index would treat the retired
                 # predecessor as a permanent collision and block migration on
-                # any hippo_unique slot forever (PTS-348). The live-only
+                # any mosaic_unique slot forever (PTS-348). The live-only
                 # predicate preserves the constraint among available rows while
                 # leaving superseded revisions out of scope.
-                if annotation_value(slot, HIPPO_UNIQUE):
+                if annotation_value(slot, MOSAIC_UNIQUE):
                     idx_name = f"idx_{class_name}_{slot.name}_unique"
                     statements.append(
                         f'CREATE UNIQUE INDEX "{idx_name}" ON "{class_name}" '
                         f'("{slot.name}") WHERE {self.IS_AVAILABLE_PREDICATE};'
                     )
 
-            # hippo_append_only: emit trigger rejecting UPDATE/DELETE
-            if annotation_value(cls, HIPPO_APPEND_ONLY):
+            # mosaic_append_only: emit trigger rejecting UPDATE/DELETE
+            if annotation_value(cls, MOSAIC_APPEND_ONLY):
                 statements.extend(self._generate_append_only_triggers(class_name))
 
         return statements
@@ -495,7 +495,7 @@ END;""",
 
 
 class FTSMigrationPlanner:
-    """Plans FTS5 virtual tables from slot ``hippo_search`` annotations."""
+    """Plans FTS5 virtual tables from slot ``mosaic_search`` annotations."""
 
     def __init__(self) -> None:
         self._fts_tables: dict[str, list[FTSTableMetadata]] = {}

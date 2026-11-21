@@ -18,7 +18,7 @@ This guide walks through building a `mosaic-reference-<name>` package from scrat
 mosaic-reference-myontology/
 ├── pyproject.toml
 ├── src/
-│   └── hippo_reference_myontology/
+│   └── mosaic_reference_myontology/
 │       ├── __init__.py
 │       ├── loader.py      # ReferenceLoader subclass (required)
 │       ├── cli.py         # Typer sub-app (optional)
@@ -26,7 +26,7 @@ mosaic-reference-myontology/
 │           └── tiny.tar.gz   # bundled "test" fixture dataset
 ```
 
-Use `hippo_reference_<name>` as the Python package name and `mosaic-reference-<name>` as the distribution name. This naming convention makes your loader discoverable via PyPI search.
+Use `mosaic_reference_<name>` as the Python package name and `mosaic-reference-<name>` as the distribution name. This naming convention makes your loader discoverable via PyPI search.
 
 ---
 
@@ -37,7 +37,7 @@ Subclass `ReferenceLoader` from `mosaic.core.loaders.reference`. At minimum you 
 > **`entity_types()` was renamed to `populates_types()`.** The name better separates the classes a package *defines* (via `schema_fragment()`) from the classes it *fills with data*. The old `entity_types()` lives on as a deprecated alias — loaders that still override it keep reporting their declared types unchanged — but new loaders should override `populates_types()`.
 
 ```python
-# src/hippo_reference_myontology/loader.py
+# src/mosaic_reference_myontology/loader.py
 from mosaic.core.loaders.reference import LoadResult, ReferenceLoader
 from mosaic.core.client import MosaicClient
 
@@ -57,11 +57,11 @@ class MyOntologyLoader(ReferenceLoader):
 
     def schema_fragment(self) -> dict:
         return {
-            "id": "https://example.org/hippo/myontology",
+            "id": "https://example.org/mosaic/myontology",
             "name": "myontology",
             "default_prefix": "myontology",            # REQUIRED — must match name
             "prefixes": {
-                "myontology": "https://example.org/hippo/myontology/",
+                "myontology": "https://example.org/mosaic/myontology/",
             },
             "classes": {
                 "MyTerm": {
@@ -91,7 +91,7 @@ class MyOntologyLoader(ReferenceLoader):
 
     def _load_fixture(self, client: MosaicClient) -> LoadResult:
         import importlib.resources, tarfile, json
-        fixture = importlib.resources.files("hippo_reference_myontology.fixtures").joinpath("tiny.tar.gz")
+        fixture = importlib.resources.files("mosaic_reference_myontology.fixtures").joinpath("tiny.tar.gz")
         entity_ids: list[str] = []
         with tarfile.open(str(fixture)) as tar:
             for member in tar.getmembers():
@@ -127,18 +127,18 @@ Both entry points are registered in `pyproject.toml`. The `mosaic.reference_load
 
 ```toml
 [project.entry-points."mosaic.reference_loaders"]
-myontology = "hippo_reference_myontology.loader:MyOntologyLoader"
+myontology = "mosaic_reference_myontology.loader:MyOntologyLoader"
 
 # Optional — only needed if you expose a Typer sub-app:
 [project.entry-points."mosaic.reference_loader_cli"]
-myontology = "hippo_reference_myontology.cli:app"
+myontology = "mosaic_reference_myontology.cli:app"
 ```
 
 The entry point key (`myontology`) must match `ReferenceLoader.name`. Mosaic validates this at registration and raises `ReferenceLoaderRegistrationError` if the entry point does not resolve to a concrete `ReferenceLoader` subclass.
 
 ### Entry-point groups: `mosaic.schema_packages` and `mosaic.reference_loaders`
 
-Discovery resolves **two** groups and deduplicates by name: the broad genus group `mosaic.schema_packages` and its subset/alias `mosaic.reference_loaders`. The legacy `hippo.schema_packages` / `hippo.reference_loaders` spellings (pre-rename, ADR-0004) are also resolved for the deprecation window, so existing `hippo-reference-*` packages remain discoverable; new packages should register under the `mosaic.*` groups and follow the `mosaic-reference-<name>` naming convention. Register a reference loader under `mosaic.reference_loaders` as shown above — it remains the conventional home for external-data loaders and is found by both `mosaic reference` and the package-level discovery.
+Discovery resolves **two** groups and deduplicates by name: the broad genus group `mosaic.schema_packages` and its subset/alias `mosaic.reference_loaders`. The legacy `hippo.*` spellings are no longer read (ADR-0015); register under the `mosaic.*` groups and follow the `mosaic-reference-<name>` naming convention. Register a reference loader under `mosaic.reference_loaders` as shown above — it remains the conventional home for external-data loaders and is found by both `mosaic reference` and the package-level discovery.
 
 A **pure-schema package** (no shipped data) registers under the genus group instead, and needs no `load()`:
 
@@ -247,7 +247,7 @@ def load(self, client, version, params=None):
 
 `client.cached_fetch` returns a `Path` to the local file. It verifies the sha256 on both download and cache hit when `expected_sha256` is supplied; a mismatch raises `CacheIntegrityError` and removes the stale file so the next call re-downloads cleanly.
 
-The cache location resolves to `$MOSAIC_CACHE_DIR/<loader_name>/` when set, else `~/.cache/hippo/references/<loader_name>/`. Use `client.cache_dir_for(self.name)` if you need to inspect or pre-warm the directory.
+The cache location resolves to `$MOSAIC_CACHE_DIR/<loader_name>/` when set, else `~/.cache/mosaic/references/<loader_name>/`. Use `client.cache_dir_for(self.name)` if you need to inspect or pre-warm the directory.
 
 **Rule:** loaders MUST use `client.cached_fetch` for all large network downloads. Never roll a private download path.
 
@@ -258,7 +258,7 @@ The cache location resolves to `$MOSAIC_CACHE_DIR/<loader_name>/` when set, else
 Expose a `typer.Typer` app via the `mosaic.reference_loader_cli` entry point to add subcommands under `mosaic reference <name> ...`.
 
 ```python
-# src/hippo_reference_myontology/cli.py
+# src/mosaic_reference_myontology/cli.py
 import typer
 
 app = typer.Typer(name="myontology", help="MyOntology loader commands.")
@@ -350,10 +350,10 @@ class FakeReferenceLoader(ReferenceLoader):
 
     def schema_fragment(self):
         return {
-            "id": "https://example.org/hippo/fake",
+            "id": "https://example.org/mosaic/fake",
             "name": "fake",
             "default_prefix": "fake",
-            "prefixes": {"fake": "https://example.org/hippo/fake/"},
+            "prefixes": {"fake": "https://example.org/mosaic/fake/"},
             "classes": {
                 "FakeTerm": {
                     "is_a": "Entity",

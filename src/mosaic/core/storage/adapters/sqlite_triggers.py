@@ -1,6 +1,6 @@
 """SQL trigger definitions for ProvenanceRecord immutability.
 
-Enforces ``hippo_append_only: true`` (sec9 §9.6 / Decision 9.6.C) at the
+Enforces ``mosaic_append_only: true`` (sec9 §9.6 / Decision 9.6.C) at the
 SQL level — UPDATE and DELETE against the ``ProvenanceRecord`` table are
 rejected by SQLite itself, not just by the Python adapter. Direct-SQL
 access (e.g., raw ``sqlite3`` CLI) bypasses Python-level checks but not
@@ -17,7 +17,7 @@ TRIGGER_PREVENT_UPDATE = """
 CREATE TRIGGER IF NOT EXISTS prevent_provenance_update
 BEFORE UPDATE ON "ProvenanceRecord"
 BEGIN
-    SELECT RAISE(ABORT, 'Cannot update ProvenanceRecord: hippo_append_only class');
+    SELECT RAISE(ABORT, 'Cannot update ProvenanceRecord: mosaic_append_only class');
 END;
 """
 
@@ -25,7 +25,7 @@ TRIGGER_PREVENT_DELETE = """
 CREATE TRIGGER IF NOT EXISTS prevent_provenance_delete
 BEFORE DELETE ON "ProvenanceRecord"
 BEGIN
-    SELECT RAISE(ABORT, 'Cannot delete ProvenanceRecord: hippo_append_only class');
+    SELECT RAISE(ABORT, 'Cannot delete ProvenanceRecord: mosaic_append_only class');
 END;
 """
 

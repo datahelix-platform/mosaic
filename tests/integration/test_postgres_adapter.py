@@ -18,9 +18,7 @@ import pytest
 # Skip all tests if psycopg is not installed or no database URL is set
 psycopg = pytest.importorskip("psycopg")
 
-POSTGRES_URL = os.environ.get("MOSAIC_DATABASE_URL") or os.environ.get(
-    "HIPPO_DATABASE_URL"
-)
+POSTGRES_URL = os.environ.get("MOSAIC_DATABASE_URL")
 
 pytestmark = pytest.mark.skipif(
     not POSTGRES_URL,
@@ -511,7 +509,7 @@ class TestPostgresBatchPut:
 
 
 class TestPostgresClientFTSWrites:
-    """Regression: client writes on postgres with hippo_search schemas.
+    """Regression: client writes on postgres with mosaic_search schemas.
 
     The first real DataHelix certification boot (datahelix#45) failed on
     every write: ``IngestionService._sync_entity_to_fts`` checked FTS-table
@@ -534,7 +532,7 @@ class TestPostgresClientFTSWrites:
                         "name": {"range": "string", "required": True},
                         "notes": {
                             "range": "string",
-                            "annotations": {"hippo_search": "fts5"},
+                            "annotations": {"mosaic_search": "fts5"},
                         },
                     }
                 }
@@ -675,13 +673,13 @@ class TestPostgresComparisonFilters:
     FUTURE = "2999-01-01T00:00:00+00:00"
 
     SCHEMA = """
-id: https://example.org/hippo/test_pg_comparison_filters
+id: https://example.org/mosaic/test_pg_comparison_filters
 name: test_pg_comparison_filters
 prefixes:
   linkml: https://w3id.org/linkml/
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 default_range: string
 
 types:
@@ -1218,7 +1216,7 @@ class TestPostgresSearchComposition:
                         "priority": {"range": "integer"},
                         "body": {
                             "range": "string",
-                            "annotations": {"hippo_search": "fts5"},
+                            "annotations": {"mosaic_search": "fts5"},
                         },
                     }
                 }
@@ -1490,7 +1488,7 @@ class TestPostgresHeterogeneousRoots:
                         "name": {"range": "string", "required": True},
                         "bio": {
                             "range": "string",
-                            "annotations": {"hippo_search": "fts5"},
+                            "annotations": {"mosaic_search": "fts5"},
                         },
                     }
                 },
@@ -1501,7 +1499,7 @@ class TestPostgresHeterogeneousRoots:
                         "donor_id": {"range": "Donor"},
                         "notes": {
                             "range": "string",
-                            "annotations": {"hippo_search": "fts5"},
+                            "annotations": {"mosaic_search": "fts5"},
                         },
                     }
                 },

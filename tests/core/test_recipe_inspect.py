@@ -22,7 +22,7 @@ id: org.example.minimal
 name: minimal
 version: 0.1.0
 created_at: 2026-05-27T00:00:00+00:00
-hippo_version: '>=0.3'
+mosaic_version: '>=0.3'
 """
 
 MINIMAL_SCHEMA = """\
@@ -64,7 +64,7 @@ class TestInspectHappyPath:
         assert m.id == "org.example.minimal"
         assert m.name == "minimal"
         assert m.version == "0.1.0"
-        assert m.hippo_version == ">=0.3"
+        assert m.mosaic_version == ">=0.3"
 
     def test_digest_is_present_and_hex(self, recipe_dir: Path) -> None:
         report = RecipeService().inspect(str(recipe_dir))
@@ -98,7 +98,7 @@ class TestInspectValidationFailures:
     def test_missing_required_field_raises(self, tmp_path: Path) -> None:
         d = tmp_path / "bad"
         d.mkdir()
-        # Missing ``hippo_version``.
+        # Missing ``mosaic_version``.
         (d / "recipe.yaml").write_text(
             "id: org.example.bad\n"
             "name: bad\n"
@@ -115,6 +115,16 @@ class TestInspectValidationFailures:
             MINIMAL_MANIFEST + "unknown_key: hello\n"
         )
         with pytest.raises(RecipeManifestError):
+            RecipeService().inspect(str(recipe_dir))
+
+    def test_retired_hippo_version_key_names_its_replacement(
+        self, recipe_dir: Path
+    ) -> None:
+        # Platform ADR-0007: ``hippo_version`` is now ``mosaic_version``.
+        (recipe_dir / "recipe.yaml").write_text(
+            MINIMAL_MANIFEST.replace("mosaic_version:", "hippo_version:")
+        )
+        with pytest.raises(RecipeManifestError, match="renamed to `mosaic_version`"):
             RecipeService().inspect(str(recipe_dir))
 
     def test_recipe_yaml_missing_raises(self, tmp_path: Path) -> None:

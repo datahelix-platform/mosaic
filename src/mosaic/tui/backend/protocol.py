@@ -32,7 +32,7 @@ SYSTEM_FIELDS: tuple[str, ...] = (
     "superseded_by",
 )
 
-#: hippo_core infrastructure classes that are concrete (non-abstract) but are
+#: mosaic_core infrastructure classes that are concrete (non-abstract) but are
 #: not user-facing entity types; hidden from sidebar/schema listings.
 CORE_INFRA_CLASSES: frozenset[str] = frozenset(
     {
@@ -47,7 +47,7 @@ CORE_INFRA_CLASSES: frozenset[str] = frozenset(
     }
 )
 
-#: Entity lifecycle status values (hippo_core ``Status`` enum). Transitions
+#: Entity lifecycle status values (mosaic_core ``Status`` enum). Transitions
 #: flip ``is_available`` and record the driver in provenance — there are no
 #: hard deletes.
 STATUS_VALUES: tuple[str, ...] = (
@@ -344,7 +344,7 @@ class TUIBackend(typing.Protocol):
     async def search_entities(
         self, entity_type: str, query: str, limit: int = 50
     ) -> list[dict[str, Any]]:
-        """Full-text search over ``hippo_search``-annotated fields."""
+        """Full-text search over ``mosaic_search``-annotated fields."""
         ...
 
     async def get_entity(self, entity_type: str, entity_id: str) -> EntityDetail:

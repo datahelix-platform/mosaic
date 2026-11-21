@@ -387,7 +387,7 @@ class DomainModule(SchemaPackage):
            schema; validating each hop against its *own* historical merged
            schema is the S4 orchestrator's job, sec11 §11.5.2.)
         3. **Commit (green only):** retires the superseded predecessors
-           (so a ``hippo_unique`` partial index never sees the old and new
+           (so a ``mosaic_unique`` partial index never sees the old and new
            record live at once, PTS-348), writes the new records, then
            records the supersede edges via
            :meth:`MosaicClient.supersede_entity`. Each supersession is
@@ -634,7 +634,7 @@ class DomainModule(SchemaPackage):
         # Hard validation gate — BEFORE any committed write.
         self._run_gate(client, step.from_version, step.to_version, plan)
 
-        # Commit (green only). A hippo_unique slot is enforced by a *partial*
+        # Commit (green only). A mosaic_unique slot is enforced by a *partial*
         # UNIQUE INDEX (``... WHERE is_available = 1``), which rejects two live
         # rows that share a business key. A 1:1 migration carries the key
         # forward, so the new record and its predecessor would momentarily both

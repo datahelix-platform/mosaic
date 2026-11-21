@@ -75,7 +75,7 @@ class TestDrsMountedInDefaultApp:
         raw = _make_raw_entity(data={"uri": uri})
         full = _make_full_entity(data={"uri": uri})
         mock_client = _make_client(raw_entity=raw, full_entity=full)
-        app = create_default_app(hippo_client=mock_client)
+        app = create_default_app(mosaic_client=mock_client)
         client = TestClient(app)
 
         response = client.get("/ga4gh/drs/v1/objects/abc-123")
@@ -91,7 +91,7 @@ class TestDrsObjectNotFound:
 
     def test_entity_not_in_storage_returns_404(self):
         mock_client = _make_client(raw_entity=None)
-        app = create_app(routers=[drs.router], hippo_client=mock_client)
+        app = create_app(routers=[drs.router], mosaic_client=mock_client)
         client = TestClient(app)
         response = client.get("/ga4gh/drs/v1/objects/nonexistent-id")
         assert response.status_code == 404
@@ -99,7 +99,7 @@ class TestDrsObjectNotFound:
     def test_unavailable_entity_returns_404(self):
         raw = _make_raw_entity(is_available=False, data={"uri": "s3://bucket/file"})
         mock_client = _make_client(raw_entity=raw)
-        app = create_app(routers=[drs.router], hippo_client=mock_client)
+        app = create_app(routers=[drs.router], mosaic_client=mock_client)
         client = TestClient(app)
         response = client.get("/ga4gh/drs/v1/objects/abc-123")
         assert response.status_code == 404
@@ -110,7 +110,7 @@ class TestDrsObjectNoUri:
         raw = _make_raw_entity(data={})
         full = _make_full_entity()
         mock_client = _make_client(raw_entity=raw, full_entity=full)
-        app = create_app(routers=[drs.router], hippo_client=mock_client)
+        app = create_app(routers=[drs.router], mosaic_client=mock_client)
         client = TestClient(app)
         response = client.get("/ga4gh/drs/v1/objects/abc-123")
         assert response.status_code == 404
@@ -119,7 +119,7 @@ class TestDrsObjectNoUri:
         raw = _make_raw_entity(data={"uri": None})
         full = _make_full_entity()
         mock_client = _make_client(raw_entity=raw, full_entity=full)
-        app = create_app(routers=[drs.router], hippo_client=mock_client)
+        app = create_app(routers=[drs.router], mosaic_client=mock_client)
         client = TestClient(app)
         response = client.get("/ga4gh/drs/v1/objects/abc-123")
         assert response.status_code == 404
@@ -131,7 +131,7 @@ class TestDrsObjectSuccess:
         raw = _make_raw_entity(data={"uri": uri})
         full = _make_full_entity(data={"uri": uri})
         mock_client = _make_client(raw_entity=raw, full_entity=full)
-        app = create_app(routers=[drs.router], hippo_client=mock_client)
+        app = create_app(routers=[drs.router], mosaic_client=mock_client)
         client = TestClient(app)
 
         response = client.get("/ga4gh/drs/v1/objects/abc-123")
@@ -145,7 +145,7 @@ class TestDrsObjectSuccess:
         raw = _make_raw_entity(data={"uri": uri})
         full = _make_full_entity(data={"uri": uri})
         mock_client = _make_client(raw_entity=raw, full_entity=full)
-        app = create_app(routers=[drs.router], hippo_client=mock_client)
+        app = create_app(routers=[drs.router], mosaic_client=mock_client)
         client = TestClient(app)
 
         response = client.get("/ga4gh/drs/v1/objects/abc-123")
@@ -157,7 +157,7 @@ class TestDrsObjectSuccess:
         raw = _make_raw_entity(data={"uri": uri})
         full = _make_full_entity(data={"uri": uri})
         mock_client = _make_client(raw_entity=raw, full_entity=full)
-        app = create_app(routers=[drs.router], hippo_client=mock_client)
+        app = create_app(routers=[drs.router], mosaic_client=mock_client)
         client = TestClient(app)
 
         response = client.get("/ga4gh/drs/v1/objects/abc-123")
@@ -180,7 +180,7 @@ class TestDrsObjectSuccess:
             updated_at=updated,
         )
         mock_client = _make_client(raw_entity=raw, full_entity=full)
-        app = create_app(routers=[drs.router], hippo_client=mock_client)
+        app = create_app(routers=[drs.router], mosaic_client=mock_client)
         client = TestClient(app)
 
         response = client.get(f"/ga4gh/drs/v1/objects/{entity_id}")
@@ -201,7 +201,7 @@ class TestDrsObjectSuccess:
         raw = _make_raw_entity(entity_id="xyz", entity_type="Donor", data={"uri": "s3://b/f"})
         full = _make_full_entity(entity_id="xyz", entity_type="Donor", data={"uri": "s3://b/f"})
         mock_client = _make_client(raw_entity=raw, full_entity=full)
-        app = create_app(routers=[drs.router], hippo_client=mock_client)
+        app = create_app(routers=[drs.router], mosaic_client=mock_client)
         client = TestClient(app)
 
         response = client.get("/ga4gh/drs/v1/objects/xyz")

@@ -24,9 +24,7 @@ from tests.support.closure_fixture import (
     seed,
 )
 
-POSTGRES_URL = os.environ.get("MOSAIC_DATABASE_URL") or os.environ.get(
-    "HIPPO_DATABASE_URL"
-)
+POSTGRES_URL = os.environ.get("MOSAIC_DATABASE_URL")
 
 pytestmark = pytest.mark.skipif(
     not POSTGRES_URL,

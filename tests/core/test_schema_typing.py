@@ -29,7 +29,7 @@ def _registry() -> SchemaRegistry:
 def test_exposed_classes_excludes_infrastructure_and_abstract():
     names = exposed_class_names(_registry())
     # Behaviour-preserving: matches the typed-client / GraphQL selection.
-    # ExternalID is a concrete hippo_core class NOT in the 5-class
+    # ExternalID is a concrete mosaic_core class NOT in the 5-class
     # infrastructure set, so it is exposed today (see issue #47 follow-up on
     # whether it should be treated as infrastructure — the TUI excludes it).
     assert names == ["ExternalID", "Project", "Sample"]
@@ -86,13 +86,13 @@ def test_accessor_name_present():
 def test_has_default_reflects_ifabsent():
     registry = SchemaRegistry.from_yaml(
         """
-id: https://example.org/hippo/test_ifabsent
+id: https://example.org/mosaic/test_ifabsent
 name: test_ifabsent
 prefixes:
   linkml: https://w3id.org/linkml/
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 default_range: string
 classes:
   Widget:
@@ -131,13 +131,13 @@ def test_reference_field_has_no_direct_filter_ops_but_is_predicate_filterable():
 def test_reference_to_unexposed_class_is_not_predicate_filterable():
     registry = SchemaRegistry.from_yaml(
         """
-id: https://example.org/hippo/test_dangling_ref
+id: https://example.org/mosaic/test_dangling_ref
 name: test_dangling_ref
 prefixes:
   linkml: https://w3id.org/linkml/
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 default_range: string
 classes:
   Widget:
@@ -208,9 +208,9 @@ def test_enum_field_is_aggregatable_but_not_range_queryable():
     assert status.range_queryable is False
 
 
-def test_search_available_reflects_hippo_search_annotation_presence():
+def test_search_available_reflects_mosaic_search_annotation_presence():
     manifest = build_capability_manifest(_registry())
-    # Project.name/description carry `hippo_search: fts5` in the fixture.
+    # Project.name/description carry `mosaic_search: fts5` in the fixture.
     assert manifest["Project"].search_available is True
     assert manifest["Project"].fields_by_name["name"].searchable is True
 
@@ -218,13 +218,13 @@ def test_search_available_reflects_hippo_search_annotation_presence():
 def test_search_available_false_with_no_searchable_slots():
     registry = SchemaRegistry.from_yaml(
         """
-id: https://example.org/hippo/test_no_search
+id: https://example.org/mosaic/test_no_search
 name: test_no_search
 prefixes:
   linkml: https://w3id.org/linkml/
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 default_range: string
 classes:
   Widget:
@@ -264,7 +264,7 @@ classes:
 
 
 def test_domain_class_named_like_infrastructure_is_exposed():
-    # A schema that defines its own ``Process`` without importing hippo_core:
+    # A schema that defines its own ``Process`` without importing mosaic_core:
     # the name collides with a framework class but the identity does not.
     registry = SchemaRegistry.from_yaml(_OWN_PROCESS_SCHEMA)
     assert exposed_class_names(registry) == ["Process", "Sample"]

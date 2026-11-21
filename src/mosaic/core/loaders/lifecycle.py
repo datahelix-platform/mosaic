@@ -20,9 +20,9 @@ The flow is:
 4. Hand a :class:`MosaicClient` to ``loader.load()`` / ``loader.upgrade()``
    inside a :meth:`MosaicClient.load_context` so every ``client.put()``
    appends a row to ``reference_write_log`` (sec2 §2.14.9, D2.14.J).
-5. Record ``{loader_name: version}`` in ``hippo_meta.reference_versions``
+5. Record ``{loader_name: version}`` in ``mosaic_meta.reference_versions``
    so ``requires:`` and "already installed" checks have a fixed source
-   of truth. The v1 ``hippo_meta.reference_entity_ids`` JSON blob is
+   of truth. The v1 ``mosaic_meta.reference_entity_ids`` JSON blob is
    gone — ``--prune-old`` queries the write log instead.
 
 Decisions D2.14.F (additive upgrade, opt-in ``--prune-old``),
@@ -65,7 +65,7 @@ if TYPE_CHECKING:
 # tooling that synthesises version strings can refuse to emit it.
 RESERVED_TEST_SLUG = "test"
 
-# hippo_meta key owned by the reference-loader lifecycle. The v1
+# mosaic_meta key owned by the reference-loader lifecycle. The v1
 # ``reference_entity_ids`` JSON blob was retired in v2 (D2.14.J); the
 # substrate for ``--prune-old`` is the ``reference_write_log`` table.
 META_KEY_VERSIONS = "reference_versions"
@@ -88,7 +88,7 @@ def install_reference(
 
     Mirrors §2.14 *Install lifecycle*. ``schema_dir`` is the deployed
     user-schema directory (defaults to ``schemas/``); when absent the
-    bundled ``hippo_core`` schema is used as the base. ``params`` is
+    bundled ``mosaic_core`` schema is used as the base. ``params`` is
     forwarded verbatim to :meth:`ReferenceLoader.load`.
 
     Re-installing the same version under the same loader is a no-op —
@@ -371,7 +371,7 @@ def deprovision_reference(
        ``reference_write_log``-tracked row for ``name`` across all
        versions. Safe because the source is external and reconstructible
        (D2.14.J substrate; see the wording note below).
-    4. **Remove the version record** from ``hippo_meta.reference_versions``
+    4. **Remove the version record** from ``mosaic_meta.reference_versions``
        so the package reads as uninstalled.
 
     Note on §11.4.2 wording: the spec says ``ReferenceLoader`` deprovision
@@ -440,7 +440,7 @@ def deprovision_reference(
 def _find_installed_dependents(name: str, db_path: Path) -> list[str]:
     """Return the names of *installed* packages that ``depends_on`` ``name``.
 
-    Cross-references ``hippo_meta.reference_versions`` (the installed set,
+    Cross-references ``mosaic_meta.reference_versions`` (the installed set,
     §11.4.4) against each installed package's declared ``depends_on()``
     (a ``list[str]`` of package names — schema_package.py is authoritative
     over the §11.2.2 table). Installed-but-no-longer-discoverable packages
@@ -511,7 +511,7 @@ def _prune_all_via_write_log(db_path: Path, name: str) -> list[EntityRef]:
 
 
 def _remove_version(db_path: Path, name: str) -> None:
-    """Drop ``name`` from ``hippo_meta.reference_versions`` (uninstall mark).
+    """Drop ``name`` from ``mosaic_meta.reference_versions`` (uninstall mark).
 
     The inverse of :func:`_write_versions`. A no-op when the key is
     already absent so the teardown stays idempotent.
@@ -542,7 +542,7 @@ def list_reference_loaders(
     db_path: str | Path | None = None,
 ) -> list[dict[str, Any]]:
     """List every discoverable reference loader, annotated with the
-    installed version recorded in ``hippo_meta`` (if any).
+    installed version recorded in ``mosaic_meta`` (if any).
     """
     from mosaic.core.loaders.discovery import discover_reference_loaders
 
@@ -603,10 +603,10 @@ def _load_deployed_registry(
                 return SchemaRegistry.from_path(path)
         elif path.exists():
             return SchemaRegistry.from_path(path)
-    hippo_core_path = importlib.resources.files("mosaic.schemas").joinpath(
-        "hippo_core.yaml"
+    mosaic_core_path = importlib.resources.files("mosaic.schemas").joinpath(
+        "mosaic_core.yaml"
     )
-    schema_view = SchemaView(str(hippo_core_path))
+    schema_view = SchemaView(str(mosaic_core_path))
     return SchemaRegistry(schema_view)
 
 
@@ -657,7 +657,7 @@ def _read_versions(db_path: Path) -> dict[str, str]:
 
 def _write_versions(db_path: Path, name: str, version: str) -> None:
     """Record ``{loader_name → current_version}`` in
-    ``hippo_meta.reference_versions``.
+    ``mosaic_meta.reference_versions``.
 
     Drives ``requires:`` resolution and "already installed" checks.
     The per-version entity-ID JSON blob (``reference_entity_ids``) is no
@@ -737,7 +737,7 @@ def _prune_via_write_log(
 def _has_meta_table(conn: sqlite3.Connection) -> bool:
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='hippo_meta'"
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='mosaic_meta'"
     )
     return cursor.fetchone() is not None
 

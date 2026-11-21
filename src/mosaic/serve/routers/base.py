@@ -23,6 +23,6 @@ def get_client_from_request(request: Request) -> Any:
     Returns:
         MosaicClient instance.
     """
-    if hasattr(request.app.state, "hippo_client"):
-        return request.app.state.hippo_client
+    if hasattr(request.app.state, "mosaic_client"):
+        return request.app.state.mosaic_client
     return None

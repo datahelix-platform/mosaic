@@ -101,17 +101,15 @@ def reference_cache_root() -> Path:
 
     Mirrors :meth:`MosaicClient._reference_cache_root` so the CLI can
     operate without instantiating a full client (sec2 §2.14.3,
-    decision D2.14.E). ``$MOSAIC_CACHE_DIR`` wins when set (legacy
-    ``$HIPPO_CACHE_DIR`` honored with a ``DeprecationWarning`` —
-    ADR-0004); otherwise ``~/.cache/hippo/references/`` (the pre-rename
-    on-disk location, kept so installed references stay found).
+    decision D2.14.E). ``$MOSAIC_CACHE_DIR`` wins when set; otherwise
+    ``~/.cache/mosaic/references/``.
     """
     from mosaic.config.env import get_env
 
     env = get_env("CACHE_DIR")
     if env:
         return Path(env)
-    return Path.home() / ".cache" / "hippo" / "references"
+    return Path.home() / ".cache" / "mosaic" / "references"
 
 
 def clean_reference_cache(name: str | None = None) -> dict[str, Any]:
@@ -140,28 +138,23 @@ def get_references_dir() -> Path:
 
     Kept for backwards-compatibility with the legacy installed.json
     bookkeeping. The lifecycle implemented here tracks installs in
-    ``hippo_meta`` instead.
+    ``mosaic_meta`` instead.
     """
-    data_dir = Path.home() / ".hippo" / "data"
+    data_dir = Path.home() / ".mosaic" / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
     refs_dir = data_dir / "references"
     refs_dir.mkdir(parents=True, exist_ok=True)
     return refs_dir
 
 
-# ``mosaic.reference_loader_cli`` is canonical; the legacy ``hippo.*``
-# spelling stays resolved for the ADR-0004 deprecation window (dedup by
-# entry-point name, mosaic wins on collision).
-REFERENCE_LOADER_CLI_GROUPS = (
-    "mosaic.reference_loader_cli",
-    "hippo.reference_loader_cli",  # legacy spelling (ADR-0004)
-)
+# Only ``mosaic.reference_loader_cli`` is read; the legacy ``hippo.*`` group
+# was removed by ADR-0015.
+REFERENCE_LOADER_CLI_GROUPS = ("mosaic.reference_loader_cli",)
 
 
 def discover_reference_loader_subapps() -> list[tuple[str, "typer.Typer"]]:
     """Discover loader-provided Typer sub-apps via the
-    ``mosaic.reference_loader_cli`` entry-point group (D2.14.A) — or its
-    legacy ``hippo.reference_loader_cli`` spelling (ADR-0004).
+    ``mosaic.reference_loader_cli`` entry-point group (D2.14.A).
 
     Each entry point must resolve to a :class:`typer.Typer` instance.
     Anything else raises :class:`ReferenceLoaderRegistrationError` —

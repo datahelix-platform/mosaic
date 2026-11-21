@@ -130,8 +130,8 @@ ordinary entity update captured by normal provenance.
 
 ### Declaring an ExternalReference slot
 
-Range any slot against `ExternalReference` (it ships with `hippo_core`).
-Add the `hippo_external_xref` annotation to make the slot a **reverse-lookup
+Range any slot against `ExternalReference` (it ships with `mosaic_core`).
+Add the `mosaic_external_xref` annotation to make the slot a **reverse-lookup
 key**:
 
 ```yaml
@@ -143,14 +143,14 @@ classes:
         range: ExternalReference
         inlined: true
         annotations:
-          hippo_external_xref: true     # reverse lookup + uniqueness
+          mosaic_external_xref: true     # reverse lookup + uniqueness
       registry_refs:                    # multivalued works the same way
         range: ExternalReference
         multivalued: true
         inlined: true
         inlined_as_list: true
         annotations:
-          hippo_external_xref: true
+          mosaic_external_xref: true
       vendor_ref:                       # plain structured value — no lookup
         range: ExternalReference
         inlined: true

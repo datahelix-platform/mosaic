@@ -2,6 +2,6 @@
 
 These are loaded as package resources at `SchemaRegistry` init time.
 
-- `hippo_ext.yaml` — annotation vocabulary declaring every `hippo_*` key
-  Mosaic recognizes. See sec9 §9.4 and `design/reference_hippo_ext.md`.
+- `mosaic_ext.yaml` — annotation vocabulary declaring every `mosaic_*` key
+  Mosaic recognizes. See sec9 §9.4 and `design/reference_mosaic_ext.md`.
 """

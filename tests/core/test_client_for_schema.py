@@ -9,9 +9,9 @@ hand-assembled registry code:
 - ``mosaic.core.factory.build_schema_registry(..., merge_requires=True)`` and
   the public ``mosaic.registry_for_schema`` / ``mosaic.client_for_schema``.
 
-The ``fake`` reference loader (registered via the ``hippo.reference_loaders``
+The ``fake`` reference loader (registered via the ``mosaic.reference_loaders``
 entry point, shipping a ``FakeTerm`` class) stands in for a real
-``hippo-reference-*`` package. ``mosaic.requires._dist_version`` is
+``mosaic-reference-*`` package. ``mosaic.requires._dist_version`` is
 monkeypatched so the exact-match version gate treats ``fake`` as installed —
 the gate compares against the *pip* distribution version, which a synthetic
 entry-point loader has none of.
@@ -38,7 +38,7 @@ prefixes:
   linkml: https://w3id.org/linkml/
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 default_range: string
 requires:
   - fake==v1
@@ -89,7 +89,7 @@ class TestFragmentSpecsForRequires:
         # No monkeypatch — `fake` is not a pip distribution, so the gate fails.
         with pytest.raises(SchemaError) as exc:
             fragment_specs_for_requires(consumer_schema)
-        assert exc.value.error_code == "HIPPO_REQUIRES_UNSATISFIED"
+        assert exc.value.error_code == "REQUIRES_UNSATISFIED"
 
     def test_check_versions_false_skips_gate(
         self, consumer_schema: Path
@@ -107,7 +107,7 @@ class TestFragmentSpecsForRequires:
         schema = tmp_path / "s.yaml"
         schema.write_text(
             "id: https://example.org/x\nname: x\n"
-            "requires:\n  - hippo-reference-absent==3.3\n"
+            "requires:\n  - mosaic-reference-absent==3.3\n"
         )
         with pytest.warns(UserWarning, match="registers no discoverable schema"):
             specs = fragment_specs_for_requires(schema)
@@ -186,7 +186,7 @@ class TestClientForSchema:
             mosaic.client_for_schema(
                 consumer_schema, database_url=str(tmp_path / "x.db")
             )
-        assert exc.value.error_code == "HIPPO_REQUIRES_UNSATISFIED"
+        assert exc.value.error_code == "REQUIRES_UNSATISFIED"
 
 
 # ---------------------------------------------------------------------------
@@ -202,7 +202,7 @@ prefixes:
   linkml: https://w3id.org/linkml/
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 default_range: string
 requires:
   - fake==v1

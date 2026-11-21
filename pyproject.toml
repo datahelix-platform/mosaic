@@ -67,26 +67,14 @@ all = [
 
 [project.scripts]
 mosaic = "mosaic.cli.main:app"
-# Deprecated alias (ADR-0004): prints a stderr notice, then delegates to
-# the mosaic CLI. Removal gated on a future ADR after the deprecation window.
-hippo = "mosaic.cli.compat:legacy_main"
 
-# Entry-point groups (ADR-0004 / WP-H3): ``mosaic.*`` is canonical; the
-# legacy ``hippo.*`` spellings stay dual-registered for the deprecation
-# window. Resolution reads both groups and dedups by entry-point name
-# (mosaic wins), so a plugin registered under both spellings loads once.
+# Entry-point groups. Only the ``mosaic.*`` spellings are read; the legacy
+# ``hippo.*`` groups were removed when ADR-0015 ended ADR-0004's window.
 [project.entry-points."mosaic.storage_adapters"]
 sqlite = "mosaic.core.storage.adapters.sqlite_adapter:SQLiteAdapter"
 postgres = "mosaic.core.storage.adapters.postgres_adapter:PostgresAdapter"
 
-[project.entry-points."hippo.storage_adapters"]
-sqlite = "mosaic.core.storage.adapters.sqlite_adapter:SQLiteAdapter"
-postgres = "mosaic.core.storage.adapters.postgres_adapter:PostgresAdapter"
-
 [project.entry-points."mosaic.write_validators"]
-schema = "mosaic.validators.schema_validator:SchemaValidator"
-
-[project.entry-points."hippo.write_validators"]
 schema = "mosaic.validators.schema_validator:SchemaValidator"
 
 # Genus group (Doc 2 §2A). ``mosaic.reference_loaders`` below is a
@@ -96,17 +84,7 @@ schema = "mosaic.validators.schema_validator:SchemaValidator"
 fake_schema = "mosaic.testing.fake_reference_loader:FakeSchemaPackage"
 obodemo = "mosaic.testing.example_ontology_loader:OboDemoLoader"
 
-[project.entry-points."hippo.schema_packages"]
-fake_schema = "mosaic.testing.fake_reference_loader:FakeSchemaPackage"
-obodemo = "mosaic.testing.example_ontology_loader:OboDemoLoader"
-
 [project.entry-points."mosaic.reference_loaders"]
-fake = "mosaic.testing.fake_reference_loader:FakeReferenceLoader"
-rich = "mosaic.testing.fake_reference_loader:RichParamsLoader"
-bare = "mosaic.testing.fake_reference_loader:BareReferenceLoader"
-obodemo = "mosaic.testing.example_ontology_loader:OboDemoLoader"
-
-[project.entry-points."hippo.reference_loaders"]
 fake = "mosaic.testing.fake_reference_loader:FakeReferenceLoader"
 rich = "mosaic.testing.fake_reference_loader:RichParamsLoader"
 bare = "mosaic.testing.fake_reference_loader:BareReferenceLoader"
@@ -115,13 +93,8 @@ obodemo = "mosaic.testing.example_ontology_loader:OboDemoLoader"
 [project.entry-points."mosaic.reference_loader_cli"]
 fake = "mosaic.testing.fake_reference_loader:fake_cli_app"
 
-[project.entry-points."hippo.reference_loader_cli"]
-fake = "mosaic.testing.fake_reference_loader:fake_cli_app"
-
-# ``src/hippo`` is the one-file deprecated alias package (WP-H2): the wheel
-# ships both so ``import hippo`` keeps working during the deprecation window.
 [tool.hatch.build.targets.wheel]
-packages = ["src/mosaic", "src/hippo"]
+packages = ["src/mosaic"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

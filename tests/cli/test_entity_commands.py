@@ -11,7 +11,7 @@ from mosaic.cli.main import app
 
 
 SCHEMA_YAML = """\
-id: https://example.org/hippo/test/entity_cli
+id: https://example.org/mosaic/test/entity_cli
 name: entity_cli_schema
 description: Minimal LinkML schema for entity CLI tests.
 
@@ -20,7 +20,7 @@ prefixes:
 
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 
 default_range: string
 

@@ -30,12 +30,12 @@ def create_test_app() -> tuple[FastAPI, TestClient]:
 
 
 class TestValidHeaderScenario:
-    """Tests for valid X-Mosaic-Actor header format (actor:<identifier>)."""
+    """Tests for valid X-DataHelix-Actor header format (actor:<identifier>)."""
 
     def test_valid_header_extracts_actor(self):
         """Given valid header with identifier, extracts actor into context."""
         _, client = create_test_app()
-        response = client.get("/test", headers={"x-hippo-actor": "actor:user123"})
+        response = client.get("/test", headers={"x-datahelix-actor": "actor:user123"})
         assert response.status_code == 200
         assert response.json()["actor_id"] == "user123"
 
@@ -43,7 +43,7 @@ class TestValidHeaderScenario:
         """Given valid header with complex identifier, extracts full identifier."""
         _, client = create_test_app()
         response = client.get(
-            "/test2", headers={"x-hippo-actor": "actor:service-abc-123@domain.com"}
+            "/test2", headers={"x-datahelix-actor": "actor:service-abc-123@domain.com"}
         )
         assert response.status_code == 200
         assert response.json()["actor_id"] == "service-abc-123@domain.com"
@@ -51,13 +51,13 @@ class TestValidHeaderScenario:
     def test_valid_header_stores_raw_header(self):
         """Given valid header, raw header is stored in context."""
         _, client = create_test_app()
-        response = client.get("/test3", headers={"x-hippo-actor": "actor:testuser"})
+        response = client.get("/test3", headers={"x-datahelix-actor": "actor:testuser"})
         assert response.status_code == 200
         assert response.json()["raw"] == "actor:testuser"
 
 
 class TestMissingHeaderScenario:
-    """Tests for missing X-Mosaic-Actor header."""
+    """Tests for missing X-DataHelix-Actor header."""
 
     def test_no_header_continues_with_empty_actor(self):
         """Given no header, continues with empty actor identifier."""
@@ -68,21 +68,21 @@ class TestMissingHeaderScenario:
 
 
 class TestInvalidHeaderFormatScenario:
-    """Tests for invalid X-Mosaic-Actor header format."""
+    """Tests for invalid X-DataHelix-Actor header format."""
 
     def test_invalid_format_returns_401(self):
         """Given invalid format (not starting with 'actor:'), returns 401."""
         _, client = create_test_app()
-        response = client.get("/test", headers={"x-hippo-actor": "Bearer token123"})
+        response = client.get("/test", headers={"x-datahelix-actor": "Bearer token123"})
         assert response.status_code == 401
-        assert response.json()["error"] == "Invalid X-Mosaic-Actor header format"
+        assert response.json()["error"] == "Invalid X-DataHelix-Actor header format"
 
     def test_invalid_format_no_prefix_returns_401(self):
         """Given header without 'actor:' prefix, returns 401."""
         _, client = create_test_app()
-        response = client.get("/test2", headers={"x-hippo-actor": "just-a-string"})
+        response = client.get("/test2", headers={"x-datahelix-actor": "just-a-string"})
         assert response.status_code == 401
-        assert response.json()["error"] == "Invalid X-Mosaic-Actor header format"
+        assert response.json()["error"] == "Invalid X-DataHelix-Actor header format"
 
 
 class TestEmptyIdentifierScenario:
@@ -91,24 +91,24 @@ class TestEmptyIdentifierScenario:
     def test_empty_identifier_returns_401(self):
         """Given empty identifier after 'actor:', returns 401."""
         _, client = create_test_app()
-        response = client.get("/test", headers={"x-hippo-actor": "actor:"})
+        response = client.get("/test", headers={"x-datahelix-actor": "actor:"})
         assert response.status_code == 401
         assert (
-            response.json()["error"] == "Empty actor identifier in X-Mosaic-Actor header"
+            response.json()["error"] == "Empty actor identifier in X-DataHelix-Actor header"
         )
 
     def test_whitespace_only_identifier_returns_401(self):
         """Given whitespace-only identifier, returns 401."""
         _, client = create_test_app()
-        response = client.get("/test2", headers={"x-hippo-actor": "actor:   "})
+        response = client.get("/test2", headers={"x-datahelix-actor": "actor:   "})
         assert response.status_code == 401
         assert (
-            response.json()["error"] == "Empty actor identifier in X-Mosaic-Actor header"
+            response.json()["error"] == "Empty actor identifier in X-DataHelix-Actor header"
         )
 
 
 class TestMultipleHeadersScenario:
-    """Tests for multiple X-Mosaic-Actor headers."""
+    """Tests for multiple X-DataHelix-Actor headers."""
 
     def test_multiple_headers_uses_first(self):
         """Given multiple headers, uses first value."""
@@ -116,8 +116,8 @@ class TestMultipleHeadersScenario:
         response = client.get(
             "/test",
             headers=[
-                ("x-hippo-actor", "actor:first"),
-                ("x-hippo-actor", "actor:second"),
+                ("x-datahelix-actor", "actor:first"),
+                ("x-datahelix-actor", "actor:second"),
             ],
         )
         assert response.status_code == 200

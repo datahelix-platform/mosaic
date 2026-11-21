@@ -18,13 +18,13 @@ from mosaic.linkml_bridge import SchemaRegistry
 from tests.support import traversal_fixture
 
 _SCHEMA = """
-id: https://example.org/hippo/test_compiler
+id: https://example.org/mosaic/test_compiler
 name: test_compiler
 prefixes:
   linkml: https://w3id.org/linkml/
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 default_range: string
 
 classes:

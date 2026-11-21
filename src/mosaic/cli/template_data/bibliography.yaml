@@ -1,7 +1,7 @@
-id: https://example.org/hippo/examples/bibliography
+id: https://example.org/mosaic/examples/bibliography
 name: bibliography
 description: >-
-  Citation-graph schema for the Hippo bibliography worked example.
+  Citation-graph schema for the Mosaic bibliography worked example.
   Demonstrates: polymorphism (Publication hierarchy), full-text search,
   B-tree indexes for FK-style lookups, and entity supersession
   (preprint → journal article).
@@ -11,7 +11,7 @@ prefixes:
 
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 
 default_range: string
 
@@ -31,12 +31,12 @@ classes:
         range: string
         required: true
         annotations:
-          hippo_search: fts5
+          mosaic_search: fts5
       orcid:
         range: string
         description: ORCID identifier (e.g. 0000-0002-1825-0097)
         annotations:
-          hippo_index: true
+          mosaic_index: true
       email:
         range: string
 
@@ -49,7 +49,7 @@ classes:
     abstract: true
     description: >-
       Abstract base for all citable works. Concrete subtypes are
-      JournalArticle, Preprint, and ConferencePaper. Hippo stores each
+      JournalArticle, Preprint, and ConferencePaper. Mosaic stores each
       in its own table; polymorphic queries must iterate subtypes and
       merge results (see sdk_example.py).
     attributes:
@@ -57,18 +57,18 @@ classes:
         range: string
         required: true
         annotations:
-          hippo_search: fts5
+          mosaic_search: fts5
       year:
         range: integer
       abstract_text:
         range: string
         annotations:
-          hippo_search: fts5
+          mosaic_search: fts5
       doi:
         range: string
         description: Digital Object Identifier (optional; journals and some preprints)
         annotations:
-          hippo_index: true
+          mosaic_index: true
 
   JournalArticle:
     is_a: Publication
@@ -77,7 +77,7 @@ classes:
       journal:
         range: string
         annotations:
-          hippo_search: fts5
+          mosaic_search: fts5
       volume:
         range: string
       issue:
@@ -96,12 +96,12 @@ classes:
         range: string
         description: Preprint server name (e.g. arXiv, bioRxiv, medRxiv)
         annotations:
-          hippo_search: fts5
+          mosaic_search: fts5
       preprint_id:
         range: string
         description: Server-local identifier (e.g. arXiv:1706.03762)
         annotations:
-          hippo_index: true
+          mosaic_index: true
 
   ConferencePaper:
     is_a: Publication
@@ -110,7 +110,7 @@ classes:
       conference_name:
         range: string
         annotations:
-          hippo_search: fts5
+          mosaic_search: fts5
       proceedings_url:
         range: string
 
@@ -126,11 +126,11 @@ classes:
         range: string
         required: true
         annotations:
-          hippo_search: fts5
+          mosaic_search: fts5
       issn:
         range: string
         annotations:
-          hippo_index: true
+          mosaic_index: true
       country:
         range: string
 
@@ -149,13 +149,13 @@ classes:
         range: Author
         required: true
         annotations:
-          hippo_index: true
+          mosaic_index: true
       publication_id:
         range: string
         required: true
         description: UUID of the linked Publication (any concrete subtype)
         annotations:
-          hippo_index: true
+          mosaic_index: true
       position:
         range: integer
         required: true
@@ -173,10 +173,10 @@ classes:
         required: true
         description: UUID of the citing Publication
         annotations:
-          hippo_index: true
+          mosaic_index: true
       cited_id:
         range: string
         required: true
         description: UUID of the cited Publication
         annotations:
-          hippo_index: true
+          mosaic_index: true

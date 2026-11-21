@@ -14,7 +14,7 @@ def schema_dict(
     classes: dict[str, Any],
     enums: Optional[dict[str, Any]] = None,
     default_range: str = "string",
-    schema_id: str = "https://example.org/hippo/test",
+    schema_id: str = "https://example.org/mosaic/test",
     schema_name: str = "test_schema",
 ) -> dict[str, Any]:
     """Return a minimal, valid LinkML schema dict around the given classes/enums."""
@@ -35,7 +35,7 @@ def build_registry(
     classes: dict[str, Any],
     enums: Optional[dict[str, Any]] = None,
     default_range: str = "string",
-    schema_id: str = "https://example.org/hippo/test",
+    schema_id: str = "https://example.org/mosaic/test",
     schema_name: str = "test_schema",
 ) -> SchemaRegistry:
     """Build a ``SchemaRegistry`` from a compact dict spec."""
@@ -61,7 +61,7 @@ def write_schema_file(
 
     ``path`` may be a directory (file defaults to ``<schema_name>.yaml``) or a
     file path. All Mosaic-specific slot metadata must be expressed via LinkML
-    annotations under ``hippo_*`` keys.
+    annotations under ``mosaic_*`` keys.
     """
     if path.is_dir():
         assert schema_name, "schema_name required when path is a directory"

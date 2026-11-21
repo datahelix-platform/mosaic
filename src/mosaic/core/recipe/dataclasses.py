@@ -32,7 +32,7 @@ class RecipeRef:
 
     Reused for ``RecipeManifest.parent``, each entry of
     ``RecipeManifest.requires.recipes``, and the shape stored in
-    ``hippo_meta.installed_recipes``.
+    ``mosaic_meta.installed_recipes``.
 
     ``digest`` is required at install time when ``source`` begins with
     ``https:``; for ``file:`` sources it is optional in the manifest but
@@ -61,7 +61,7 @@ class RecipeManifest:
     name: str
     version: str
     created_at: str
-    hippo_version: str
+    mosaic_version: str
     description: Optional[str] = None
     author: Optional[RecipeAuthor] = None
     license: Optional[str] = None
@@ -72,7 +72,7 @@ class RecipeManifest:
 
 @dataclass(frozen=True)
 class InstalledRecipe:
-    """An entry in ``hippo_meta.installed_recipes`` (sec10 §10.3.4).
+    """An entry in ``mosaic_meta.installed_recipes`` (sec10 §10.3.4).
 
     Extends :class:`RecipeRef`'s shape with the install-time-captured
     fields. ``digest`` is always present after install (computed for

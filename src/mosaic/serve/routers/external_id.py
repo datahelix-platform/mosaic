@@ -2,7 +2,7 @@
 
 DEPRECATED (issue #48): these endpoints are backed by the deprecated
 ``ExternalID`` entity pattern. New deployments should declare
-``ExternalReference``-ranged slots (annotated ``hippo_external_xref`` for
+``ExternalReference``-ranged slots (annotated ``mosaic_external_xref`` for
 reverse lookup) and use ``GET /xref/{system}/{value}``; an entity's
 external references travel as ordinary slot data on the entity endpoints.
 The endpoints below remain functional shims and are marked ``deprecated``
@@ -23,8 +23,8 @@ router = APIRouter(tags=["external-ids"])
 
 async def get_client(request: Request) -> MosaicClient:
     """Get the MosaicClient from request state."""
-    if hasattr(request.app.state, "hippo_client"):
-        return request.app.state.hippo_client
+    if hasattr(request.app.state, "mosaic_client"):
+        return request.app.state.mosaic_client
     return MosaicClient()
 
 
@@ -41,7 +41,7 @@ class ExternalIdRequest(BaseModel):
     description=(
         "DEPRECATED (issue #48): backed by the deprecated ExternalID "
         "entity. Use `GET /xref/{system}/{value}` over "
-        "`hippo_external_xref`-annotated ExternalReference slots instead."
+        "`mosaic_external_xref`-annotated ExternalReference slots instead."
     ),
 )
 async def get_entity_by_external_id(
@@ -122,7 +122,7 @@ async def list_entity_external_ids(
     description=(
         "DEPRECATED (issue #48): backed by the deprecated ExternalID "
         "entity. Write an ExternalReference value to an entity slot "
-        "(annotated `hippo_external_xref` for reverse lookup) via the "
+        "(annotated `mosaic_external_xref` for reverse lookup) via the "
         "ordinary entity write endpoints instead."
     ),
 )

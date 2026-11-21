@@ -1,6 +1,6 @@
 """External-reference (xref) reverse-lookup router (issue #48).
 
-Serves the generic reverse lookup over ``hippo_external_xref``-annotated
+Serves the generic reverse lookup over ``mosaic_external_xref``-annotated
 ``ExternalReference`` slots: ``GET /xref/{system}/{value}`` resolves a
 ``(system, value)`` pair to the single available entity that holds it.
 
@@ -21,8 +21,8 @@ router = APIRouter(tags=["external-references"])
 
 async def get_client(request: Request) -> MosaicClient:
     """Get the MosaicClient from request state."""
-    if hasattr(request.app.state, "hippo_client"):
-        return request.app.state.hippo_client
+    if hasattr(request.app.state, "mosaic_client"):
+        return request.app.state.mosaic_client
     return MosaicClient()
 
 
@@ -30,7 +30,7 @@ async def get_client(request: Request) -> MosaicClient:
     "/xref/{system}/{value}",
     summary="Resolve an external reference to its entity",
     description=(
-        "Reverse lookup over `hippo_external_xref`-annotated "
+        "Reverse lookup over `mosaic_external_xref`-annotated "
         "ExternalReference slots: returns the full envelope of the single "
         "AVAILABLE entity whose annotated slot carries the `(system, "
         "value)` pair. The pair is globally unique among available "

@@ -3,10 +3,10 @@
 Exercises every acceptance criterion from PTS-229 and the v2 substrate
 swap from PTS-256:
 
-- ``install --version v1`` writes ``hippo_meta[reference_versions]``
+- ``install --version v1`` writes ``mosaic_meta[reference_versions]``
   AND populates ``reference_write_log`` for every ``client.put()`` made
   inside the ``load_context`` block (sec2 §2.14.9, D2.14.J).
-- Upgrade additive: both versions queryable, hippo_meta reflects target.
+- Upgrade additive: both versions queryable, mosaic_meta reflects target.
 - Upgrade ``--prune-old`` success: prior rows removed (hard delete) and
   matching ``reference_write_log`` rows deleted in the same transaction.
 - Upgrade ``--prune-old`` failure mid-load: prior rows intact.
@@ -53,7 +53,7 @@ def hippo_workspace(tmp_path: Path) -> dict[str, Path]:
     """Return paths to an empty Mosaic workspace (db + schemas dir).
 
     The schemas dir is intentionally left empty so the install lifecycle
-    falls back to the bundled ``hippo_core`` schema as the base. The
+    falls back to the bundled ``mosaic_core`` schema as the base. The
     fake loader's fragment is then merged on top.
     """
     db_path = tmp_path / "hippo.db"
@@ -118,7 +118,7 @@ def _select_write_log(
 
 
 class TestInstall:
-    def test_install_records_version_in_hippo_meta(self, hippo_workspace):
+    def test_install_records_version_in_mosaic_meta(self, hippo_workspace):
         result = install_reference(
             "fake",
             "v1",
@@ -386,7 +386,7 @@ class TestUpgradePruneOld:
             versions = get_meta(conn, META_KEY_VERSIONS) or {}
         finally:
             conn.close()
-        # hippo_meta still points at v1 — upgrade was aborted before
+        # mosaic_meta still points at v1 — upgrade was aborted before
         # the version pointer rotated.
         assert versions == {"fake": "v1"}
 
@@ -708,9 +708,9 @@ def obodemo_workspace(tmp_path: Path, monkeypatch) -> dict[str, Path]:
 
     Locally the editable install's ``.dist-info`` predates ``obodemo``, so
     discovery is monkeypatched (mirrors the S0 schema-package tests); CI's
-    clean install carries the real entry point. ``HIPPO_CACHE_DIR`` is
+    clean install carries the real entry point. ``MOSAIC_CACHE_DIR`` is
     pinned to ``tmp_path`` so ``cached_fetch`` is hermetic and never
-    touches ``~/.cache/hippo``.
+    touches ``~/.cache/mosaic``.
     """
     import importlib.metadata as md
 
@@ -729,7 +729,7 @@ def obodemo_workspace(tmp_path: Path, monkeypatch) -> dict[str, Path]:
             }
         ),
     )
-    monkeypatch.setenv("HIPPO_CACHE_DIR", str(tmp_path / "cache"))
+    monkeypatch.setenv("MOSAIC_CACHE_DIR", str(tmp_path / "cache"))
     db_path = tmp_path / "hippo.db"
     schema_dir = tmp_path / "schemas"
     schema_dir.mkdir()
@@ -913,7 +913,7 @@ class TestOboDemoDiffUpgradeAcceptance:
         assert _select_write_log(db, "obodemo", "v1") == []
         assert len(_select_write_log(db, "obodemo", "v2")) == 4
 
-        # hippo_meta now pins v2.
+        # mosaic_meta now pins v2.
         conn = _open(db)
         try:
             versions = get_meta(conn, META_KEY_VERSIONS)

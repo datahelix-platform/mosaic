@@ -33,15 +33,15 @@ class TestPartialIndexes:
                         "count": {
                             "range": "integer",
                             "annotations": {
-                                "hippo_index": True,
-                                "hippo_index_partial": True,
+                                "mosaic_index": True,
+                                "mosaic_index_partial": True,
                             },
                         },
                         "score": {
                             "range": "float",
                             "annotations": {
-                                "hippo_index": True,
-                                "hippo_index_partial": True,
+                                "mosaic_index": True,
+                                "mosaic_index_partial": True,
                             },
                         },
                     }

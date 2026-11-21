@@ -7,7 +7,7 @@ PR 7 of PTS-291. Verifies:
   transaction.
 - Dry-run leaves no state change.
 - Bottom-up dependency resolution + cycle detection.
-- ``hippo_version`` incompatibility rejection.
+- ``mosaic_version`` incompatibility rejection.
 - The no-in-place-override merge guard fires through ``import_``.
 - A failure mid-merge rolls back both the meta write and the provenance
   event (atomicity, invariant 3).
@@ -47,7 +47,7 @@ def _make_recipe(
     version: str = "0.1.0",
     parent: dict | None = None,
     requires: dict | None = None,
-    hippo_version: str = ">=0.0",
+    mosaic_version: str = ">=0.0",
     extra_classes: dict | None = None,
 ) -> Path:
     """Build a minimal recipe directory under ``root``."""
@@ -59,7 +59,7 @@ def _make_recipe(
         f"name: {name}",
         f"version: {version}",
         "created_at: '2026-05-27T00:00:00+00:00'",
-        f"hippo_version: '{hippo_version}'",
+        f"mosaic_version: '{mosaic_version}'",
     ]
     if parent is not None:
         manifest_lines.append("parent:")
@@ -282,14 +282,14 @@ class TestDependencyResolution:
 
 
 class TestVersionCompatibility:
-    def test_incompatible_hippo_version_rejected(
+    def test_incompatible_mosaic_version_rejected(
         self, client: MosaicClient, tmp_path: Path
     ) -> None:
         recipe_dir = _make_recipe(
             tmp_path,
             recipe_id="org.example.future",
             name="future",
-            hippo_version=">=99.99",
+            mosaic_version=">=99.99",
         )
         with pytest.raises(RecipeVersionIncompatibleError):
             client.recipe_import(str(recipe_dir))
@@ -318,7 +318,7 @@ class TestOverrideGuardThroughImport:
                 name: offender
                 version: 0.1.0
                 created_at: '2026-05-27T00:00:00+00:00'
-                hippo_version: '>=0.0'
+                mosaic_version: '>=0.0'
                 """
             )
         )
@@ -377,7 +377,7 @@ class TestAtomicity:
                 name: offender2
                 version: 0.1.0
                 created_at: '2026-05-27T00:00:00+00:00'
-                hippo_version: '>=0.0'
+                mosaic_version: '>=0.0'
                 """
             )
         )

@@ -41,12 +41,10 @@ from mosaic.core.loaders.reference import ReferenceLoader, SchemaPackage
 # external-data species. Discovery resolves both so a package registered
 # under either is found, and dedups by name (genus group canonical).
 #
-# ADR-0004: each group also has a legacy ``hippo.*`` spelling that stays
-# resolved for the deprecation window — mosaic spellings are scanned first,
-# so a plugin dual-registered under both spellings loads exactly once.
-SCHEMA_PACKAGES_GROUPS = ("mosaic.schema_packages", "hippo.schema_packages")
-REFERENCE_LOADERS_GROUPS = ("mosaic.reference_loaders", "hippo.reference_loaders")
-#: Canonical group names (kept for backwards compatibility).
+# The legacy ``hippo.*`` spellings are no longer read (ADR-0015).
+SCHEMA_PACKAGES_GROUPS = ("mosaic.schema_packages",)
+REFERENCE_LOADERS_GROUPS = ("mosaic.reference_loaders",)
+#: Canonical group names.
 SCHEMA_PACKAGES_GROUP = SCHEMA_PACKAGES_GROUPS[0]
 REFERENCE_LOADERS_GROUP = REFERENCE_LOADERS_GROUPS[0]
 
@@ -133,14 +131,12 @@ def _build_package_info(
 def discover_reference_loaders() -> list[dict[str, Any]]:
     """Discover and instantiate reference loaders via entry points.
 
-    Each entry point in the ``mosaic.reference_loaders`` group (or its
-    legacy ``hippo.reference_loaders`` spelling — ADR-0004) must point
+    Each entry point in the ``mosaic.reference_loaders`` group must point
     at a concrete :class:`ReferenceLoader` subclass. The class is
     instantiated eagerly so that callers receive a ready-to-use loader
     surface; an entry point pointing at anything else raises
     :class:`ReferenceLoaderRegistrationError` with a message identifying
-    the offending entry point. Entries are deduplicated by name with the
-    mosaic spelling canonical, so a dual-registered loader loads once.
+    the offending entry point. Entries are deduplicated by name.
     """
     loaders: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -165,11 +161,10 @@ def discover_schema_packages() -> list[dict[str, Any]]:
     """Discover and instantiate every :class:`SchemaPackage` via entry points.
 
     Resolves the broad ``mosaic.schema_packages`` group **and** the
-    ``mosaic.reference_loaders`` subset/alias (Doc 2 §2A) — plus their
-    legacy ``hippo.*`` spellings (ADR-0004) — so a package registered
-    under any of them is found. Entries are deduplicated by name with the
-    genus group canonical: the ``schema_packages`` groups are scanned
-    first, then the ``reference_loaders`` groups contribute only the
+    ``mosaic.reference_loaders`` subset/alias (Doc 2 §2A), so a package
+    registered under either is found. Entries are deduplicated by name with the
+    genus group canonical: the ``schema_packages`` group is scanned
+    first, then the ``reference_loaders`` group contributes only the
     names not already seen. Each entry point must resolve to a concrete
     :class:`SchemaPackage` subclass; anything else raises
     :class:`SchemaPackageRegistrationError`.
@@ -381,7 +376,7 @@ def fragment_specs_for_requires(
                 f"{len(errors)} unsatisfied `requires:` pin(s):\n  - "
                 + "\n  - ".join(errors),
                 field_name="requires",
-                error_code="HIPPO_REQUIRES_UNSATISFIED",
+                error_code="REQUIRES_UNSATISFIED",
             )
 
     discovered = discover_schema_packages()

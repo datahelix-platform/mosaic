@@ -57,8 +57,8 @@ def _operations_from_body(entities: Any) -> list[WriteOperation]:
 
 async def get_client(request: Request) -> MosaicClient:
     """Get the MosaicClient from request state."""
-    if hasattr(request.app.state, "hippo_client"):
-        return request.app.state.hippo_client
+    if hasattr(request.app.state, "mosaic_client"):
+        return request.app.state.mosaic_client
     return MosaicClient()
 
 
@@ -109,7 +109,7 @@ async def ingest_entity(
         raise HTTPException(status_code=422, detail=str(e))
     except MosaicValidationError as e:
         # Adapter-level integrity violations (e.g. XrefUniquenessError on
-        # a hippo_external_xref slot) follow the standard validation
+        # a mosaic_external_xref slot) follow the standard validation
         # error path — same 422 shape as schema validation failures.
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:

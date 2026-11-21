@@ -3,7 +3,7 @@
 Same expectations as ``test_inverse_slots.py``, but ``inverse: samples`` sits
 on ``Sample.donor_id`` and ``Donor.samples`` is synthesized: the generated
 schema still grows ``samples: [Sample!]``, ``samplesCount`` and
-``DonorFilter.samples: {some, none}``, ``hippoSchema`` reports
+``DonorFilter.samples: {some, none}``, ``mosaicSchema`` reports
 ``inverseOf: "donor_id"`` and the slot stays out of Create/Update inputs.
 """
 
@@ -48,12 +48,12 @@ class TestSynthesizedEdge:
         assert (inv.name, inv.forward_slot, inv.declared_on) == ("samples", "donor_id", "forward")
 
     def test_hippo_schema_reports_inverse_of(self, gql):
-        body = gql('{ hippoSchema { name fields { name inverseOf multivalued } } }')
+        body = gql('{ mosaicSchema { name fields { name inverseOf multivalued } } }')
         assert "errors" not in body, body
-        donor = next(t for t in body["data"]["hippoSchema"] if t["name"] == "Donor")
+        donor = next(t for t in body["data"]["mosaicSchema"] if t["name"] == "Donor")
         samples = next(f for f in donor["fields"] if f["name"] == "samples")
         assert samples == {"name": "samples", "inverseOf": "donor_id", "multivalued": True}
-        sample = next(t for t in body["data"]["hippoSchema"] if t["name"] == "Sample")
+        sample = next(t for t in body["data"]["mosaicSchema"] if t["name"] == "Sample")
         donor_id = next(f for f in sample["fields"] if f["name"] == "donor_id")
         assert donor_id["inverseOf"] is None
 

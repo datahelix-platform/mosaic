@@ -1,4 +1,4 @@
-id: https://example.org/hippo/test/sample
+id: https://example.org/mosaic/test/sample
 name: sample_schema
 description: Minimal LinkML schema exercising Hippo-relevant features.
 
@@ -7,7 +7,7 @@ prefixes:
 
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 
 default_range: string
 
@@ -18,10 +18,10 @@ classes:
       name:
         required: true
         annotations:
-          hippo_search: fts5
+          mosaic_search: fts5
       description:
         annotations:
-          hippo_search: fts5
+          mosaic_search: fts5
       samples:
         range: Sample
         multivalued: true
@@ -33,16 +33,16 @@ classes:
       name:
         required: true
         annotations:
-          hippo_search: fts5
+          mosaic_search: fts5
       project_id:
         range: Project
         annotations:
-          hippo_index: true
+          mosaic_index: true
       collected_at:
         range: datetime
         annotations:
-          hippo_index: true
-          hippo_index_partial: true
+          mosaic_index: true
+          mosaic_index_partial: true
       status:
         range: SampleStatus
       volume_ml:

@@ -6,7 +6,7 @@ Gaps identified in `tests/integration/` coverage of LinkML-backed behavior. Patt
 
 - [ ] **Non-abstract `is_a` inheritance** — DDL generator emits CASCADE-DELETE FKs for parent classes; only abstract parents are unit-tested. Need an integration test that inserts child rows, deletes parents, and asserts cascade behavior.
 - [ ] **Composite `unique_keys`** — DDL emission is unit-tested; no integration test actually attempts a duplicate multi-column insert to verify the DB rejects it.
-- [ ] **Single-column `hippo_unique`** — DDL side is covered, runtime enforcement isn't.
+- [ ] **Single-column `mosaic_unique`** — DDL side is covered, runtime enforcement isn't.
 - [ ] **Required-field addition during schema evolution** — `TestAdditiveFieldAddition` only covers optional additions. Add a test for the failure/backfill path when a required field is added to a schema with existing rows.
 - [ ] **PostgreSQL DDL parity with SQLite** — `test_postgres_adapter.py` only exercises CRUD. Add a DDL-parity test for the same LinkML schema against both adapters (type mappings: `TIMESTAMPTZ`, `DOUBLE PRECISION`, `BOOLEAN`, enum/index/FTS behavior).
 
@@ -16,7 +16,7 @@ Gaps identified in `tests/integration/` coverage of LinkML-backed behavior. Patt
 - [ ] **CEL validator errors through REST** — asserted at `HippoClient` level (`pytest.raises`); verify errors surface as HTTP 400/422 with structured detail.
 - [ ] **Read-side / cross-entity validators** — pipeline supports priority-ordered validators, but only single-op CEL write-validators are exercised.
 - [ ] **`hippo_default` / LinkML `ifabsent`** — DDL emits `DEFAULT`; no test creates an entity with the field omitted and verifies the default lands.
-- [ ] **Partial-index correctness** — `hippo_index_partial` DDL is asserted; add a query-through-the-index test confirming unavailable rows are excluded.
+- [ ] **Partial-index correctness** — `mosaic_index_partial` DDL is asserted; add a query-through-the-index test confirming unavailable rows are excluded.
 - [ ] **FTS modes beyond `fts5`** — only `fts5` is tested in E2E. Cover other supported modes (or explicitly document that only `fts5` is supported).
 - [ ] **Validator timeouts at integration level** — unit-tested only; never tripped in a real E2E flow.
 

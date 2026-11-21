@@ -13,8 +13,8 @@ router = APIRouter(prefix="/ga4gh/drs/v1", tags=["drs"])
 
 async def get_client(request: Request):
     """Get the MosaicClient from request state."""
-    if hasattr(request.app.state, "hippo_client"):
-        return request.app.state.hippo_client
+    if hasattr(request.app.state, "mosaic_client"):
+        return request.app.state.mosaic_client
     return None
 
 

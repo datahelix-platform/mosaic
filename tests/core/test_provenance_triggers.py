@@ -64,7 +64,7 @@ class TestProvenanceImmutability:
             )
             conn.commit()
 
-        assert "hippo_append_only" in str(exc_info.value)
+        assert "mosaic_append_only" in str(exc_info.value)
 
     def test_update_timestamp_rejected(self, conn: sqlite3.Connection) -> None:
         self._insert(conn, "test-2")
@@ -76,7 +76,7 @@ class TestProvenanceImmutability:
             )
             conn.commit()
 
-        assert "hippo_append_only" in str(exc_info.value)
+        assert "mosaic_append_only" in str(exc_info.value)
 
     def test_update_actor_rejected(self, conn: sqlite3.Connection) -> None:
         self._insert(conn, "test-3")
@@ -88,7 +88,7 @@ class TestProvenanceImmutability:
             )
             conn.commit()
 
-        assert "hippo_append_only" in str(exc_info.value)
+        assert "mosaic_append_only" in str(exc_info.value)
 
     def test_update_patch_rejected(self, conn: sqlite3.Connection) -> None:
         self._insert(conn, "test-4")
@@ -100,7 +100,7 @@ class TestProvenanceImmutability:
             )
             conn.commit()
 
-        assert "hippo_append_only" in str(exc_info.value)
+        assert "mosaic_append_only" in str(exc_info.value)
 
     def test_delete_rejected(self, conn: sqlite3.Connection) -> None:
         """BEFORE DELETE trigger rejects row deletion."""
@@ -113,7 +113,7 @@ class TestProvenanceImmutability:
             )
             conn.commit()
 
-        assert "hippo_append_only" in str(exc_info.value)
+        assert "mosaic_append_only" in str(exc_info.value)
 
     def test_transaction_rollback_preserves_row(
         self, conn: sqlite3.Connection

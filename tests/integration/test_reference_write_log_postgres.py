@@ -1,5 +1,5 @@
 """Postgres adapter parity tests for ``reference_write_log`` DDL and
-the one-time backfill from ``hippo_meta.reference_entity_ids``
+the one-time backfill from ``mosaic_meta.reference_entity_ids``
 (sec2 §2.14.9, Decision 2.14.J).
 
 Mirrors ``tests/core/test_reference_write_log.py``. Requires a running
@@ -20,9 +20,7 @@ psycopg = pytest.importorskip("psycopg")
 
 from mosaic.core.meta import set_meta as sqlite_set_meta  # noqa: E402
 
-POSTGRES_URL = os.environ.get("MOSAIC_DATABASE_URL") or os.environ.get(
-    "HIPPO_DATABASE_URL"
-)
+POSTGRES_URL = os.environ.get("MOSAIC_DATABASE_URL")
 
 pytestmark = pytest.mark.skipif(
     not POSTGRES_URL,
@@ -31,7 +29,7 @@ pytestmark = pytest.mark.skipif(
 
 
 def _set_meta_pg(conn, key: str, value: dict) -> None:
-    """Postgres-flavoured upsert into ``hippo_meta``.
+    """Postgres-flavoured upsert into ``mosaic_meta``.
 
     Mirrors ``mosaic.core.meta.set_meta`` but with ``%s`` placeholders so
     it works against psycopg cursors.
@@ -43,7 +41,7 @@ def _set_meta_pg(conn, key: str, value: dict) -> None:
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO hippo_meta (key, value, updated_at)
+        INSERT INTO mosaic_meta (key, value, updated_at)
         VALUES (%s, %s, %s)
         ON CONFLICT(key) DO UPDATE SET value = excluded.value,
                                        updated_at = excluded.updated_at
@@ -62,7 +60,7 @@ def _cleanup_db(database_url: str) -> None:
         if cur.fetchone()[0]:
             cur.execute("DELETE FROM reference_write_log")
         for table in (
-            "hippo_meta",
+            "mosaic_meta",
             "entity_external_ids",
             "relationships",
             '"ProvenanceRecord"',
@@ -130,7 +128,7 @@ def _select_log(database_url: str) -> list[dict]:
 def _meta_value(database_url: str, key: str) -> str | None:
     with psycopg.connect(database_url) as conn:
         cur = conn.cursor()
-        cur.execute("SELECT value FROM hippo_meta WHERE key = %s", (key,))
+        cur.execute("SELECT value FROM mosaic_meta WHERE key = %s", (key,))
         row = cur.fetchone()
         return row[0] if row else None
 
@@ -145,7 +143,7 @@ def _simulate_v1_state(database_url: str) -> None:
     with psycopg.connect(database_url, autocommit=True) as conn:
         cur = conn.cursor()
         cur.execute(
-            "DELETE FROM hippo_meta WHERE key = %s", (_MIGRATION_MARKER,)
+            "DELETE FROM mosaic_meta WHERE key = %s", (_MIGRATION_MARKER,)
         )
 
 

@@ -40,10 +40,10 @@ def _fragment_with(**overrides) -> dict:
     """Build a minimal, schema-valid loader fragment, mergeable on top of
     ``sample_schema``. Caller overrides fields per test."""
     base = {
-        "id": "https://example.org/hippo/foo",
+        "id": "https://example.org/mosaic/foo",
         "name": "foo",
         "default_prefix": "foo",
-        "prefixes": {"foo": "https://example.org/hippo/foo/"},
+        "prefixes": {"foo": "https://example.org/mosaic/foo/"},
         "classes": {
             "FooThing": {
                 "attributes": {
@@ -62,13 +62,13 @@ class TestRule1Prefix:
     def test_missing_default_prefix_raises_config_error(self, deployed_sv: SchemaView):
         fragment = _fragment_with()
         fragment.pop("default_prefix")
-        spec = LoaderFragmentSpec("foo", "hippo-reference-foo", "1.0.0", fragment)
+        spec = LoaderFragmentSpec("foo", "mosaic-reference-foo", "1.0.0", fragment)
         with pytest.raises(ConfigError, match=r"missing `default_prefix:`"):
             merge_loader_fragment(deployed_sv, spec)
 
     def test_prefix_must_equal_loader_name(self, deployed_sv: SchemaView):
         fragment = _fragment_with(default_prefix="bar")
-        spec = LoaderFragmentSpec("foo", "hippo-reference-foo", "1.0.0", fragment)
+        spec = LoaderFragmentSpec("foo", "mosaic-reference-foo", "1.0.0", fragment)
         with pytest.raises(ConfigError, match=r"requires it to equal the loader name"):
             merge_loader_fragment(deployed_sv, spec)
 
@@ -76,29 +76,29 @@ class TestRule1Prefix:
         self, deployed_sv: SchemaView
     ):
         spec_a = LoaderFragmentSpec(
-            "foo", "hippo-reference-foo-a", "1.0.0", _fragment_with()
+            "foo", "mosaic-reference-foo-a", "1.0.0", _fragment_with()
         )
         spec_b = LoaderFragmentSpec(
-            "foo", "hippo-reference-foo-b", "2.0.0", _fragment_with()
+            "foo", "mosaic-reference-foo-b", "2.0.0", _fragment_with()
         )
         with pytest.raises(ConfigError) as exc_info:
             merge_loader_fragments(deployed_sv, [spec_a, spec_b])
         msg = str(exc_info.value)
-        assert "hippo-reference-foo-a" in msg
-        assert "hippo-reference-foo-b" in msg
+        assert "mosaic-reference-foo-a" in msg
+        assert "mosaic-reference-foo-b" in msg
 
     def test_unique_prefixes_succeed(self, deployed_sv: SchemaView):
         spec_a = LoaderFragmentSpec(
-            "foo", "hippo-reference-foo", "1.0.0", _fragment_with()
+            "foo", "mosaic-reference-foo", "1.0.0", _fragment_with()
         )
         bar_fragment = {
-            "id": "https://example.org/hippo/bar",
+            "id": "https://example.org/mosaic/bar",
             "name": "bar",
             "default_prefix": "bar",
-            "prefixes": {"bar": "https://example.org/hippo/bar/"},
+            "prefixes": {"bar": "https://example.org/mosaic/bar/"},
             "classes": {"BarThing": {"attributes": {"label": {"range": "string"}}}},
         }
-        spec_b = LoaderFragmentSpec("bar", "hippo-reference-bar", "1.0.0", bar_fragment)
+        spec_b = LoaderFragmentSpec("bar", "mosaic-reference-bar", "1.0.0", bar_fragment)
         merged = merge_loader_fragments(deployed_sv, [spec_a, spec_b])
         names = set(merged.all_classes().keys())
         assert {"FooThing", "BarThing"}.issubset(names)
@@ -109,27 +109,27 @@ class TestRule2Imports:
 
     def test_strips_linkml_types(self, deployed_sv: SchemaView):
         fragment = _fragment_with(imports=["linkml:types"])
-        spec = LoaderFragmentSpec("foo", "hippo-reference-foo", "1.0.0", fragment)
+        spec = LoaderFragmentSpec("foo", "mosaic-reference-foo", "1.0.0", fragment)
         merged = merge_loader_fragment(deployed_sv, spec)
         # Deployed schema already imports linkml:types; the fragment's redundant
         # import was stripped before merge, so the count does not grow.
         assert merged.schema.imports.count("linkml:types") == 1
 
     def test_strips_curie_imports_with_known_prefix(self, deployed_sv: SchemaView):
-        # `hippo_core` is exposed via the deployed importmap, so its prefix is
-        # implicitly known. Adding a hippo_core CURIE-form import in the
+        # `mosaic_core` is exposed via the deployed importmap, so its prefix is
+        # implicitly known. Adding a mosaic_core CURIE-form import in the
         # fragment is redundant and must be stripped.
         fragment = _fragment_with(imports=["linkml:types", "linkml:other"])
-        spec = LoaderFragmentSpec("foo", "hippo-reference-foo", "1.0.0", fragment)
+        spec = LoaderFragmentSpec("foo", "mosaic-reference-foo", "1.0.0", fragment)
         merged = merge_loader_fragment(deployed_sv, spec)
         # Both linkml-prefixed imports stripped; their prefix is already
         # in the deployed schema.
         assert "linkml:other" not in (merged.schema.imports or [])
 
     def test_private_imports_pass_through(self, deployed_sv: SchemaView):
-        private_url = "https://example.org/hippo/foo/private_types"
+        private_url = "https://example.org/mosaic/foo/private_types"
         fragment = _fragment_with(imports=["linkml:types", private_url])
-        spec = LoaderFragmentSpec("foo", "hippo-reference-foo", "1.0.0", fragment)
+        spec = LoaderFragmentSpec("foo", "mosaic-reference-foo", "1.0.0", fragment)
         merged = merge_loader_fragment(deployed_sv, spec)
         assert private_url in (merged.schema.imports or [])
 
@@ -139,7 +139,7 @@ class TestRule3ProvidedBy:
 
     def test_provided_by_on_class(self, deployed_sv: SchemaView):
         fragment = _fragment_with()
-        spec = LoaderFragmentSpec("foo", "hippo-reference-foo", "1.2.3", fragment)
+        spec = LoaderFragmentSpec("foo", "mosaic-reference-foo", "1.2.3", fragment)
         merged = merge_loader_fragment(deployed_sv, spec)
         cls = merged.get_class("FooThing")
         assert cls is not None
@@ -148,7 +148,7 @@ class TestRule3ProvidedBy:
 
     def test_provided_by_on_attribute_slot(self, deployed_sv: SchemaView):
         fragment = _fragment_with()
-        spec = LoaderFragmentSpec("foo", "hippo-reference-foo", "1.2.3", fragment)
+        spec = LoaderFragmentSpec("foo", "mosaic-reference-foo", "1.2.3", fragment)
         merged = merge_loader_fragment(deployed_sv, spec)
         # Attribute-induced slot must carry the annotation after roundtrip.
         induced = {s.name: s for s in merged.class_induced_slots("FooThing")}
@@ -159,7 +159,7 @@ class TestRule3ProvidedBy:
     def test_provided_by_on_top_level_slot(self, deployed_sv: SchemaView):
         fragment = _fragment_with()
         fragment["slots"] = {"foo_shared": {"range": "string"}}
-        spec = LoaderFragmentSpec("foo", "hippo-reference-foo", "1.2.3", fragment)
+        spec = LoaderFragmentSpec("foo", "mosaic-reference-foo", "1.2.3", fragment)
         merged = merge_loader_fragment(deployed_sv, spec)
         slot = merged.get_slot("foo_shared")
         assert slot is not None
@@ -177,7 +177,7 @@ class TestRule4LoaderDependsOn:
 
     def test_warning_when_dep_missing(self, deployed_sv: SchemaView):
         spec = LoaderFragmentSpec(
-            "foo", "hippo-reference-foo", "1.0.0", self._fragment_with_dep("bar")
+            "foo", "mosaic-reference-foo", "1.0.0", self._fragment_with_dep("bar")
         )
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
@@ -189,7 +189,7 @@ class TestRule4LoaderDependsOn:
 
     def test_silent_when_dep_installed(self, deployed_sv: SchemaView):
         spec = LoaderFragmentSpec(
-            "foo", "hippo-reference-foo", "1.0.0", self._fragment_with_dep("bar")
+            "foo", "mosaic-reference-foo", "1.0.0", self._fragment_with_dep("bar")
         )
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
@@ -206,7 +206,7 @@ class TestRule4LoaderDependsOn:
     def test_comma_separated_deps_each_checked(self, deployed_sv: SchemaView):
         spec = LoaderFragmentSpec(
             "foo",
-            "hippo-reference-foo",
+            "mosaic-reference-foo",
             "1.0.0",
             self._fragment_with_dep("bar, baz"),
         )
@@ -227,7 +227,7 @@ class TestRule4LoaderDependsOn:
         # Even with a missing dep the merge still produces a valid SchemaView
         # carrying the new class.
         spec = LoaderFragmentSpec(
-            "foo", "hippo-reference-foo", "1.0.0", self._fragment_with_dep("nope")
+            "foo", "mosaic-reference-foo", "1.0.0", self._fragment_with_dep("nope")
         )
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -242,7 +242,7 @@ class TestSchemaRegistryConvenience:
         self, deployed_registry: SchemaRegistry
     ):
         spec = LoaderFragmentSpec(
-            "foo", "hippo-reference-foo", "1.0.0", _fragment_with()
+            "foo", "mosaic-reference-foo", "1.0.0", _fragment_with()
         )
         new_reg = deployed_registry.with_loader_fragments([spec])
         assert new_reg is not deployed_registry

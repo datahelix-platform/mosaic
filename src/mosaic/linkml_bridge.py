@@ -2,15 +2,15 @@
 
 Thin wrapper around ``linkml_runtime.SchemaView`` and ``linkml.validator`` that
 exposes the handful of projections Mosaic needs. Mosaic-specific slot metadata is
-carried via LinkML annotations under flat ``hippo_<name>`` keys (e.g.
-``hippo_search: fts5``). User-authored schema YAML stays 100% valid LinkML.
+carried via LinkML annotations under flat ``mosaic_<name>`` keys (e.g.
+``mosaic_search: fts5``). User-authored schema YAML stays 100% valid LinkML.
 
-Every ``hippo_*`` annotation used in a user schema must be declared in
-``hippo_ext`` (ships with the package at ``src/mosaic/schemas/hippo_ext.yaml``).
+Every ``mosaic_*`` annotation used in a user schema must be declared in
+``mosaic_ext`` (ships with the package at ``src/mosaic/schemas/mosaic_ext.yaml``).
 ``SchemaRegistry`` validates this at construction time — undeclared annotations,
 value-type mismatches, and wrong-target attachments surface as
 ``SchemaError`` at load. See sec9 §9.4 for the design rationale and
-``design/reference_hippo_ext.md`` for the per-annotation reference.
+``design/reference_mosaic_ext.md`` for the per-annotation reference.
 """
 
 from __future__ import annotations
@@ -30,14 +30,14 @@ from linkml_runtime.linkml_model.meta import ClassDefinition, SlotDefinition
 from linkml_runtime.utils.schemaview import SchemaView
 
 
-HIPPO_SEARCH = "hippo_search"
-HIPPO_INDEX = "hippo_index"
-HIPPO_INDEX_PARTIAL = "hippo_index_partial"
-HIPPO_UNIQUE = "hippo_unique"
-HIPPO_APPEND_ONLY = "hippo_append_only"
-HIPPO_ACCESSOR = "hippo_accessor"
-HIPPO_NAMESPACE = "hippo_namespace"
-HIPPO_EXTERNAL_XREF = "hippo_external_xref"
+MOSAIC_SEARCH = "mosaic_search"
+MOSAIC_INDEX = "mosaic_index"
+MOSAIC_INDEX_PARTIAL = "mosaic_index_partial"
+MOSAIC_UNIQUE = "mosaic_unique"
+MOSAIC_APPEND_ONLY = "mosaic_append_only"
+MOSAIC_ACCESSOR = "mosaic_accessor"
+MOSAIC_NAMESPACE = "mosaic_namespace"
+MOSAIC_EXTERNAL_XREF = "mosaic_external_xref"
 
 #: Name of the framework-provided external-reference value type (issue #48).
 EXTERNAL_REFERENCE_CLASS = "ExternalReference"
@@ -56,7 +56,16 @@ EXTERNAL_REFERENCE_CLASS = "ExternalReference"
 #: INFRASTRUCTURE_CLASSES set in ``mosaic.core.schema_typing``.
 VALUE_TYPE_CLASSES: frozenset[str] = frozenset({EXTERNAL_REFERENCE_CLASS})
 
-HIPPO_ANNOTATION_PREFIX = "hippo_"
+MOSAIC_ANNOTATION_PREFIX = "mosaic_"
+#: Retired spellings (platform ADR-0007). Mosaic reads only the ``mosaic_*``
+#: names; a schema that still uses one of these fails validation with an
+#: error naming the replacement, so a stale schema fails loudly instead of
+#: having its annotations silently ignored.
+RETIRED_ANNOTATION_PREFIX = "hippo_"
+RETIRED_SCHEMA_MODULES = {"hippo_core": "mosaic_core", "hippo_ext": "mosaic_ext"}
+#: ``mosaic_``-prefixed keys Mosaic stamps on schemas itself (not user
+#: vocabulary, so not declared in mosaic_ext and skipped by its validation).
+_INTERNAL_ANNOTATION_KEYS = frozenset({"mosaic_synthesized_from"})
 _CLASS_ANNOTATION_SUBSET = "class_annotation"
 _SLOT_ANNOTATION_SUBSET = "slot_annotation"
 
@@ -64,12 +73,12 @@ _SLOT_ANNOTATION_SUBSET = "slot_annotation"
 # (PR 3.1). Carries one multivalued slot per concrete class in the merged
 # schema. The leading underscore keeps it from colliding with user classes,
 # which by LinkML convention use UpperCamelCase.
-TREE_ROOT_CLASS_NAME = "_HippoInstanceBundle"
+TREE_ROOT_CLASS_NAME = "_MosaicInstanceBundle"
 
 # Top-level YAML keys that Mosaic recognises but LinkML's meta-schema does
 # not. ``SchemaRegistry.from_path`` strips these before constructing a
 # ``SchemaView`` so the LinkML parser stays strict on every other key.
-_HIPPO_TOP_LEVEL_KEYS = frozenset({"requires"})
+_MOSAIC_TOP_LEVEL_KEYS = frozenset({"requires"})
 
 
 def default_accessor(class_name: str) -> str:
@@ -83,7 +92,7 @@ def default_accessor(class_name: str) -> str:
 
     The naive ``+ "s"`` produces awkward plurals for words ending in ``s``
     (e.g. ``Process`` → ``processs``). Schemas override via the
-    ``hippo_accessor`` class annotation; see ``class_accessor_name``.
+    ``mosaic_accessor`` class annotation; see ``class_accessor_name``.
     """
     s1 = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", class_name)
     snake = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
@@ -91,9 +100,9 @@ def default_accessor(class_name: str) -> str:
 
 
 def class_accessor_name(class_name: str, cls_obj: Any) -> str:
-    """Accessor / tree-root slot name for a class, honoring ``hippo_accessor``.
+    """Accessor / tree-root slot name for a class, honoring ``mosaic_accessor``.
 
-    Returns the ``hippo_accessor`` annotation value if present (validated
+    Returns the ``mosaic_accessor`` annotation value if present (validated
     as a string), else ``default_accessor(class_name)``. Used by both the
     typed-client surface (``typed_client._resolve_accessor``) and the
     synthesized tree-root class so users see one mental model.
@@ -103,7 +112,7 @@ def class_accessor_name(class_name: str, cls_obj: Any) -> str:
     synthesis accepts the result as-is since downstream LinkML validation
     will surface any malformed slot name.
     """
-    override = annotation_value(cls_obj, HIPPO_ACCESSOR)
+    override = annotation_value(cls_obj, MOSAIC_ACCESSOR)
     if isinstance(override, str) and override:
         return override
     return default_accessor(class_name)
@@ -141,41 +150,41 @@ def slot_default(slot: Any) -> Optional[Any]:
 
 
 # ---------------------------------------------------------------------------
-# Shipped-with-Mosaic schemas — hippo_ext (annotation vocabulary) and hippo_core
+# Shipped-with-Mosaic schemas — mosaic_ext (annotation vocabulary) and mosaic_core
 # (Entity, Status, Operation, Validator, ReferenceLoader). Both are loaded as
-# bundled resources; hippo_core is made available to user schemas through
-# SchemaView's importmap so callers can declare `imports: [hippo_core]` and
+# bundled resources; mosaic_core is made available to user schemas through
+# SchemaView's importmap so callers can declare `imports: [mosaic_core]` and
 # `is_a: Entity`.
 # ---------------------------------------------------------------------------
 
-_HIPPO_EXT_SV: Optional[SchemaView] = None
+_MOSAIC_EXT_SV: Optional[SchemaView] = None
 
 
-def _hippo_ext_resource_path() -> str:
-    resource = importlib.resources.files("mosaic.schemas").joinpath("hippo_ext.yaml")
+def _mosaic_ext_resource_path() -> str:
+    resource = importlib.resources.files("mosaic.schemas").joinpath("mosaic_ext.yaml")
     return str(resource)
 
 
-def _hippo_core_resource_path() -> str:
-    resource = importlib.resources.files("mosaic.schemas").joinpath("hippo_core.yaml")
+def _mosaic_core_resource_path() -> str:
+    resource = importlib.resources.files("mosaic.schemas").joinpath("mosaic_core.yaml")
     return str(resource)
 
 
-def _hippo_ext_schema_view() -> SchemaView:
-    global _HIPPO_EXT_SV
-    if _HIPPO_EXT_SV is None:
-        _HIPPO_EXT_SV = SchemaView(_hippo_ext_resource_path())
-    return _HIPPO_EXT_SV
+def _mosaic_ext_schema_view() -> SchemaView:
+    global _MOSAIC_EXT_SV
+    if _MOSAIC_EXT_SV is None:
+        _MOSAIC_EXT_SV = SchemaView(_mosaic_ext_resource_path())
+    return _MOSAIC_EXT_SV
 
 
 def _bundled_importmap() -> dict[str, str]:
-    """Importmap that lets user schemas say `imports: [hippo_core]`.
+    """Importmap that lets user schemas say `imports: [mosaic_core]`.
 
     SchemaView resolves import names against this map and appends `.yaml`
     when opening the file, so values must omit the extension.
     """
     return {
-        "hippo_core": _hippo_core_resource_path().removesuffix(".yaml"),
+        "mosaic_core": _mosaic_core_resource_path().removesuffix(".yaml"),
     }
 
 
@@ -244,12 +253,14 @@ def _validate_one_annotation(
     target_kind: str,
     target_path: str,
 ) -> Optional[str]:
+    if key in _INTERNAL_ANNOTATION_KEYS:
+        return None
     decl = ext_slots.get(key)
     if decl is None:
-        known = sorted(k for k in ext_slots if k.startswith(HIPPO_ANNOTATION_PREFIX))
+        known = sorted(k for k in ext_slots if k.startswith(MOSAIC_ANNOTATION_PREFIX))
         return (
             f"annotation `{key}` on {target_kind} `{target_path}` is not "
-            f"declared in hippo_ext. Known annotations: {known}"
+            f"declared in mosaic_ext. Known annotations: {known}"
         )
     expected_subset = (
         _CLASS_ANNOTATION_SUBSET if target_kind == "class" else _SLOT_ANNOTATION_SUBSET
@@ -267,19 +278,19 @@ def _validate_one_annotation(
     return None
 
 
-def _iter_hippo_annotations(element: Any):
-    """Yield (key, annotation) pairs for every hippo_* annotation on ``element``.
+def _iter_mosaic_annotations(element: Any, prefix: str = MOSAIC_ANNOTATION_PREFIX):
+    """Yield (key, annotation) pairs for every mosaic_* annotation on ``element``.
 
     LinkML exposes ``.annotations`` as a ``JsonObj`` which supports ``in`` and
     ``[]`` indexing but doesn't implement ``.items()``. We iterate by filtering
-    to keys that start with the hippo_ prefix.
+    to keys that start with ``prefix`` (the mosaic_ prefix by default).
     """
     annotations = getattr(element, "annotations", None)
     if annotations is None:
         return
     for key in list(annotations):
         key = str(key)
-        if not key.startswith(HIPPO_ANNOTATION_PREFIX):
+        if not key.startswith(prefix):
             continue
         try:
             ann = annotations[key]
@@ -288,24 +299,64 @@ def _iter_hippo_annotations(element: Any):
         yield key, ann
 
 
-def _validate_hippo_annotations(sv: SchemaView) -> None:
-    """Validate every hippo_* annotation in ``sv`` against hippo_ext.
+def _retired_annotation_error(key: str, target_kind: str, target_path: str) -> str:
+    replacement = MOSAIC_ANNOTATION_PREFIX + key[len(RETIRED_ANNOTATION_PREFIX):]
+    return (
+        f"annotation `{key}` on {target_kind} `{target_path}` uses the retired "
+        f"`{RETIRED_ANNOTATION_PREFIX}` prefix; rename it to `{replacement}` "
+        f"(platform ADR-0007)"
+    )
+
+
+def _check_retired_imports(sv: SchemaView) -> None:
+    """Reject ``imports: [hippo_core]`` / ``[hippo_ext]`` with the new name.
+
+    Runs before anything resolves the imports, because LinkML would
+    otherwise fail with an unhelpful file-not-found for the retired module.
+    """
+    retired = [
+        imp for imp in (sv.schema.imports or []) if str(imp) in RETIRED_SCHEMA_MODULES
+    ]
+    if not retired:
+        return
+    from mosaic.core.exceptions import SchemaError
+
+    raise SchemaError(
+        "schema imports a retired Mosaic module: "
+        + ", ".join(
+            f"`{imp}` (rename it to `{RETIRED_SCHEMA_MODULES[str(imp)]}`)"
+            for imp in retired
+        )
+        + " (platform ADR-0007)",
+        error_code="EXT_VALIDATION",
+    )
+
+
+def _validate_mosaic_annotations(sv: SchemaView) -> None:
+    """Validate every mosaic_* annotation in ``sv`` against mosaic_ext.
 
     Raises ``SchemaError`` aggregating all failures if any annotation is
-    undeclared, mistyped, or attached to the wrong kind of element.
+    undeclared, mistyped, or attached to the wrong kind of element, or if
+    the schema still uses a retired ``hippo_*`` key or imports a retired
+    ``hippo_core`` / ``hippo_ext`` module (platform ADR-0007) — those
+    errors name the replacement.
     """
-    # Skip validation if we're loading hippo_ext itself (circular).
-    if sv.schema.name == "hippo_ext":
+    # Skip validation if we're loading mosaic_ext itself (circular).
+    if sv.schema.name == "mosaic_ext":
         return
 
-    ext = _hippo_ext_schema_view()
+    _check_retired_imports(sv)
+
+    ext = _mosaic_ext_schema_view()
     ext_slots = ext.all_slots()
     ext_enums = ext.all_enums()
 
     failures: list[str] = []
 
     for class_name, cls in sv.all_classes().items():
-        for key, ann in _iter_hippo_annotations(cls):
+        for key, _ann in _iter_mosaic_annotations(cls, RETIRED_ANNOTATION_PREFIX):
+            failures.append(_retired_annotation_error(key, "class", class_name))
+        for key, ann in _iter_mosaic_annotations(cls):
             err = _validate_one_annotation(
                 ext_slots, ext_enums, key, ann, "class", class_name
             )
@@ -319,7 +370,11 @@ def _validate_hippo_annotations(sv: SchemaView) -> None:
             # LinkML's own validation surface the deeper problem.
             continue
         for slot in induced:
-            for key, ann in _iter_hippo_annotations(slot):
+            for key, _ann in _iter_mosaic_annotations(slot, RETIRED_ANNOTATION_PREFIX):
+                failures.append(
+                    _retired_annotation_error(key, "slot", f"{class_name}.{slot.name}")
+                )
+            for key, ann in _iter_mosaic_annotations(slot):
                 err = _validate_one_annotation(
                     ext_slots,
                     ext_enums,
@@ -336,9 +391,9 @@ def _validate_hippo_annotations(sv: SchemaView) -> None:
         from mosaic.core.exceptions import SchemaError
 
         raise SchemaError(
-            f"{len(failures)} hippo_* annotation error(s) in schema:\n  - "
+            f"{len(failures)} mosaic_* annotation error(s) in schema:\n  - "
             + "\n  - ".join(failures),
-            error_code="HIPPO_EXT_VALIDATION",
+            error_code="EXT_VALIDATION",
         )
 
 
@@ -346,7 +401,7 @@ def _flatten_for_validator(sv: SchemaView) -> dict[str, Any]:
     """Build a self-contained schema dict with all imports resolved inline.
 
     LinkML's ``Validator`` re-resolves ``imports:`` when it processes a
-    SchemaDefinition, which fails for bundled schemas like ``hippo_core``
+    SchemaDefinition, which fails for bundled schemas like ``mosaic_core``
     that live outside the user-schema directory and are only visible via
     the ``SchemaRegistry``'s importmap. We work around this by flattening
     the merged ``SchemaView`` back into a dict that has every class, slot,
@@ -355,7 +410,7 @@ def _flatten_for_validator(sv: SchemaView) -> dict[str, Any]:
     from linkml_runtime.dumpers import yaml_dumper
 
     flat: dict[str, Any] = {
-        "id": sv.schema.id or "https://example.org/hippo/flat",
+        "id": sv.schema.id or "https://example.org/mosaic/flat",
         "name": sv.schema.name or "flat",
         "prefixes": dict(sv.schema.prefixes or {}),
         "default_range": sv.schema.default_range or "string",
@@ -446,12 +501,12 @@ def value_type_class_names(sv: SchemaView) -> frozenset[str]:
 
 
 def _build_tree_root_class(sv: SchemaView) -> ClassDefinition:
-    """Construct the synthesized ``_HippoInstanceBundle`` tree-root class.
+    """Construct the synthesized ``_MosaicInstanceBundle`` tree-root class.
 
     Per the β-handoff (PR 3.1): one multivalued, inlined slot per concrete
     (non-abstract) class in the merged schema, including bundled
-    ``hippo_core`` classes. Slot name comes from ``class_accessor_name`` —
-    snake_case-pluralized class name, overridable via the ``hippo_accessor``
+    ``mosaic_core`` classes. Slot name comes from ``class_accessor_name`` —
+    snake_case-pluralized class name, overridable via the ``mosaic_accessor``
     class annotation. This keeps the wire format aligned with the
     typed-client accessor surface (sec9 §9.8).
 
@@ -467,9 +522,9 @@ def _build_tree_root_class(sv: SchemaView) -> ClassDefinition:
     schema-diff engine, and typed-client never see it as a domain class.
 
     Raises ``SchemaError`` if the user schema already declares a class
-    named ``_HippoInstanceBundle`` or if two distinct classes resolve to
+    named ``_MosaicInstanceBundle`` or if two distinct classes resolve to
     the same tree-root slot name (the wire format is a flat namespace —
-    add ``hippo_accessor`` overrides to disambiguate).
+    add ``mosaic_accessor`` overrides to disambiguate).
     """
     existing = sv.all_classes(imports=True)
     if TREE_ROOT_CLASS_NAME in existing:
@@ -478,7 +533,7 @@ def _build_tree_root_class(sv: SchemaView) -> ClassDefinition:
         raise SchemaError(
             f"Class name {TREE_ROOT_CLASS_NAME!r} is reserved for the "
             f"synthesized tree-root and may not be declared in a user schema.",
-            error_code="HIPPO_TREE_ROOT_COLLISION",
+            error_code="TREE_ROOT_COLLISION",
         )
 
     attributes: dict[str, SlotDefinition] = {}
@@ -508,9 +563,9 @@ def _build_tree_root_class(sv: SchemaView) -> ClassDefinition:
             raise SchemaError(
                 f"Tree-root slot name {slot_name!r} would be assigned to "
                 f"both {seen_slots[slot_name]!r} and {cls_name!r}. Add a "
-                f"`hippo_accessor` annotation to at least one class to "
+                f"`mosaic_accessor` annotation to at least one class to "
                 f"disambiguate.",
-                error_code="HIPPO_TREE_ROOT_SLOT_COLLISION",
+                error_code="TREE_ROOT_SLOT_COLLISION",
             )
         seen_slots[slot_name] = cls_name
         attributes[slot_name] = SlotDefinition(
@@ -529,7 +584,7 @@ def _build_tree_root_class(sv: SchemaView) -> ClassDefinition:
             "one multivalued slot per concrete class in the merged schema; "
             "slot names follow the typed-client accessor convention "
             "(`snake_case(ClassName) + 's'`, overridable via "
-            "`hippo_accessor`). Not user-authored — Mosaic injects it into "
+            "`mosaic_accessor`). Not user-authored — Mosaic injects it into "
             "the validator schema so `mosaic validate` / `mosaic ingest` can "
             "target a single tree-shaped root."
         ),
@@ -1001,9 +1056,11 @@ def concrete_class_closure(sv: SchemaView, class_name: str) -> tuple[str, ...]:
 
 #: Annotation Mosaic stamps on a reverse slot it synthesized from a
 #: forward-side ``inverse`` (ADR-0012). Its value is the forward
-#: declaration (``"Sample.donor"``). Not a ``hippo_*`` key, so hippo_ext
-#: validation ignores it; it survives a ``yaml_dumper`` round-trip, so a
-#: registry rebuilt from a dumped view still reports ``declared_on``.
+#: declaration (``"Sample.donor"``). It shares the ``mosaic_`` prefix since
+#: the platform ADR-0007 rename, but it is Mosaic-internal, not part of the
+#: mosaic_ext vocabulary, so annotation validation skips it explicitly
+#: (``_INTERNAL_ANNOTATION_KEYS``). It survives a ``yaml_dumper`` round-trip,
+#: so a registry rebuilt from a dumped view still reports ``declared_on``.
 SYNTHESIZED_INVERSE_ANNOTATION = "mosaic_synthesized_from"
 
 
@@ -1151,7 +1208,7 @@ def _synthesize_forward_inverse_slots(sv: SchemaView) -> None:
     reads it as the derived side and validates it as such (the reverse of
     a multivalued forward slot is ADR-0013).
     """
-    if sv.schema.name == "hippo_ext":
+    if sv.schema.name == "mosaic_ext":
         return
     from linkml_runtime.linkml_model.annotations import Annotation
 
@@ -1320,7 +1377,7 @@ def _validate_inverse_slots(sv: SchemaView) -> None:
 
     Raises ``SchemaError`` aggregating all failures.
     """
-    if sv.schema.name == "hippo_ext":
+    if sv.schema.name == "mosaic_ext":
         return
     classes = sv.all_classes()
     value_types = value_type_class_names(sv)
@@ -1445,7 +1502,7 @@ class SchemaRegistry:
     """Mosaic-facing schema registry backed by a LinkML ``SchemaView``."""
 
     def __init__(self, schema_view: SchemaView) -> None:
-        _validate_hippo_annotations(schema_view)
+        _validate_mosaic_annotations(schema_view)
         # ADR-0012: a forward-side ``inverse`` becomes a real reverse slot on
         # the range class before ADR-0011 validation sees the schema.
         _synthesize_forward_inverse_slots(schema_view)
@@ -1462,7 +1519,7 @@ class SchemaRegistry:
         # Synthesize the wire-format tree-root class once at construction.
         # Kept off the SchemaView so DDL generation, schema-diff, and the
         # typed-client surface stay unaware of it; the validator's flat
-        # schema gets a copy so `validate(bundle, _HippoInstanceBundle)`
+        # schema gets a copy so `validate(bundle, _MosaicInstanceBundle)`
         # works (sec9 PR 3.1).
         self._tree_root_class = _build_tree_root_class(schema_view)
         # Validator needs a self-contained schema (no unresolved imports) so
@@ -1491,8 +1548,8 @@ class SchemaRegistry:
         # to recover the directive.
         raw = p.read_text()
         doc = yaml.safe_load(raw) or {}
-        if isinstance(doc, dict) and _HIPPO_TOP_LEVEL_KEYS & doc.keys():
-            doc = {k: v for k, v in doc.items() if k not in _HIPPO_TOP_LEVEL_KEYS}
+        if isinstance(doc, dict) and _MOSAIC_TOP_LEVEL_KEYS & doc.keys():
+            doc = {k: v for k, v in doc.items() if k not in _MOSAIC_TOP_LEVEL_KEYS}
             # Stripping `requires:` forces construction from a string, which
             # loses the source path LinkML uses to resolve relative imports;
             # re-anchor it to ``p`` so sibling imports resolve relative to the
@@ -1507,7 +1564,7 @@ class SchemaRegistry:
         if not files:
             raise FileNotFoundError(f"No schema files found in {path}")
         merged: dict[str, Any] = {
-            "id": f"https://example.org/hippo/{path.name}",
+            "id": f"https://example.org/mosaic/{path.name}",
             "name": path.name,
             "prefixes": {"linkml": "https://w3id.org/linkml/"},
             "imports": ["linkml:types"],
@@ -1600,7 +1657,7 @@ class SchemaRegistry:
         return self._value_type_classes
 
     def tree_root_class_name(self) -> str:
-        """Name of the synthesized tree-root class (``_HippoInstanceBundle``).
+        """Name of the synthesized tree-root class (``_MosaicInstanceBundle``).
 
         Callers pass this to :meth:`validate` to validate a LinkML-native
         instance YAML bundle (one multivalued slot per concrete class).
@@ -1661,10 +1718,10 @@ class SchemaRegistry:
         return [s for s in self.induced_slots(class_name) if s.required]
 
     def searchable_slots(self, class_name: str) -> list[tuple[SlotDefinition, str]]:
-        """Slots annotated with ``hippo_search``; returns (slot, mode) pairs."""
+        """Slots annotated with ``mosaic_search``; returns (slot, mode) pairs."""
         pairs: list[tuple[SlotDefinition, str]] = []
         for slot in self.induced_slots(class_name):
-            mode = annotation_value(slot, HIPPO_SEARCH)
+            mode = annotation_value(slot, MOSAIC_SEARCH)
             if mode is not None:
                 pairs.append((slot, str(mode)))
         return pairs
@@ -1872,7 +1929,7 @@ class SchemaRegistry:
         return None
 
     def external_xref_slots(self, class_name: str) -> list[SlotDefinition]:
-        """Slots annotated ``hippo_external_xref: true`` on ``class_name``.
+        """Slots annotated ``mosaic_external_xref: true`` on ``class_name``.
 
         The annotation is only meaningful on slots whose range is the
         ``ExternalReference`` value type; annotating any other slot is a
@@ -1882,27 +1939,27 @@ class SchemaRegistry:
         """
         out: list[SlotDefinition] = []
         for slot in self.induced_slots(class_name):
-            if not annotation_value(slot, HIPPO_EXTERNAL_XREF):
+            if not annotation_value(slot, MOSAIC_EXTERNAL_XREF):
                 continue
             if slot.range != EXTERNAL_REFERENCE_CLASS:
                 from mosaic.core.exceptions import SchemaError
 
                 raise SchemaError(
                     f"Slot {class_name}.{slot.name} declares "
-                    f"`hippo_external_xref: true` but its range is "
+                    f"`mosaic_external_xref: true` but its range is "
                     f"{slot.range!r}; the annotation is only valid on "
                     f"slots ranged against {EXTERNAL_REFERENCE_CLASS!r}.",
-                    error_code="HIPPO_EXTERNAL_XREF_RANGE",
+                    error_code="EXTERNAL_XREF_RANGE",
                 )
             out.append(slot)
         return out
 
     def indexed_slots(self, class_name: str) -> list[tuple[SlotDefinition, bool]]:
-        """(slot, partial) pairs for slots annotated with ``hippo_index``."""
+        """(slot, partial) pairs for slots annotated with ``mosaic_index``."""
         out: list[tuple[SlotDefinition, bool]] = []
         for slot in self.induced_slots(class_name):
-            if annotation_value(slot, HIPPO_INDEX):
-                partial = bool(annotation_value(slot, HIPPO_INDEX_PARTIAL))
+            if annotation_value(slot, MOSAIC_INDEX):
+                partial = bool(annotation_value(slot, MOSAIC_INDEX_PARTIAL))
                 out.append((slot, partial))
         return out
 
@@ -1910,7 +1967,7 @@ class SchemaRegistry:
         return [
             s.name
             for s in self.induced_slots(class_name)
-            if annotation_value(s, HIPPO_UNIQUE)
+            if annotation_value(s, MOSAIC_UNIQUE)
         ]
 
     def boolean_slot_names(self, class_name: str) -> set[str]:
@@ -2006,10 +2063,10 @@ class SchemaRegistry:
         return out
 
     def append_only_classes(self) -> set[str]:
-        """Names of classes annotated ``hippo_append_only: true``.
+        """Names of classes annotated ``mosaic_append_only: true``.
 
         Adapters consult this set to reject UPDATE and DELETE against the
-        corresponding tables per sec9 §9.4 / reference_hippo_ext.md. Only
+        corresponding tables per sec9 §9.4 / reference_mosaic_ext.md. Only
         concrete (non-abstract) classes are returned — an abstract class
         with the annotation is purely declarative. Per sec9 §9.6 this set
         currently contains ``{"ProvenanceRecord"}``; domain schemas may
@@ -2020,7 +2077,7 @@ class SchemaRegistry:
             cls = self._sv.get_class(name)
             if cls is None or cls.abstract:
                 continue
-            if annotation_value(cls, HIPPO_APPEND_ONLY):
+            if annotation_value(cls, MOSAIC_APPEND_ONLY):
                 out.add(name)
         return out
 

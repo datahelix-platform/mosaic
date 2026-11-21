@@ -30,7 +30,7 @@ prefixes:
   linkml: https://w3id.org/linkml/
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 default_range: string
 classes:
   Donor:
@@ -97,7 +97,7 @@ _NO_DESIGNATOR_SCHEMA = """\
 id: https://example.org/nd
 name: nd
 prefixes: {linkml: https://w3id.org/linkml/}
-imports: [linkml:types, hippo_core]
+imports: [linkml:types, mosaic_core]
 default_range: string
 classes:
   Widget:

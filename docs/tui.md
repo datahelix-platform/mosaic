@@ -49,7 +49,7 @@ mosaic tui --db data/mosaic.db --schema schemas/
 |--------|---------|-------------|
 | `--backend`, `-b` | `sdk` | Backend mode: `sdk` or `rest` |
 | `--db` | resolved | SQLite database path. Falls back to `config.json` in the cwd, then `data/mosaic.db`, then `mosaic.db` |
-| `--schema` | resolved | LinkML schema file or directory. Falls back to `schemas/` in the cwd, then the bundled `hippo_core` schema |
+| `--schema` | resolved | LinkML schema file or directory. Falls back to `schemas/` in the cwd, then the bundled `mosaic_core` schema |
 
 ### REST mode (remote `mosaic serve`)
 

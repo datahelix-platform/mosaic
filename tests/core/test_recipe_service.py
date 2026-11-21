@@ -57,7 +57,7 @@ class TestListInstalledCleanInstance:
 
 
 class TestListInstalledHydration:
-    """``list_installed`` rehydrates ``InstalledRecipe`` entries from ``hippo_meta``."""
+    """``list_installed`` rehydrates ``InstalledRecipe`` entries from ``mosaic_meta``."""
 
     def _seed(self, storage: SQLiteAdapter, payload: dict) -> None:
         with storage._transaction() as conn:

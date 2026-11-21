@@ -4,7 +4,7 @@ Read-only CLI affordances over the SDK query surface (sec4):
 
 - ``mosaic entity get`` — fetch one entity by type and id.
 - ``mosaic entity query`` — list entities with field filters.
-- ``mosaic entity search`` — full-text search over ``hippo_search``
+- ``mosaic entity search`` — full-text search over ``mosaic_search``
   fields.
 - ``mosaic entity history`` — the entity's provenance trail.
 - ``mosaic status`` — adapter, schema version, entity counts, and
@@ -34,7 +34,7 @@ _SCHEMA_OPTION = typer.Option(
     "--schema",
     help=(
         "Path to the LinkML schema file or directory. Without it only "
-        "the bundled hippo_core classes are recognized."
+        "the bundled mosaic_core classes are recognized."
     ),
 )
 _JSON_OPTION = typer.Option(
@@ -166,7 +166,7 @@ def entity_search(
     schema: Optional[str] = _SCHEMA_OPTION,
     as_json: bool = _JSON_OPTION,
 ) -> None:
-    """Full-text search over fields declared with hippo_search."""
+    """Full-text search over fields declared with mosaic_search."""
     from mosaic.core.exceptions import MosaicError
 
     client = _get_readonly_client(db_path, schema)

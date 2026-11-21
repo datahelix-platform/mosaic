@@ -3,8 +3,8 @@
 The storage and GraphQL cases run on both adapters through
 ``tests/support/closure_fixture.py``. This module covers what is
 transport-independent: the family model, the planner-facing capability
-manifest and QuerySpec (Decision 4), the ``hippo_anchor`` /
-``hippo_manifest`` opt-outs (Decision 5), a migration transform's
+manifest and QuerySpec (Decision 4), the ``mosaic_anchor`` /
+``mosaic_manifest`` opt-outs (Decision 5), a migration transform's
 one-class-at-a-time default, and full-text search over a family.
 """
 
@@ -138,10 +138,10 @@ class TestQuerySpecOverFamilies:
 
 
 class TestOptOuts:
-    def test_hippo_anchor_false_keeps_the_interface_but_no_collection(self):
+    def test_mosaic_anchor_false_keeps_the_interface_but_no_collection(self):
         from mosaic.graphql import build_graphql_schema
 
-        registry = _with_annotation("Sample", "hippo_anchor")
+        registry = _with_annotation("Sample", "mosaic_anchor")
         manifest = build_capability_manifest(registry)
         assert manifest["Sample"].anchor is False
         result = validate_query_spec(
@@ -156,18 +156,18 @@ class TestOptOuts:
         assert "samples(" not in sdl and "sample(id" not in sdl
         assert "inputs: [Sample!]!" in sdl
 
-    def test_hippo_anchor_false_on_a_concrete_class_removes_only_queryspec_anchoring(self):
+    def test_mosaic_anchor_false_on_a_concrete_class_removes_only_queryspec_anchoring(self):
         from mosaic.graphql import build_graphql_schema
 
-        registry = _with_annotation("Assay", "hippo_anchor")
+        registry = _with_annotation("Assay", "mosaic_anchor")
         manifest = build_capability_manifest(registry)
         assert manifest["Assay"].anchor is False
         assert "assays(" in str(build_graphql_schema(registry))
 
-    def test_hippo_manifest_false_hides_the_family_from_the_planner(self):
+    def test_mosaic_manifest_false_hides_the_family_from_the_planner(self):
         from mosaic.graphql import build_graphql_schema
 
-        registry = _with_annotation("Sample", "hippo_manifest")
+        registry = _with_annotation("Sample", "mosaic_manifest")
         manifest = build_capability_manifest(registry)
         assert "Sample" not in manifest
         assert manifest["Assay"].fields_by_name["inputs"].predicate is False
@@ -192,7 +192,7 @@ prefixes:
   linkml: https://w3id.org/linkml/
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 default_range: string
 classes:
   Note:
@@ -205,13 +205,13 @@ classes:
     attributes:
       body:
         annotations:
-          hippo_search: fts5
+          mosaic_search: fts5
   Letter:
     is_a: Note
     attributes:
       text:
         annotations:
-          hippo_search: fts5
+          mosaic_search: fts5
 """
 
 

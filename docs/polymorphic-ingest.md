@@ -88,7 +88,7 @@ name (`category: SolidSample`) is the simplest and recommended form.
 !!! note "Accessor names"
     Collection keys follow Mosaic's accessor convention — `snake_case(ClassName)`
     pluralized (e.g. `Sample` → `samples`, `RNASeqAssay` → `rna_seq_assays`),
-    overridable per class with the `hippo_accessor` annotation. Both the **base**
+    overridable per class with the `mosaic_accessor` annotation. Both the **base**
     accessor (`samples:`, dispatched by `category`) and the **concrete** accessors
     (`solid_samples:`, `liquid_samples:`) work; use whichever reads best.
 

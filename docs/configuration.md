@@ -16,18 +16,15 @@ Configuration is loaded via `load_mosaic_config()`, and schemas are loaded via `
 ## Config file discovery (`mosaic.yaml`)
 
 When no explicit `--config` is given, Mosaic scans the working directory in
-this order: `config.json`, `mosaic.yaml`, `mosaic.yml`, then the legacy
-`hippo.yaml` / `hippo.yml` (pre-rename spellings, ADR-0004 — still honored
-with a `DeprecationWarning`). When both `mosaic.yaml` and `hippo.yaml` exist,
-`mosaic.yaml` wins silently. `mosaic init` writes `mosaic.yaml`.
+this order: `config.json`, `mosaic.yaml`, `mosaic.yml`. The pre-rename
+`hippo.yaml` / `hippo.yml` names are no longer detected (ADR-0015).
+`mosaic init` writes `mosaic.yaml`.
 
 ## Environment variables
 
 Runtime environment variables use the `MOSAIC_` prefix (`MOSAIC_CACHE_DIR`,
 `MOSAIC_RECIPE_CACHE`, `MOSAIC_TUI_TOKEN`, `MOSAIC_DATABASE_URL`). The legacy
-`HIPPO_` spellings are honored as a fallback for the deprecation window — one
-`DeprecationWarning` per variable. `${MOSAIC_*}` references inside config
-values fall back the same way.
+`HIPPO_` spellings are no longer read (ADR-0015).
 
 ### Conversational planning delegate (MCP + GraphQL)
 
@@ -186,7 +183,7 @@ classes:
         required: true
         identifier: true
         annotations:
-          hippo_index: true
+          mosaic_index: true
       species:
         range: string
         required: true
@@ -208,12 +205,12 @@ classes:
         required: true
         identifier: true
         annotations:
-          hippo_index: true
+          mosaic_index: true
       donor:
         range: Donor
         required: true
         annotations:
-          hippo_index: true
+          mosaic_index: true
       sample_type:
         range: SampleType
         required: true
@@ -222,7 +219,7 @@ classes:
       notes:
         range: string
         annotations:
-          hippo_search: fts5
+          mosaic_search: fts5
 ```
 
 ### Schema Inheritance
@@ -307,16 +304,16 @@ Mosaic extends standard LinkML with storage annotations. These are expressed und
 
 | Annotation | Values | Description |
 |------------|--------|-------------|
-| `hippo_index` | `true` | Creates a B-tree database index on this attribute |
-| `hippo_index_partial` | `true` | Creates a partial index (non-null values only) |
-| `hippo_search` | `fts`, `fts5`, `embedding` | Enables full-text search indexing |
+| `mosaic_index` | `true` | Creates a B-tree database index on this attribute |
+| `mosaic_index_partial` | `true` | Creates a partial index (non-null values only) |
+| `mosaic_search` | `fts`, `fts5`, `embedding` | Enables full-text search indexing |
 
 ```yaml
   diagnosis:
     range: string
     annotations:
-      hippo_index: true
-      hippo_search: fts5
+      mosaic_index: true
+      mosaic_search: fts5
 ```
 
 ### References (Entity Links)
@@ -462,7 +459,7 @@ classes:
         required: true
         identifier: true
         annotations:
-          hippo_index: true
+          mosaic_index: true
         description: "Internal donor identifier"
       species:
         range: string
@@ -493,12 +490,12 @@ classes:
       medical_record_number:
         range: string
         annotations:
-          hippo_index: true
+          mosaic_index: true
         description: "Hospital MRN"
       notes:
         range: string
         annotations:
-          hippo_search: fts5
+          mosaic_search: fts5
         description: "Free-text notes for searching"
 ```
 
@@ -534,13 +531,13 @@ classes:
         required: true
         identifier: true
         annotations:
-          hippo_index: true
+          mosaic_index: true
         description: "Internal sample identifier"
       donor:
         range: Donor
         required: true
         annotations:
-          hippo_index: true
+          mosaic_index: true
         description: "Reference to donor"
       sample_type:
         range: SampleType
@@ -564,7 +561,7 @@ classes:
       barcode:
         range: string
         annotations:
-          hippo_index: true
+          mosaic_index: true
         description: "Sample barcode"
     unique_keys:
       barcode_key:

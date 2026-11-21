@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any, Optional, Union
 
 from mosaic.core.client import MosaicClient
-from mosaic.core.client import HippoClient  # deprecated alias (ADR-0004)
 from mosaic.core.exceptions import ValidationFailure
 from mosaic.core.pipeline import ValidationPipeline
 from mosaic.core.types import (
@@ -85,7 +84,6 @@ def client_for_schema(
 
 __all__ = [
     "MosaicClient",
-    "HippoClient",  # deprecated alias (ADR-0004)
     "client_for_schema",
     "registry_for_schema",
     "ValidationFailure",

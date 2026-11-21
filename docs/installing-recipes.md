@@ -28,7 +28,7 @@ Example output:
 id:           org.broad.scrnaseq
 name:         scrnaseq
 version:      1.2.0
-hippo:        >=0.3,<1.0
+mosaic:       >=0.3,<1.0
 created_at:   2026-05-27T14:00:00Z
 description:  Single-cell RNA-seq metadata schema fragment
 license:      CC-BY-4.0
@@ -71,7 +71,7 @@ mosaic recipe import https://zenodo.org/record/12345/files/scrnaseq-1.2.0.tar.gz
 
 **Dry run:**
 
-A dry run resolves and validates all dependencies, checks the `hippo_version` specifier, and checks Reference Loader preconditions — but writes nothing to the database:
+A dry run resolves and validates all dependencies, checks the `mosaic_version` specifier, and checks Reference Loader preconditions — but writes nothing to the database:
 
 ```bash
 mosaic recipe import ./scrnaseq-1.2.0/ --dry-run
@@ -80,7 +80,7 @@ mosaic recipe import ./scrnaseq-1.2.0/ --dry-run
 ### What happens during import
 
 1. Mosaic resolves every `parent` and `requires.recipes` dependency bottom-up, recursively.
-2. `hippo_version` is checked against the running Mosaic version; import fails if the specifier excludes it.
+2. `mosaic_version` is checked against the running Mosaic version; import fails if the specifier excludes it.
 3. Every `requires.reference_loaders` pin is checked against installed loader versions; import fails if any pin is unmet (Mosaic does not install loaders automatically).
 4. Each schema fragment is merged through `SchemaManager`, verifying no prefix collisions and no in-place redefinition of upstream classes.
 5. An `installed_recipes` entry and a `recipe_imported` provenance event are written for each recipe — all in a single storage transaction.
@@ -99,7 +99,7 @@ For `https:` sources, Mosaic verifies the fetched bytes' canonical content hash 
 
 ## Content-addressable cache
 
-`HttpsResolver` caches fetched recipes at `~/.hippo/recipe-cache/<sha256>/`. A cache hit skips the network entirely on subsequent installs of the same digest. Cache eviction is not implemented in v1.
+`HttpsResolver` caches fetched recipes at `~/.mosaic/recipe-cache/<sha256>/`. A cache hit skips the network entirely on subsequent installs of the same digest. Cache eviction is not implemented in v1.
 
 To use a different cache directory, set `MOSAIC_RECIPE_CACHE`:
 
@@ -124,7 +124,7 @@ A **lockfile** captures the exact set of installed recipes — id, version, sour
 mosaic recipe export-lockfile --out recipe.lock.yaml
 ```
 
-This serialises `hippo_meta.installed_recipes` as a portable YAML document:
+This serialises `mosaic_meta.installed_recipes` as a portable YAML document:
 
 ```yaml
 lockfile_version: 1

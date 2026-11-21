@@ -58,7 +58,7 @@ if TYPE_CHECKING:
 
 
 META_KEY_INSTALLED_RECIPES = "installed_recipes"
-"""``hippo_meta`` key under which installed-recipe records live.
+"""``mosaic_meta`` key under which installed-recipe records live.
 
 Mirrors the ``reference_versions`` convention used by the Reference
 Loader install/upgrade machinery (sec2 §2.14 step 5). The stored value
@@ -125,10 +125,10 @@ class RecipeService:
             self._resolvers = tuple(resolvers)
 
     def list_installed(self) -> list[InstalledRecipe]:
-        """Return every entry in ``hippo_meta.installed_recipes``.
+        """Return every entry in ``mosaic_meta.installed_recipes``.
 
         Returns ``[]`` on a clean instance, on adapters with no storage
-        backing, or when the ``hippo_meta`` table predates the recipe
+        backing, or when the ``mosaic_meta`` table predates the recipe
         subsystem (the key is simply absent).
         """
         if self._storage is None or not hasattr(self._storage, "_transaction"):
@@ -215,7 +215,7 @@ class RecipeService:
 
         1. Resolve ``source`` and parse + validate ``recipe.yaml`` (same
            preflight as :meth:`inspect`).
-        2. Check ``hippo_version`` against the running Mosaic via
+        2. Check ``mosaic_version`` against the running Mosaic via
            :class:`packaging.specifiers.SpecifierSet`.
         3. Recursively resolve every dependency (``parent`` +
            ``requires.recipes``) bottom-up with cycle detection. Each
@@ -357,7 +357,7 @@ class RecipeService:
             manifest_dict = self._read_manifest_yaml(recipe_dir, source=source)
             self._validate_manifest(manifest_dict, source=source)
             manifest = _manifest_from_dict(manifest_dict)
-            self._check_hippo_version(manifest, source=source)
+            self._check_mosaic_version(manifest, source=source)
 
             self._enforce_https_digest_required(source, expected_digest, manifest)
 
@@ -436,38 +436,38 @@ class RecipeService:
                 )
             )
 
-    def _check_hippo_version(
+    def _check_mosaic_version(
         self, manifest: RecipeManifest, *, source: str
     ) -> None:
         """Reject the import if the running Mosaic version is excluded."""
         from packaging.specifiers import InvalidSpecifier, SpecifierSet
 
         try:
-            spec = SpecifierSet(manifest.hippo_version)
+            spec = SpecifierSet(manifest.mosaic_version)
         except InvalidSpecifier as e:
             raise RecipeVersionIncompatibleError(
                 f"Recipe {manifest.id}@{manifest.version} declares an "
-                f"invalid hippo_version specifier {manifest.hippo_version!r}: {e}",
+                f"invalid mosaic_version specifier {manifest.mosaic_version!r}: {e}",
                 source=source,
                 recipe_id=manifest.id,
                 recipe_version=manifest.version,
-                specifier=manifest.hippo_version,
+                specifier=manifest.mosaic_version,
             ) from e
 
-        from mosaic import __version__ as _hippo_version_module
+        from mosaic import __version__ as _mosaic_version_module
 
         # The mosaic package version is not yet imported in older builds —
         # fall through gracefully when the attribute is missing.
-        if _hippo_version_module not in spec:
+        if _mosaic_version_module not in spec:
             raise RecipeVersionIncompatibleError(
                 f"Recipe {manifest.id}@{manifest.version} requires "
-                f"mosaic {manifest.hippo_version!r} but installed Mosaic is "
-                f"{_hippo_version_module!r}.",
+                f"mosaic {manifest.mosaic_version!r} but installed Mosaic is "
+                f"{_mosaic_version_module!r}.",
                 source=source,
                 recipe_id=manifest.id,
                 recipe_version=manifest.version,
-                specifier=manifest.hippo_version,
-                hippo_version=_hippo_version_module,
+                specifier=manifest.mosaic_version,
+                mosaic_version=_mosaic_version_module,
             )
 
     def _enforce_https_digest_required(
@@ -589,7 +589,7 @@ class RecipeService:
         Selectivity: a class/slot is included when its ``provided_by``
         annotation is absent or does NOT start with ``recipe.`` or
         ``loader.``, AND its ``from_schema`` is not a bundled framework
-        schema (``hippo_core``, ``recipe_manifest``). This prevents
+        schema (``mosaic_core``, ``recipe_manifest``). This prevents
         accidental re-distribution of upstream content and protects
         attribution.
 
@@ -649,7 +649,7 @@ class RecipeService:
           or ``loader.`` (so author-written content stays in, imported
           recipe/loader content stays out), AND
         - the element's *containing schema* is not a framework schema
-          (``hippo_core``, ``recipe_manifest``, ``linkml:types``).
+          (``mosaic_core``, ``recipe_manifest``, ``linkml:types``).
 
         ``SchemaView.in_schema(name)`` resolves the containing schema
         by element name; we look the resulting schema's ``id`` up in
@@ -790,7 +790,7 @@ class RecipeService:
         Dumps :meth:`list_installed` as a YAML document carrying
         ``lockfile_version: 1`` at the top level for forward-compatible
         parsing (sec10 §10.6.2). Each entry mirrors the
-        ``hippo_meta.installed_recipes`` shape: ``id``, ``version``,
+        ``mosaic_meta.installed_recipes`` shape: ``id``, ``version``,
         ``source``, ``digest`` (sha256-prefixed for portability),
         ``installed_at``, and ``parent`` (or ``null`` if absent).
 
@@ -1001,7 +1001,7 @@ class RecipeService:
 
         Args:
             installed_id: ``RecipeManifest.id`` of the parent recipe. Must
-                match an entry in ``hippo_meta.installed_recipes``.
+                match an entry in ``mosaic_meta.installed_recipes``.
             out_dir: Target directory. Created if missing. Must not
                 already contain a ``recipe.yaml`` or ``schema.yaml``.
 
@@ -1091,8 +1091,23 @@ class RecipeService:
 
         Uses the bundled LinkML schema shipped under
         ``mosaic.schemas`` and the same ``JsonschemaValidationPlugin(closed=True)``
-        wiring exercised by the Phase-2 schema tests.
+        wiring exercised by the Phase-2 schema tests. A manifest that still
+        carries the retired ``hippo_version`` key is rejected with an error
+        naming ``mosaic_version`` (platform ADR-0007).
         """
+        if isinstance(manifest_dict, dict) and "hippo_version" in manifest_dict:
+            message = (
+                "`hippo_version` was renamed to `mosaic_version` "
+                "(platform ADR-0007); rename the key in recipe.yaml"
+            )
+            raise RecipeManifestError(
+                f"recipe.yaml failed validation (1 error(s)): {message}",
+                source=source,
+                recipe_id=manifest_dict.get("id"),
+                recipe_version=manifest_dict.get("version"),
+                errors=[message],
+            )
+
         from linkml.validator import Validator
         from linkml.validator.plugins import JsonschemaValidationPlugin
 
@@ -1142,8 +1157,8 @@ class RecipeService:
 
 
 _FRAMEWORK_SCHEMA_IDS = {
-    "https://w3id.org/hippo/hippo_core",
-    "https://w3id.org/hippo/recipe_manifest",
+    "https://w3id.org/datahelix/mosaic/mosaic_core",
+    "https://w3id.org/datahelix/mosaic/recipe_manifest",
     "https://w3id.org/linkml/types",
     "https://w3id.org/linkml/meta",
 }
@@ -1152,7 +1167,7 @@ _FRAMEWORK_SCHEMA_IDS = {
 def _is_framework_origin(from_schema: Optional[str]) -> bool:
     """True when a LinkML element belongs to a bundled framework schema.
 
-    Mosaic's own ``hippo_core`` (``Entity``, ``ProvenanceRecord``, …)
+    Mosaic's own ``mosaic_core`` (``Entity``, ``ProvenanceRecord``, …)
     has no ``provided_by`` annotation but should never be re-exported
     as user-authored content. The check is by ``from_schema`` URI;
     URIs are matched against a small known set so that user schemas
@@ -1171,7 +1186,7 @@ def _build_export_manifest_stub(
     """Return a ``recipe.yaml`` mapping with author-fillable stubs.
 
     ``id``/``name``/``version`` are stubs the user MUST replace before
-    publishing. ``hippo_version``/``created_at`` are filled with
+    publishing. ``mosaic_version``/``created_at`` are filled with
     sensible defaults. ``parent``/``requires.recipes`` come from the
     caller's inference.
     """
@@ -1182,7 +1197,7 @@ def _build_export_manifest_stub(
         "name": "TODO-set-name",
         "version": "0.0.0",
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "hippo_version": f">={_local_hippo_version()}",
+        "mosaic_version": f">={_local_mosaic_version()}",
     }
     if parent is not None:
         manifest["parent"] = {
@@ -1221,7 +1236,7 @@ def _build_extend_manifest_stub(*, parent: RecipeRef) -> dict:
         "name": "TODO-set-name",
         "version": "0.0.0",
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "hippo_version": f">={_local_hippo_version()}",
+        "mosaic_version": f">={_local_mosaic_version()}",
         "parent": {
             "id": parent.id,
             "version": parent.version,
@@ -1246,7 +1261,7 @@ def _build_extend_schema_fragment_stub() -> dict:
     }
 
 
-def _local_hippo_version() -> str:
+def _local_mosaic_version() -> str:
     """Best-effort lookup of the currently-installed Mosaic version."""
     try:
         from mosaic import __version__
@@ -1548,7 +1563,7 @@ def _manifest_from_dict(data: dict) -> RecipeManifest:
         name=data["name"],
         version=data["version"],
         created_at=str(data["created_at"]),
-        hippo_version=data["hippo_version"],
+        mosaic_version=data["mosaic_version"],
         description=data.get("description"),
         author=author,
         license=data.get("license"),

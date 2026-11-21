@@ -67,11 +67,11 @@ This provides:
   available as a config option for deployments requiring stronger durability guarantees)
 
 ```yaml
-# hippo.yaml — optional stricter durability
+# mosaic.yaml — optional stricter durability
 adapter:
   type: sqlite
   sqlite:
-    path: ./hippo.db
+    path: ./mosaic.db
     synchronous: FULL    # default: NORMAL
 ```
 
@@ -104,8 +104,8 @@ for the medium workload profile.
 | Data volume exceeds practical SQLite limits (~10GB) | Migrate to PostgreSQL adapter |
 | Multi-region or cloud-native requirement | Migrate to DynamoDB or PostgreSQL on RDS |
 
-Migration path: `hippo migrate` applies schema to new adapter; data migration is a one-time
-`hippo export / hippo import` operation (deferred tooling; not in v0.1).
+Migration path: `mosaic migrate` applies schema to new adapter; data migration is a one-time
+`hippo export / mosaic import` operation (deferred tooling; not in v0.1).
 
 #### REST server scaling
 
@@ -117,7 +117,7 @@ failover) are delegated entirely to the storage adapter. The API layer has no di
 logic of its own.
 
 **Multi-instance operational constraint (v0.1):** Schema changes require a **restart-on-migrate**
-procedure: drain all instances, run `hippo migrate` against the storage backend, restart
+procedure: drain all instances, run `mosaic migrate` against the storage backend, restart
 all instances. This is standard operational practice (30–60s downtime window) and acceptable
 for the expected v0.1 schema change frequency (infrequent, deliberate).
 
@@ -127,13 +127,13 @@ is no dynamic schema reload in v0.1.
 #### Planned schema sync roadmap (post-v0.1)
 
 The foundation for zero-downtime schema changes is already in place (additive-only migrations,
-schema version tracked in `hippo_meta`). The roadmap to eliminate restart-on-migrate:
+schema version tracked in `mosaic_meta`). The roadmap to eliminate restart-on-migrate:
 
 | Phase | Change | Complexity |
 |---|---|---|
-| **v0.2** | Schema version check on every write: compare instance's cached version against `hippo_meta`. Return `503 Service Unavailable` + `Retry-After: 5s` if mismatch. Eliminates silent data inconsistency risk; operators see 503s as a restart signal. | Low |
-| **v0.3** | Schema version polling: each instance polls `hippo_meta` on a short interval (default 10s) and reloads schema in-memory if the version changes. No new infrastructure dependencies — polling uses the existing storage adapter. | Moderate |
-| **v0.3+** | `hippo migrate` enforces the expand-contract convention for new required fields: required fields must be introduced as optional in one migration and made required in a subsequent one. Eliminates the remaining validation-inconsistency window during transitions. | Moderate |
+| **v0.2** | Schema version check on every write: compare instance's cached version against `mosaic_meta`. Return `503 Service Unavailable` + `Retry-After: 5s` if mismatch. Eliminates silent data inconsistency risk; operators see 503s as a restart signal. | Low |
+| **v0.3** | Schema version polling: each instance polls `mosaic_meta` on a short interval (default 10s) and reloads schema in-memory if the version changes. No new infrastructure dependencies — polling uses the existing storage adapter. | Moderate |
+| **v0.3+** | `mosaic migrate` enforces the expand-contract convention for new required fields: required fields must be introduced as optional in one migration and made required in a subsequent one. Eliminates the remaining validation-inconsistency window during transitions. | Moderate |
 
 These phases build incrementally on the existing design without architectural changes.
 
@@ -147,7 +147,7 @@ Authentication and authorisation are **explicitly out of scope for v0.1**. The R
 accepts all requests with no credential check. The auth middleware stub passes all requests
 through.
 
-**Recommended deployment for v0.1**: Run `hippo serve` on `localhost` or within a private
+**Recommended deployment for v0.1**: Run `mosaic serve` on `localhost` or within a private
 network only. Do not expose the REST API to the public internet without an external auth proxy.
 
 #### Actor field
@@ -196,7 +196,7 @@ Hippo makes no compliance guarantees in v0.1.
 Hippo uses Python's stdlib `logging` module. Structured JSON logging is configurable:
 
 ```yaml
-# hippo.yaml
+# mosaic.yaml
 logging:
   level: INFO          # DEBUG | INFO | WARNING | ERROR
   format: json         # json | text (default: text for local, json for server)
@@ -221,7 +221,7 @@ The SDK-first architecture makes Hippo highly testable in isolation:
 
 - All business logic is in `hippo/core/` with no I/O dependencies
 - `EntityStore` and other ABCs can be mocked via standard Python `unittest.mock`
-- `IngestionPipeline` accepts a `HippoClient` — test against an in-memory SQLite adapter
+- `IngestionPipeline` accepts a `MosaicClient` — test against an in-memory SQLite adapter
 - `WriteValidator` implementations are pure functions (input: `WriteOperation` + mock client)
 - CEL expressions can be tested without running the full Hippo server
 

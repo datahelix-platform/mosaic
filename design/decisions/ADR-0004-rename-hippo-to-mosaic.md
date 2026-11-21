@@ -1,6 +1,6 @@
 # ADR-0004: Rename the Hippo component to Mosaic
 
-- **Status:** Accepted
+- **Status:** Accepted (deprecation window ended by [ADR-0015](./ADR-0015-end-adr-0004-deprecation-window.md), 2026-11-20)
 - **Date:** 2026-07-08
 - **Deciders:** labadorf, design session (packaging & naming, 2026-07-08)
 - **Related:** **platform ADR-0002** (the `datahelix` metapackage + prefixed dists — removes the PyPI-saturation forcing function this rename would otherwise depend on); platform `sec2_components.md`; **Canon** and **Cappella** as consumers of the `hippo.*` entry-point namespace; this repo's `design/INDEX.md` Key Decisions Log

@@ -5,36 +5,32 @@ Mosaic is a LinkML runtime. This guide covers installing Mosaic in production an
 ## Upgrading from Hippo
 
 Mosaic is the new name of the component previously distributed as **Hippo**
-(ADR-0004). Upgrading is a dependency swap — `pip install datahelix-mosaic`
-(the `hippo` distribution is retired at 0.10.x) — and nothing else has to
-change on day one:
+(ADR-0004). Since v0.16.0 the `hippo` spellings are gone entirely
+(ADR-0015, platform ADR-0007), so an upgrade from a pre-0.16 release is a
+rename plus a rebuild:
 
-- **Imports:** `import hippo` still works; it is a shim that emits one
-  `DeprecationWarning` and aliases every `hippo.*` module to the identical
-  `mosaic.*` module object, so `isinstance` checks and module identity hold
-  across both spellings. `HippoClient` remains available as an alias of
-  `MosaicClient`.
-- **CLI:** the `hippo` command still works; it prints a deprecation notice to
-  stderr and delegates to `mosaic`.
-- **Config:** `mosaic.yaml` is preferred; an existing `hippo.yaml` /
-  `hippo.yml` is still auto-detected (with a warning). When both exist,
-  `mosaic.yaml` wins. A config-less deployment whose database lives at the
-  old default `data/hippo.db` is still picked up; new deployments default to
-  `data/mosaic.db`.
-- **Environment variables:** `MOSAIC_CACHE_DIR`, `MOSAIC_RECIPE_CACHE`,
-  `MOSAIC_TUI_TOKEN`, and `MOSAIC_DATABASE_URL` are preferred; the `HIPPO_*`
-  spellings are honored as a fallback (one warning per variable).
-- **Plugins:** entry points are read from the `mosaic.*` groups *and* the
-  legacy `hippo.*` groups (deduplicated by name), so existing
-  `hippo-reference-*` packages remain discoverable. New plugins should
-  register under `mosaic.*` and follow the `mosaic-reference-<name>` /
-  `mosaic-adapter-<name>` naming convention.
-- **No data migration.** Schema-layer names (`hippo_core`, `hippo_ext`,
-  `hippo_*` annotations), the `hippo_meta` table, and on-disk provenance are
-  intentionally unchanged.
-
-The `hippo` aliases will be removed no sooner than two minor releases after
-0.11.0, via a future ADR.
+- **Distribution and imports:** install `datahelix-mosaic` and import
+  `mosaic`. `import hippo`, `HippoClient`, `HippoError`, `HippoConfig` and
+  `load_hippo_config` were removed; use `MosaicClient`, `MosaicError`,
+  `MosaicConfig` and `load_mosaic_config`.
+- **CLI:** the `hippo` console script was removed; run `mosaic`.
+- **Config:** only `config.json`, `mosaic.yaml` and `mosaic.yml` are
+  auto-detected; rename a `hippo.yaml`. The default SQLite database is
+  `data/mosaic.db` (a `data/hippo.db` is no longer picked up).
+- **Environment variables:** only the `MOSAIC_*` spellings are read
+  (`MOSAIC_CACHE_DIR`, `MOSAIC_RECIPE_CACHE`, `MOSAIC_TUI_TOKEN`,
+  `MOSAIC_DATABASE_URL`, `MOSAIC_CONFIG`, …). Cache defaults moved to
+  `~/.cache/mosaic/references/` and `~/.mosaic/recipe-cache/`.
+- **Plugins:** only the `mosaic.*` entry-point groups are read; a plugin
+  registered only under `hippo.*` is no longer discovered. Name loader
+  distributions `mosaic-reference-<name>`.
+- **Schemas and data:** schemas import `mosaic_core` (not `hippo_core`) and
+  use `mosaic_*` annotation keys; the internal tables are `mosaic_meta` and
+  `mosaic_xref_index`. There is no migration: rebuild the database from
+  source data. Mosaic does not detect a pre-rename database; opened, it
+  gets an empty `mosaic_meta` next to `hippo_meta` and none of the old data
+  is read. The full old → new table is in the CHANGELOG's v0.16.0
+  `### Upgrading` section.
 
 ## Requirements
 
@@ -62,7 +58,7 @@ To set up Mosaic for local development:
 1. Clone the repository:
    ```bash
    git clone https://github.com/your-org/mosaic.git
-   cd hippo
+   cd mosaic
    ```
 
 2. Install with development dependencies:

@@ -41,7 +41,7 @@ def _make_recipe(root: Path, *, recipe_id: str, name: str) -> Path:
             name: {name}
             version: 0.1.0
             created_at: '2026-05-27T00:00:00+00:00'
-            hippo_version: '>=0.0'
+            mosaic_version: '>=0.0'
             """
         )
     )
@@ -138,10 +138,10 @@ class TestExtendHappyPath:
         # Stubs the author MUST replace before sharing.
         assert "TODO" in manifest["id"]
         assert "TODO" in manifest["name"]
-        # But version and hippo_version are real strings so closed-schema
+        # But version and mosaic_version are real strings so closed-schema
         # validation passes once id/name are set.
         assert manifest["version"]
-        assert manifest["hippo_version"]
+        assert manifest["mosaic_version"]
         assert manifest["created_at"]
 
     def test_schema_fragment_is_empty_but_valid_linkml(

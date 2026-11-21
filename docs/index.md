@@ -2,11 +2,9 @@
 
 > **Formerly Hippo.** The component was renamed to **Mosaic** (ADR-0004): the
 > distribution is `datahelix-mosaic`, the import package is `mosaic`, and the
-> CLI is `mosaic`. Existing code and deployments keep working through a
-> deprecation window — `import hippo`, the `hippo` command, `hippo.yaml`,
-> `HIPPO_*` environment variables, and `hippo.*` entry-point groups are all
-> still honored (with deprecation warnings). See
-> [Installation](installation.md#upgrading-from-hippo) for the upgrade notes.
+> CLI is `mosaic`. Since v0.16.0 no `hippo` spelling is honored any more
+> (ADR-0015) — see [Installation](installation.md#upgrading-from-hippo) for
+> the upgrade notes.
 
 A runtime for LinkML schemas. Point it at a schema and you get a typed Python SDK, a REST API, a relational database with append-only PROV-O provenance, and CEL-based dynamic validation — without writing any of that infrastructure yourself. **The schema defines the application; Mosaic runs it.**
 

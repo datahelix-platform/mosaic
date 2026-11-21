@@ -24,18 +24,14 @@ from mosaic.core.storage import EntityStore
 #: Backend assumed when config does not specify ``storage_backend``.
 DEFAULT_BACKEND = "sqlite"
 #: Entry-point groups registering storage adapters (see ``pyproject.toml``).
-#: ``mosaic.storage_adapters`` is canonical; the legacy ``hippo.*`` spelling
-#: is still resolved during the ADR-0004 deprecation window. Resolution
-#: dedups by entry-point name with mosaic winning on collision.
-STORAGE_ADAPTERS_GROUPS = ("mosaic.storage_adapters", "hippo.storage_adapters")
-#: Canonical group name (kept for backwards compatibility).
+#: Only ``mosaic.storage_adapters`` is read (the legacy ``hippo.*`` group
+#: was removed by ADR-0015).
+STORAGE_ADAPTERS_GROUPS = ("mosaic.storage_adapters",)
+#: Canonical group name.
 STORAGE_ADAPTERS_GROUP = STORAGE_ADAPTERS_GROUPS[0]
 #: Where a *new* SQLite deployment lands when config gives no
-#: ``database_url`` (ADR-0004: renamed from ``data/hippo.db``; an existing
-#: legacy database is still picked up — see :func:`default_sqlite_path`).
+#: ``database_url``.
 DEFAULT_SQLITE_PATH = "data/mosaic.db"
-#: Legacy default database path (pre-rename deployments).
-LEGACY_SQLITE_PATH = "data/hippo.db"
 #: Config filenames auto-detected in the cwd, in priority order (kept for
 #: backwards compatibility; the lookup itself is centralized in
 #: :func:`mosaic.config.loader.find_config_file`).
@@ -43,8 +39,6 @@ CONFIG_CANDIDATES = (
     "config.json",
     "mosaic.yaml",
     "mosaic.yml",
-    "hippo.yaml",  # legacy (ADR-0004)
-    "hippo.yml",  # legacy (ADR-0004)
 )
 #: Backends whose import failure should hint at an optional extra.
 _BACKEND_EXTRA = {"postgres": "postgres"}
@@ -55,24 +49,9 @@ PathLike = Union[str, Path]
 def default_sqlite_path() -> str:
     """Resolve the default SQLite database path for a config-less deployment.
 
-    New deployments land at :data:`DEFAULT_SQLITE_PATH` (``data/mosaic.db``).
-    A pre-rename deployment whose database still lives at the legacy
-    ``data/hippo.db`` keeps working: when the new default does not exist
-    but the legacy file does, the legacy path is used and a
-    ``DeprecationWarning`` is emitted (ADR-0004).
+    Always :data:`DEFAULT_SQLITE_PATH` (``data/mosaic.db``). The legacy
+    ``data/hippo.db`` is no longer picked up (ADR-0015).
     """
-    import warnings
-
-    if not Path(DEFAULT_SQLITE_PATH).exists() and Path(LEGACY_SQLITE_PATH).exists():
-        warnings.warn(
-            f"Using legacy default database {LEGACY_SQLITE_PATH}; new "
-            f"deployments default to {DEFAULT_SQLITE_PATH} (ADR-0004). "
-            "Set database_url explicitly (or rename the file) to silence "
-            "this warning.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return LEGACY_SQLITE_PATH
     return DEFAULT_SQLITE_PATH
 
 
@@ -81,7 +60,7 @@ def build_schema_registry(
     *,
     merge_requires: bool = False,
 ) -> Any:
-    """Build a ``SchemaRegistry`` from *schema_path* or the bundled hippo_core.
+    """Build a ``SchemaRegistry`` from *schema_path* or the bundled mosaic_core.
 
     The bundled schema declares only Mosaic's framework classes (``Entity``,
     ``ProvenanceRecord``, ``ExternalID``, ...). Callers needing user-domain
@@ -110,10 +89,10 @@ def build_schema_registry(
 
     from linkml_runtime.utils.schemaview import SchemaView
 
-    hippo_core_path = importlib.resources.files("mosaic.schemas").joinpath(
-        "hippo_core.yaml"
+    mosaic_core_path = importlib.resources.files("mosaic.schemas").joinpath(
+        "mosaic_core.yaml"
     )
-    registry = SchemaRegistry(SchemaView(str(hippo_core_path)))
+    registry = SchemaRegistry(SchemaView(str(mosaic_core_path)))
     _validate_identifier_columns(registry)
     return registry
 
@@ -183,8 +162,7 @@ def _merge_required_loaders(registry: Any, schema_path: PathLike) -> Any:
 
 
 def resolve_storage_adapter_class(backend: str) -> type[EntityStore]:
-    """Resolve a storage-adapter class from ``mosaic.storage_adapters``
-    (or the legacy ``hippo.storage_adapters`` group — ADR-0004).
+    """Resolve a storage-adapter class from ``mosaic.storage_adapters``.
 
     Raises:
         AdapterError: if *backend* is not registered, fails to import (e.g.
@@ -311,8 +289,7 @@ def load_config_autodetect(config_path: Optional[PathLike] = None) -> Any:
     When *config_path* is given it is loaded directly (errors propagate).
     Otherwise the cwd is scanned via
     :func:`mosaic.config.loader.find_config_file` — ``config.json`` /
-    ``mosaic.yaml`` / ``mosaic.yml`` first, then the legacy ``hippo.yaml``
-    / ``hippo.yml`` spellings with a ``DeprecationWarning`` (ADR-0004).
+    ``mosaic.yaml`` / ``mosaic.yml``.
     Returns ``None`` when nothing is given and nothing is found, so
     callers can fall back to built-in defaults.
     """

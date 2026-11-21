@@ -64,7 +64,7 @@ def _require_mcp() -> None:
         raise ImportError(MCP_EXTRA_HINT) from exc
 
 
-def create_mcp_app(hippo_client: "MosaicClient") -> tuple[Any, Any]:
+def create_mcp_app(mosaic_client: "MosaicClient") -> tuple[Any, Any]:
     """Build the MCP server and its mountable ASGI app for one deployment.
 
     Returns ``(mcp_server, asgi_app)``. The caller must mount ``asgi_app``
@@ -82,4 +82,4 @@ def create_mcp_app(hippo_client: "MosaicClient") -> tuple[Any, Any]:
     _require_mcp()
     from mosaic.mcp.router import create_mcp_app as _create
 
-    return _create(hippo_client)
+    return _create(mosaic_client)

@@ -14,11 +14,11 @@ from mosaic.core.validation.presets import PresetConfig, PresetValidator
 from mosaic.core.validation.presets.errors import ErrorMessageBuilder
 from mosaic.core.validation.validators import ValidationResult, WriteOperation
 
-REF_CHECK_PRESET = "hippo:ref_check"
-COUNT_CONSTRAINT_PRESET = "hippo:count_constraint"
-IMMUTABLE_FIELD_PRESET = "hippo:immutable_field"
-FIELD_REQUIRED_IF_PRESET = "hippo:field_required_if"
-NO_SELF_REF_PRESET = "hippo:no_self_ref"
+REF_CHECK_PRESET = "mosaic:ref_check"
+COUNT_CONSTRAINT_PRESET = "mosaic:count_constraint"
+IMMUTABLE_FIELD_PRESET = "mosaic:immutable_field"
+FIELD_REQUIRED_IF_PRESET = "mosaic:field_required_if"
+NO_SELF_REF_PRESET = "mosaic:no_self_ref"
 
 
 class RefCheckPreset(PresetValidator):

@@ -65,8 +65,7 @@ reads to move the `composition.lock.json` pin to
 
 The distribution-name question is settled: the package ships as
 **`datahelix-mosaic`** (platform ADR-0002 prefixed-dist convention +
-ADR-0004 rename; the import package is `mosaic`, with a deprecated `hippo`
-alias). The `pypi` job stays disabled until:
+ADR-0004 rename; the import package is `mosaic`). The `pypi` job stays disabled until:
 
 1. A [trusted publisher](https://docs.pypi.org/trusted-publishers/) is
    configured on PyPI for this repository (workflow `release.yml`,

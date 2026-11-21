@@ -24,14 +24,14 @@ from dataclasses import dataclass, field as dc_field
 from typing import Any, Optional
 
 from mosaic.linkml_bridge import (
-    HIPPO_EXTERNAL_XREF,
+    MOSAIC_EXTERNAL_XREF,
     VALUE_TYPE_CLASSES,
     SchemaRegistry,
     annotation_value,
     class_accessor_name,
 )
 
-#: hippo_core framework classes that transports never expose as domain
+#: mosaic_core framework classes that transports never expose as domain
 #: entities. ``Entity`` is abstract; the rest are system concerns. This is
 #: the single definition — transports import it rather than re-listing it.
 INFRASTRUCTURE_CLASSES: frozenset[str] = frozenset(
@@ -45,11 +45,11 @@ INFRASTRUCTURE_CLASSES: frozenset[str] = frozenset(
 )
 
 #: ``from_schema`` of the framework classes named in INFRASTRUCTURE_CLASSES.
-HIPPO_CORE_SCHEMA_URI = "https://w3id.org/hippo/hippo_core"
+MOSAIC_CORE_SCHEMA_URI = "https://w3id.org/datahelix/mosaic/mosaic_core"
 
 
 def is_infrastructure_class(registry: SchemaRegistry, name: str) -> bool:
-    """True if ``name`` is one of ``hippo_core``'s framework classes.
+    """True if ``name`` is one of ``mosaic_core``'s framework classes.
 
     Matches by identity (the class's defining schema), not bare name, so a
     domain schema that defines its own ``Process`` keeps it as an ordinary
@@ -58,7 +58,7 @@ def is_infrastructure_class(registry: SchemaRegistry, name: str) -> bool:
     if name not in INFRASTRUCTURE_CLASSES:
         return False
     cls = registry.get_class(name)
-    return cls is not None and str(cls.from_schema) == HIPPO_CORE_SCHEMA_URI
+    return cls is not None and str(cls.from_schema) == MOSAIC_CORE_SCHEMA_URI
 
 
 # VALUE_TYPE_CLASSES (imported above) is the framework-baseline value-type
@@ -117,7 +117,7 @@ class SlotModel:
     target_class: Optional[str] = None  # set when kind is REFERENCE/STRUCTURED
     enum_name: Optional[str] = None  # set when kind is ENUM
     enum_values: tuple[str, ...] = ()
-    #: ``hippo_external_xref`` annotation present (issue #48): the slot's
+    #: ``mosaic_external_xref`` annotation present (issue #48): the slot's
     #: ``(system, value)`` pairs are reverse-lookup keys with global
     #: uniqueness among available entities. Only meaningful on
     #: STRUCTURED slots ranged against ``ExternalReference``.
@@ -207,7 +207,7 @@ def _classify_slot(slot: Any, registry: SchemaRegistry, enums: dict[str, Any]) -
         target_class=target_class,
         enum_name=enum_name,
         enum_values=enum_values,
-        is_external_xref=bool(annotation_value(slot, HIPPO_EXTERNAL_XREF)),
+        is_external_xref=bool(annotation_value(slot, MOSAIC_EXTERNAL_XREF)),
         # Only the virtual side of an ``inverse`` pair is a derived reverse
         # (ADR-0011); which side that is follows ADR-0013's pair rule, not
         # "multivalued + inverse" — a multivalued *forward* slot such as
@@ -265,10 +265,10 @@ class FamilyTypeModel(EntityTypeModel):
     kinds: tuple[str, ...] = ()
     #: Nearest ancestor that is itself a family, if any.
     parent: Optional[str] = None
-    #: ``hippo_anchor`` (Decision 5): the family has its own collection
+    #: ``mosaic_anchor`` (Decision 5): the family has its own collection
     #: (accessor, page, filter input, search, QuerySpec anchor).
     anchor: bool = True
-    #: ``hippo_manifest`` (Decision 5): the family is listed in the
+    #: ``mosaic_manifest`` (Decision 5): the family is listed in the
     #: planner-facing capability manifest.
     manifest: bool = True
     #: Fields only some kinds store (alike across those kinds), filterable
@@ -281,7 +281,7 @@ class FamilyTypeModel(EntityTypeModel):
 
 
 def class_flag(cls: Any, key: str, default: bool = True) -> bool:
-    """A boolean class annotation (``hippo_anchor``/``hippo_manifest``,
+    """A boolean class annotation (``mosaic_anchor``/``mosaic_manifest``,
     ADR-0014 Decision 5), ``default`` when absent."""
     value = annotation_value(cls, key) if cls is not None else None
     if value is None:
@@ -355,8 +355,8 @@ def build_family_model(
             fields=fields,
             kinds=kinds,
             parent=parent,
-            anchor=class_flag(cls, "hippo_anchor"),
-            manifest=class_flag(cls, "hippo_manifest"),
+            anchor=class_flag(cls, "mosaic_anchor"),
+            manifest=class_flag(cls, "mosaic_manifest"),
             kind_fields=tuple(kind_fields),
             kind_field_owners=tuple(owners),
         )
@@ -457,7 +457,7 @@ class FieldCapability:
     orderable: bool  # legal `orderBy` field
     aggregatable: bool  # legal `facetCounts` field
     range_queryable: bool  # legal `fieldRange` (min/max) field
-    searchable: bool  # carries a `hippo_search` annotation
+    searchable: bool  # carries a `mosaic_search` annotation
     #: On a family (ADR-0014 Decision 4): the kinds that have this field
     #: when only some do — the others read it as NULL. Empty = every kind
     #: (or not a family).
@@ -486,7 +486,7 @@ class EntityCapability:
     #: Exposed concrete closure — a family's kinds, or a concrete parent
     #: with its subclasses (itself first). Empty for a leaf.
     kinds: tuple[str, ...] = ()
-    #: ``hippo_anchor`` (Decision 5): may anchor a QuerySpec.
+    #: ``mosaic_anchor`` (Decision 5): may anchor a QuerySpec.
     anchor: bool = True
 
     @property
@@ -578,7 +578,7 @@ def build_capability_manifest(
             abstract=False,
             parent=nearest_listed_ancestor(class_name),
             kinds=closure if len(closure) > 1 else (),
-            anchor=class_flag(sv.get_class(class_name), "hippo_anchor"),
+            anchor=class_flag(sv.get_class(class_name), "mosaic_anchor"),
         )
     for class_name, fam in families.items():
         searchable_names = set().union(*(searchable(k) for k in fam.kinds))

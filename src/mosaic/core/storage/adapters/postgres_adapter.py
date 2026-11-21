@@ -995,13 +995,13 @@ class PostgresFTSStore:
 # ---------------------------------------------------------------------------
 
 POSTGRES_PROVENANCE_TRIGGERS = """
--- Enforce hippo_append_only on ProvenanceRecord at the SQL level
+-- Enforce mosaic_append_only on ProvenanceRecord at the SQL level
 -- (sec9 §9.6 / Decision 9.6.C). A single BEFORE UPDATE / BEFORE DELETE
 -- trigger covers any column change and any row deletion.
 CREATE OR REPLACE FUNCTION prevent_provenance_update()
 RETURNS TRIGGER AS $$
 BEGIN
-    RAISE EXCEPTION 'Cannot update ProvenanceRecord: hippo_append_only class';
+    RAISE EXCEPTION 'Cannot update ProvenanceRecord: mosaic_append_only class';
 END;
 $$ LANGUAGE plpgsql;
 
@@ -1014,7 +1014,7 @@ CREATE TRIGGER trg_prevent_provenance_update
 CREATE OR REPLACE FUNCTION prevent_provenance_delete()
 RETURNS TRIGGER AS $$
 BEGIN
-    RAISE EXCEPTION 'Cannot delete ProvenanceRecord: hippo_append_only class';
+    RAISE EXCEPTION 'Cannot delete ProvenanceRecord: mosaic_append_only class';
 END;
 $$ LANGUAGE plpgsql;
 
@@ -1031,8 +1031,7 @@ class PostgresAdapter(EntityStore):
 
     Args:
         database_url: PostgreSQL connection string (e.g. postgresql://user:pass@host:5432/db).
-            Can also be set via the MOSAIC_DATABASE_URL environment variable
-            (legacy HIPPO_DATABASE_URL honored — ADR-0004).
+            Can also be set via the MOSAIC_DATABASE_URL environment variable.
         schema_registry: LinkML schema registry for schema introspection
             and validation. Required for LinkML-native storage operations.
         min_pool_size: Minimum number of connections in the pool (default: 2).
@@ -1168,7 +1167,7 @@ class PostgresAdapter(EntityStore):
             cur.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
 
             cur.execute("""
-                CREATE TABLE IF NOT EXISTS hippo_meta (
+                CREATE TABLE IF NOT EXISTS mosaic_meta (
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL,
                     updated_at TEXT NOT NULL
@@ -1207,7 +1206,7 @@ class PostgresAdapter(EntityStore):
 
             # ProvenanceRecord table (sec9 §9.6 / Decision 9.6.D). Shape
             # matches what the LinkML DDL generator produces from
-            # hippo_core.ProvenanceRecord (verified by
+            # mosaic_core.ProvenanceRecord (verified by
             # tests/core/test_ddl_generator.py::
             # TestHippoCoreProvenanceRecordDDL).
             cur.execute("""
@@ -1373,7 +1372,7 @@ class PostgresAdapter(EntityStore):
             self._ensure_fts_tables(conn)
 
     def _ensure_fts_tables(self, conn: "psycopg.Connection") -> None:
-        """Create FTS shadow tables for every ``hippo_search`` slot.
+        """Create FTS shadow tables for every ``mosaic_search`` slot.
 
         SQLite creates FTS tables alongside its per-class typed tables, so
         a fresh deployment searches out of the box; the Postgres adapter's
@@ -1404,7 +1403,7 @@ class PostgresAdapter(EntityStore):
     _REFERENCE_WRITE_LOG_MIGRATION_KEY = "_reference_write_log_v1_migrated"
 
     def _migrate_reference_entity_ids(self, cur: "psycopg.Cursor") -> None:
-        """One-time backfill from ``hippo_meta.reference_entity_ids`` JSON
+        """One-time backfill from ``mosaic_meta.reference_entity_ids`` JSON
         blob to the ``reference_write_log`` table (sec2 §2.14.9).
 
         v1 stored ``{loader_name: {version: [entity_id, ...]}}`` under the
@@ -1426,14 +1425,14 @@ class PostgresAdapter(EntityStore):
         inserting some rows but before stamping the marker.
         """
         cur.execute(
-            "SELECT 1 FROM hippo_meta WHERE key = %s",
+            "SELECT 1 FROM mosaic_meta WHERE key = %s",
             (self._REFERENCE_WRITE_LOG_MIGRATION_KEY,),
         )
         if cur.fetchone() is not None:
             return
 
         cur.execute(
-            "SELECT value FROM hippo_meta WHERE key = 'reference_entity_ids'"
+            "SELECT value FROM mosaic_meta WHERE key = 'reference_entity_ids'"
         )
         row = cur.fetchone()
         if row is not None:
@@ -1473,12 +1472,12 @@ class PostgresAdapter(EntityStore):
                             )
 
             cur.execute(
-                "DELETE FROM hippo_meta WHERE key = 'reference_entity_ids'"
+                "DELETE FROM mosaic_meta WHERE key = 'reference_entity_ids'"
             )
 
         now = datetime.now(timezone.utc).isoformat()
         cur.execute(
-            "INSERT INTO hippo_meta (key, value, updated_at) "
+            "INSERT INTO mosaic_meta (key, value, updated_at) "
             "VALUES (%s, %s, %s) "
             "ON CONFLICT(key) DO UPDATE SET value = excluded.value, "
             "                                updated_at = excluded.updated_at",
@@ -3148,15 +3147,15 @@ class PostgresAdapter(EntityStore):
             patch={"status": "deleted", **metadata},
         )
 
-    # -- hippo_external_xref side index (issue #48) --------------------------
+    # -- mosaic_external_xref side index (issue #48) --------------------------
 
     _XREF_NOT_IMPLEMENTED = (
-        "hippo_external_xref reverse lookup is not implemented on the "
-        "PostgreSQL adapter yet. The xref side index (hippo_xref_index) "
+        "mosaic_external_xref reverse lookup is not implemented on the "
+        "PostgreSQL adapter yet. The xref side index (mosaic_xref_index) "
         "is maintained by the SQLite adapter's per-class write path; the "
         "PostgreSQL adapter still uses the legacy single-table `entities` "
         "layout and gains xref parity together with its per-class-table "
-        "migration. Use the SQLite adapter for hippo_external_xref-"
+        "migration. Use the SQLite adapter for mosaic_external_xref-"
         "annotated schemas, or query the ExternalReference slot data "
         "directly."
     )

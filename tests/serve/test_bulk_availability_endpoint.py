@@ -29,7 +29,7 @@ def hippo_client(db_path):
 def client(hippo_client):
     app = create_app(
         routers=[health.router, availability.router, ingest.router],
-        hippo_client=hippo_client,
+        mosaic_client=hippo_client,
     )
     return TestClient(app)
 

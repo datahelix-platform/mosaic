@@ -40,7 +40,7 @@ def _reg(
         "default_range: string\n"
         "imports:\n"
         "  - linkml:types\n"
-        "  - hippo_core\n"
+        "  - mosaic_core\n"
         "classes:\n"
         f"{classes_yaml}"
     )
@@ -155,7 +155,7 @@ class TestNonRootNamespaces:
             "  Sample:\n"
             "    is_a: Entity\n"
             "    annotations:\n"
-            "      hippo_namespace: tissue\n"
+            "      mosaic_namespace: tissue\n"
             "    attributes:\n"
             "      name:\n"
             "        range: string\n"
@@ -178,7 +178,7 @@ class TestNonRootNamespaces:
             "  Measurement:\n"
             "    is_a: Entity\n"
             "    annotations:\n"
-            "      hippo_namespace: assay.quant\n"
+            "      mosaic_namespace: assay.quant\n"
             "    attributes:\n"
             "      value:\n"
             "        range: float\n"
@@ -198,7 +198,7 @@ class TestNonRootNamespaces:
             "  Measurement:\n"
             "    is_a: Entity\n"
             "    annotations:\n"
-            "      hippo_namespace: assay.quant\n"
+            "      mosaic_namespace: assay.quant\n"
             "    attributes:\n"
             "      value:\n"
             "        range: float\n"
@@ -211,17 +211,17 @@ class TestNonRootNamespaces:
 
 
 # ---------------------------------------------------------------------------
-# hippo_accessor override
+# mosaic_accessor override
 # ---------------------------------------------------------------------------
 
 
 class TestAccessorOverride:
-    def test_hippo_accessor_overrides_default(self, client_factory):
+    def test_mosaic_accessor_overrides_default(self, client_factory):
         reg = _reg(
             "  Analysis:\n"
             "    is_a: Entity\n"
             "    annotations:\n"
-            "      hippo_accessor: analytics\n"
+            "      mosaic_accessor: analytics\n"
             "    attributes:\n"
             "      name:\n"
             "        range: string\n"
@@ -246,7 +246,7 @@ class TestCollisionDetection:
         # name are caught at SchemaRegistry construction with a
         # `SchemaError` — which fires before the typed-client surface
         # would have raised its own `duplicate_accessor` error. The
-        # disambiguation message still names `hippo_accessor`.
+        # disambiguation message still names `mosaic_accessor`.
         from mosaic.core.exceptions import SchemaError
 
         with pytest.raises(SchemaError) as exc:
@@ -254,18 +254,18 @@ class TestCollisionDetection:
                 "  DNASample:\n"
                 "    is_a: Entity\n"
                 "    annotations:\n"
-                "      hippo_namespace: tissue\n"
+                "      mosaic_namespace: tissue\n"
                 "    attributes:\n"
                 "      name: {range: string}\n"
                 "  DnaSample:\n"
                 "    is_a: Entity\n"
                 "    annotations:\n"
-                "      hippo_namespace: tissue\n"
+                "      mosaic_namespace: tissue\n"
                 "    attributes:\n"
                 "      label: {range: string}\n"
             )
         assert "dna_samples" in str(exc.value)
-        assert "hippo_accessor" in str(exc.value)
+        assert "mosaic_accessor" in str(exc.value)
 
     def test_case2_accessor_vs_subnamespace(self, client_factory):
         # Class `Protocol` in namespace `tissue` → accessor `protocols`.
@@ -275,13 +275,13 @@ class TestCollisionDetection:
             "  Protocol:\n"
             "    is_a: Entity\n"
             "    annotations:\n"
-            "      hippo_namespace: tissue\n"
+            "      mosaic_namespace: tissue\n"
             "    attributes:\n"
             "      name: {range: string}\n"
             "  Step:\n"
             "    is_a: Entity\n"
             "    annotations:\n"
-            "      hippo_namespace: tissue.protocols\n"
+            "      mosaic_namespace: tissue.protocols\n"
             "    attributes:\n"
             "      order: {range: integer}\n"
         )
@@ -294,7 +294,7 @@ class TestCollisionDetection:
             "  Thing:\n"
             "    is_a: Entity\n"
             "    annotations:\n"
-            "      hippo_namespace: query\n"  # collides with MosaicClient.query
+            "      mosaic_namespace: query\n"  # collides with MosaicClient.query
             "    attributes:\n"
             "      name: {range: string}\n"
         )
@@ -307,7 +307,7 @@ class TestCollisionDetection:
             "  Thing:\n"
             "    is_a: Entity\n"
             "    annotations:\n"
-            "      hippo_namespace: root\n"
+            "      mosaic_namespace: root\n"
             "    attributes:\n"
             "      name: {range: string}\n"
         )
@@ -320,7 +320,7 @@ class TestCollisionDetection:
             "  Schema:\n"
             "    is_a: Entity\n"
             "    annotations:\n"
-            "      hippo_accessor: storage\n"  # conflicts with MosaicClient.storage
+            "      mosaic_accessor: storage\n"  # conflicts with MosaicClient.storage
             "    attributes:\n"
             "      name: {range: string}\n"
         )
@@ -330,7 +330,7 @@ class TestCollisionDetection:
 
 
 # ---------------------------------------------------------------------------
-# hippo_core infrastructure classes are NOT exposed
+# mosaic_core infrastructure classes are NOT exposed
 # ---------------------------------------------------------------------------
 
 
@@ -344,7 +344,7 @@ class TestInfrastructureExcluded:
         )
         client = client_factory(reg)
 
-        # ProvenanceRecord is hippo_core infrastructure; no typed accessor.
+        # ProvenanceRecord is mosaic_core infrastructure; no typed accessor.
         assert not hasattr(client, "provenance_records")
 
     def test_process_not_exposed(self, client_factory):

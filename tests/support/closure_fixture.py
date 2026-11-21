@@ -39,7 +39,7 @@ prefixes:
   linkml: https://w3id.org/linkml/
 imports:
   - linkml:types
-  - hippo_core
+  - mosaic_core
 default_range: string
 classes:
   Person:
@@ -61,7 +61,7 @@ classes:
   Process:
     is_a: Entity
     annotations:
-      hippo_accessor: processes
+      mosaic_accessor: processes
     attributes:
       name:
       operator:
@@ -578,9 +578,9 @@ class ClosureGraphQLCases:
         assert {f["value"]: f["count"] for f in data["f"]} == {"blood": 1, "brain": 1}
 
     def test_family_schema_description(self, gql):
-        data = gql('{ s: hippoEntityType(name: "Sample") { abstract parent kinds } '
-                   'b: hippoEntityType(name: "Brain") { abstract parent kinds } '
-                   'p: hippoEntityType(name: "Process") { abstract kinds } }')
+        data = gql('{ s: mosaicEntityType(name: "Sample") { abstract parent kinds } '
+                   'b: mosaicEntityType(name: "Brain") { abstract parent kinds } '
+                   'p: mosaicEntityType(name: "Process") { abstract kinds } }')
         assert data["s"] == {"abstract": True, "parent": None, "kinds": ["Blood", "Brain"]}
         assert data["b"] == {"abstract": False, "parent": "Sample", "kinds": []}
         assert data["p"] == {"abstract": False, "kinds": ["Process", "BankBrain"]}

@@ -1,16 +1,16 @@
-## Reference: `hippo_core` — Hippo's Built-In Classes and Enums
+## Reference: `mosaic_core` — Hippo's Built-In Classes and Enums
 
 **Document status:** Draft v0.1
-**Depends on:** sec9_linkml_redesign.md §9.5, `src/hippo/schemas/hippo_core.yaml`
+**Depends on:** sec9_linkml_redesign.md §9.5, `src/mosaic/schemas/mosaic_core.yaml`
 
-This document is the authoritative reference for `hippo_core.yaml` — Hippo's
+This document is the authoritative reference for `mosaic_core.yaml` — Hippo's
 built-in primitives shipped as a LinkML schema. Every user schema imports
-`hippo_core` and every domain class uses `is_a: Entity`. See sec9 §9.5 for
+`mosaic_core` and every domain class uses `is_a: Entity`. See sec9 §9.5 for
 the design rationale.
 
-The live schema ships at `src/hippo/schemas/hippo_core.yaml` and is loaded
+The live schema ships at `src/mosaic/schemas/mosaic_core.yaml` and is loaded
 by `SchemaRegistry` via a bundled importmap: callers declare
-`imports: [hippo_core]` in their own schemas and LinkML resolves the
+`imports: [mosaic_core]` in their own schemas and LinkML resolves the
 reference to the shipped file.
 
 ---
@@ -20,12 +20,12 @@ reference to the shipped file.
 | Element | Kind | Purpose |
 |---|---|---|
 | `Entity` | abstract class | Base class for every domain entity. Provides `id` and `is_available`. |
-| `ProvenanceRecord` | class | Atomic audit record of an operation on an entity. Annotated `hippo_append_only: true`; PROV-O-aligned. `is_a: Entity`. |
+| `ProvenanceRecord` | class | Atomic audit record of an operation on an entity. Annotated `mosaic_append_only: true`; PROV-O-aligned. `is_a: Entity`. |
 | `Process` | class | Composite activity grouping atomic operations under one logical execution (reference loads, migrations, pipeline runs). `is_a: Entity`. |
 | `Validator` | class (placeholder) | Declarative validator definition; slot inventory finalized later. |
 | `ReferenceLoader` | class | Metadata for reference-data loader plugins. Full slot inventory: `name`, `entity_type` (multivalued), `source`, `schema_fragment`. |
 | `ExternalReference` | value type (class) | Inline structured cross-system identifier (`system`, `value`, optional `retrieved_at`/`version`). NOT `is_a: Entity` — no id/lifecycle; stored inline on the slot that ranges it (issue #48). |
-| `ExternalID` | class — **DEPRECATED** | Legacy entity-shaped cross-system identifier. Superseded by `ExternalReference` + `hippo_external_xref`; removal scoped to a future major. |
+| `ExternalID` | class — **DEPRECATED** | Legacy entity-shaped cross-system identifier. Superseded by `ExternalReference` + `mosaic_external_xref`; removal scoped to a future major. |
 | `Status` | enum | Lifecycle state of an entity. |
 | `Operation` | enum | Operation kinds recorded on a `ProvenanceRecord`. |
 
@@ -50,7 +50,7 @@ deliberately NOT declared here — computed at read time from
 ```yaml
 # user_schema.yaml
 imports:
-  - hippo_core
+  - mosaic_core
 classes:
   Sample:
     is_a: Entity
@@ -58,7 +58,7 @@ classes:
       barcode:
         range: string
         annotations:
-          hippo_unique: true
+          mosaic_unique: true
 ```
 
 ---
@@ -67,7 +67,7 @@ classes:
 
 Atomic audit record of an operation on an entity. `is_a: Entity`
 (participates in the normal identity model — UUID id, lifecycle) but
-annotated `hippo_append_only: true` — adapters MUST reject `UPDATE` and
+annotated `mosaic_append_only: true` — adapters MUST reject `UPDATE` and
 `DELETE` against the backing table. Only `INSERT` is permitted.
 
 `class_uri: prov:Activity` at the atomic scale. `Process` shares the
@@ -89,14 +89,14 @@ multiple granularities uniformly.
 | `patch` | string (JSON) | no | — | Operation-specific change payload. Shape varies by operation. Unstructured by design. |
 | `context` | string (JSON) | no | — | Caller-supplied contextual metadata. Structure at the caller's discretion. |
 
-**Indexes** (via `hippo_index: true` annotations): `entity_id`,
+**Indexes** (via `mosaic_index: true` annotations): `entity_id`,
 `operation`, `timestamp`, `process_id`. Wave 2 `computed-temporal-fields`
 adds composite indexes as needed for the read-time aggregation paths.
 
 **Status.** Active. Wave 2's `provenance-migration` landed the storage
 migration: the `ProvenanceRecord` table replaces the legacy `provenance`
 table, `ProvenanceStore` writes the sec9 §9.6 shape, and the SQLite /
-Postgres adapters enforce `hippo_append_only` via BEFORE UPDATE /
+Postgres adapters enforce `mosaic_append_only` via BEFORE UPDATE /
 BEFORE DELETE triggers (Decision 9.6.C). Two known transition gaps
 remain — the `actor_id = "unknown"` fallback for unmigrated callers,
 and `schema_version = ""` until `SchemaRegistry` is plumbed through
@@ -120,10 +120,10 @@ attributes (pipeline parameters, input/output manifests, runtime metadata).
 | `id` | string (UUID) | yes | Inherited from `Entity`. |
 | `is_available` | boolean | yes | Inherited from `Entity`. Processes are archived, not hard-deleted. |
 | `parent_process_id` | Process (self-ref) | no | Process composition. Processes form a tree; caller can model a DAG by adding further references on subclasses. Null for root processes. |
-| `operation_kind` | string | yes | Caller-defined category (`reference_data_installed`, `pipeline_run`, `schema_migration`, `manual_edit`, …). Not a closed enum. Annotated `hippo_index: true`. |
-| `started_at` | datetime | yes | UTC wall-clock time at process start. Annotated `hippo_index: true`. |
+| `operation_kind` | string | yes | Caller-defined category (`reference_data_installed`, `pipeline_run`, `schema_migration`, `manual_edit`, …). Not a closed enum. Annotated `mosaic_index: true`. |
+| `started_at` | datetime | yes | UTC wall-clock time at process start. Annotated `mosaic_index: true`. |
 | `ended_at` | datetime | no | UTC wall-clock time at process completion. Null while running or after failure without completion. |
-| `actor_id` | string (UUID) | yes | UUID of the entity responsible for initiating this process. Resolvable via `HippoClient.resolve_type(uuid)` per sec9 §9.5. |
+| `actor_id` | string (UUID) | yes | UUID of the entity responsible for initiating this process. Resolvable via `MosaicClient.resolve_type(uuid)` per sec9 §9.5. |
 
 **Lifecycle via provenance (Wave 2).** Process creation emits a `create`
 ProvenanceRecord (like any other entity). State transitions (setting
@@ -135,7 +135,7 @@ Recursion bottoms out at root processes whose creation record has
 ```yaml
 # Cappella schema fragment
 imports:
-  - hippo_core
+  - mosaic_core
 classes:
   PipelineRun:
     is_a: Process
@@ -165,7 +165,7 @@ Lifecycle state of an entity. Recorded in provenance via
 | `distributed` | Sent elsewhere (e.g., external distribution). |
 | `removed` | Physically removed (rare; normally `superseded` / `deleted`). |
 
-Adding a value is a minor bump on `hippo_core`. Removing a value is breaking.
+Adding a value is a minor bump on `mosaic_core`. Removing a value is breaking.
 
 ---
 
@@ -208,7 +208,7 @@ user-schema extensions become possible as soon as the shape firms up.
 ### `ReferenceLoader`
 
 Metadata for a reference-data loader plugin. Instances are contributed by
-plugins registered under the `hippo.reference_loaders` entry point. The full
+plugins registered under the `mosaic.reference_loaders` entry point. The full
 slot inventory was finalized by the `reference-loader-shape` OpenSpec change
 (Wave 3 per sec9 §9.12), resolving Decisions 9.5.E and 9.5.F.
 
@@ -275,15 +275,15 @@ ordinary entity update captured by normal provenance.
 | `version` | string | no | External record version the reference was captured against. |
 
 Slots ranged against `ExternalReference` may carry the
-`hippo_external_xref` annotation to become reverse-lookup keys — global
+`mosaic_external_xref` annotation to become reverse-lookup keys — global
 `(system, value)` uniqueness among available entities plus
-`HippoClient.find_by_xref` / `GET /xref/{system}/{value}` / GraphQL
-`findByXref`, served by the `hippo_xref_index` side table. See
-`reference_hippo_ext.md` for the annotation contract.
+`MosaicClient.find_by_xref` / `GET /xref/{system}/{value}` / GraphQL
+`findByXref`, served by the `mosaic_xref_index` side table. See
+`reference_mosaic_ext.md` for the annotation contract.
 
 `ExternalReference` is excluded from every entity surface: no table, no
 typed-client accessor, no tree-root bundle slot, no GraphQL object type,
-no TUI listing (`VALUE_TYPE_CLASSES` in `hippo.linkml_bridge`).
+no TUI listing (`VALUE_TYPE_CLASSES` in `mosaic.linkml_bridge`).
 
 #### `ExternalID` deprecation
 
@@ -292,8 +292,8 @@ no TUI listing (`VALUE_TYPE_CLASSES` in `hippo.linkml_bridge`).
 `external_id_add`/`external_id_remove` provenance ops) is **deprecated** in
 favor of the value-type + annotation pattern above:
 
-- The class stays in `hippo_core` and remains fully functional.
-- `HippoClient.register_external_id` / `get_by_external_id` /
+- The class stays in `mosaic_core` and remains fully functional.
+- `MosaicClient.register_external_id` / `get_by_external_id` /
   `list_external_ids` / mapping-level `supersede` emit
   `DeprecationWarning` (entity-level `supersede_entity` is unaffected).
 - The `/external-ids` REST endpoints are marked `deprecated` in OpenAPI.
@@ -304,41 +304,41 @@ favor of the value-type + annotation pattern above:
 
 ### Version and compatibility
 
-`hippo_core.version` is `0.6.0` (0.1.0 initial → 0.2.0 added `Process` → 0.3.0 added `ProvenanceRecord` → 0.4.0 finalized `ReferenceLoader` slot inventory → 0.5.0 added `ExternalID` → 0.6.0 added `ExternalReference` and deprecated `ExternalID`, issue #48). Bump rules (per sec9 §9.3):
+`mosaic_core.version` is `0.6.0` (0.1.0 initial → 0.2.0 added `Process` → 0.3.0 added `ProvenanceRecord` → 0.4.0 finalized `ReferenceLoader` slot inventory → 0.5.0 added `ExternalID` → 0.6.0 added `ExternalReference` and deprecated `ExternalID`, issue #48). Bump rules (per sec9 §9.3):
 
 | Change | Bump |
 |---|---|
 | Add an optional slot on `Entity`, new enum value, new class | Minor |
 | Change an existing class's slot shape, newly required slot, enum removal | Major |
 
-Deployments pin a specific `(hippo_ext, hippo_core)` pair. User schemas
-declare which `hippo_core` major they target; `SchemaRegistry` refuses to
+Deployments pin a specific `(mosaic_ext, mosaic_core)` pair. User schemas
+declare which `mosaic_core` major they target; `SchemaRegistry` refuses to
 merge against an incompatible major.
 
 ---
 
 ### Design invariants
 
-Three invariants a coding agent must preserve when touching `hippo_core`:
+Three invariants a coding agent must preserve when touching `mosaic_core`:
 
 1. **`Entity` stays sparse.** Only `id` and `is_available`. Resist adding
    slots; everything else belongs either in a user-schema subclass or
    derives from provenance.
-2. **No cross-layer references.** `hippo_core` MUST NOT reference any
+2. **No cross-layer references.** `mosaic_core` MUST NOT reference any
    domain class. Any relationship from a domain entity to its provenance
    is expressed via `entity_id` on `ProvenanceRecord` (Wave 2), never by
    a slot on `Entity` pointing into system-level data.
-3. **`hippo_core` validates against itself.** Its own shape satisfies the
-   LinkML metamodel. A malformed `hippo_core` is a startup failure, not a
+3. **`mosaic_core` validates against itself.** Its own shape satisfies the
+   LinkML metamodel. A malformed `mosaic_core` is a startup failure, not a
    silent degradation.
 
 ---
 
-### What `hippo_core` deliberately excludes
+### What `mosaic_core` deliberately excludes
 
 Some concepts sec9 specifies but does not land in this change. An agent
 encountering a gap should consult the owning change below rather than
-adding the concept to `hippo_core` ad-hoc.
+adding the concept to `mosaic_core` ad-hoc.
 
 | Concept | Owning change |
 |---|---|
