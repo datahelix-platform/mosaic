@@ -263,7 +263,7 @@ mutation {
 mutation {
   setSampleAvailabilityBulk(ids: ["…", "…"], isAvailable: false, reason: "audit") {
     total succeeded failed
-    failures { entityId error }
+    failures { entityId error code actualEntityType }
   }
 }
 ```
@@ -278,7 +278,11 @@ id of any other type is refused with `NOT_FOUND`, the same code as an unknown
 id, and nothing changes. The message names both types, and the error's
 `extensions` carry `entity_type` (the mutation's type) and
 `actual_entity_type` (the id's). In the bulk form that id is reported in
-`failures`. `supersede…`'s `replacementId` may be of any type, so a
+`failures` with `code: "NOT_FOUND"` and `actualEntityType` set; an unknown id
+also has `code: "NOT_FOUND"`, with `actualEntityType` null. Use
+`actual_entity_type` / `actualEntityType` to tell a wrong-type id from an
+unknown one, not the message text. Mosaic has no per-record authorization, so
+naming the id's type reveals nothing a caller couldn't already read. `supersede…`'s `replacementId` may be of any type, so a
 misclassified record can be replaced by a corrected one of the right type.
 `update…` stays exact-type: an id of another type is `NOT_FOUND`, and a
 subclass's id through its parent's `update…` is `ENTITY_TYPE_CONFLICT`.

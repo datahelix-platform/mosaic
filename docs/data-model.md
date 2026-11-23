@@ -316,7 +316,8 @@ Both entities are retained — there are no hard deletes. The old entity remains
 - `EntityKindMismatchError` (an `EntityNotFoundError`) — if `entity_type` is
   given and `entity_id` is of another type. `set_availability_bulk(entity_type, ids)`
   reports such an id as a failure, and `delete(entity_type, id)` raises the
-  same error.
+  same error. Its `actual_entity_type` names the id's real type, and is the
+  stable way to tell this case from an unknown id.
 - `EntityAlreadySupersededError` — if `entity_id` is already superseded
 
 ---

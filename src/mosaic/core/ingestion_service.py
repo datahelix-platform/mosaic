@@ -354,7 +354,8 @@ class IngestionService:
         entity_id: str,
         bypass_validation: Optional[bool] = None,
     ) -> bool:
-        """Delete an entity."""
+        """Delete an entity (kind-checked first, #289; see MosaicClient.delete)."""
+        entity_type = self._checked_delete_type(entity_type, entity_id)
         should_bypass = bypass_validation if bypass_validation is not None else (
             self._schema_manager.bypass_validation if self._schema_manager else False
         )
@@ -374,7 +375,6 @@ class IngestionService:
                     entity_id=entity_id,
                 )
 
-        entity_type = self._checked_delete_type(entity_type, entity_id)
         return self._delete_internal(entity_type, entity_id)
 
     def _checked_delete_type(self, entity_type: str, entity_id: str) -> str:
@@ -418,7 +418,11 @@ class IngestionService:
                 existing = read_fn(eid)
 
                 if existing is None:
-                    failures.append({"id": eid, "error": f"Entity not found: {eid}"})
+                    failures.append({
+                        "id": eid,
+                        "error": f"Entity not found: {eid}",
+                        "code": "NOT_FOUND",
+                    })
                     continue
 
                 # #289: the id must be of this kind or one of its concrete

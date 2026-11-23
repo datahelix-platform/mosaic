@@ -753,8 +753,21 @@ class MosaicClient:
         entity_id: str,
         bypass_validation: Optional[bool] = None,
     ) -> bool:
-        """Delete an entity."""
+        """Delete an entity.
+
+        The id must be an ``entity_type`` row or a row of one of its
+        concrete subclasses (ADR-0014); another kind's id, or a kind the
+        schema doesn't have, raises
+        :class:`~mosaic.core.exceptions.EntityKindMismatchError` before
+        anything runs (#289). Validators then run for the row's own class.
+        """
         from mosaic.core.exceptions import ValidationFailure
+
+        # #289: kind check first; a concrete subclass's row is validated and
+        # deleted as its own class.
+        entity_type = self._ingestion_service._checked_delete_type(
+            entity_type, entity_id
+        )
 
         should_bypass = (
             bypass_validation
@@ -777,11 +790,6 @@ class MosaicClient:
                     entity_id=entity_id,
                 )
 
-        # #289: an id of another kind is refused (EntityKindMismatchError);
-        # a concrete subclass's row is deleted as its own class (ADR-0014).
-        entity_type = self._ingestion_service._checked_delete_type(
-            entity_type, entity_id
-        )
         return self._delete_internal(entity_type, entity_id)
 
     def set_availability_bulk(

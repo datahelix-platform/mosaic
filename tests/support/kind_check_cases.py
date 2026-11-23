@@ -87,9 +87,14 @@ class KindCheckSDKCases:
             "Blood", ["bl1", "br1", "no-such-id"], is_available=False
         )
         assert (result["succeeded"], result["failed"]) == (1, 2)
-        errors = {f["id"]: f["error"] for f in result["failures"]}
-        assert errors["no-such-id"] == "Entity not found: no-such-id"
-        assert "Brain" in errors["br1"]
+        by_id = {f["id"]: f for f in result["failures"]}
+        assert by_id["no-such-id"]["error"] == "Entity not found: no-such-id"
+        assert "Brain" in by_id["br1"]["error"]
+        # Every not-found entry carries the code; only a wrong-kind id has
+        # actual_entity_type (the stable way to tell the two apart).
+        assert {f["code"] for f in by_id.values()} == {"NOT_FOUND"}
+        assert by_id["br1"]["actual_entity_type"] == "Brain"
+        assert "actual_entity_type" not in by_id["no-such-id"]
         _untouched(client, "Brain", "br1")
 
     # -- supersede ------------------------------------------------------------
@@ -141,6 +146,30 @@ class KindCheckSDKCases:
         _untouched(client, "Brain", "br1")
         _untouched(client, "Process", "pr1")
         _untouched(client, "Measurement", "m1")
+
+    def test_delete_with_unknown_kind_is_refused(self, client):
+        with pytest.raises(EntityKindMismatchError) as info:
+            client.delete("Bloood", "bl1")
+        assert info.value.actual_entity_type == "Blood"
+        _untouched(client, "Blood", "bl1")
+
+    def test_delete_checks_kind_before_validating_as_stored_class(
+        self, client, monkeypatch
+    ):
+        seen: list[str] = []
+        real = client.validate
+
+        def spy(operation):
+            seen.append(operation.entity_type)
+            return real(operation)
+
+        monkeypatch.setattr(client, "validate", spy)
+        with pytest.raises(EntityKindMismatchError):
+            client.delete("Blood", "br1", bypass_validation=False)
+        assert seen == []  # refused before any validator ran
+        client.delete("Process", "bb1", bypass_validation=False)
+        assert seen == ["BankBrain"]  # validated as the row's own class
+        assert _row(client, "BankBrain", "bb1")["is_available"] is False
 
     def test_delete_on_own_kind_and_through_parent_still_works(self, client):
         client.delete("Blood", "bl1")
@@ -221,14 +250,19 @@ class KindCheckGraphQLCases:
 
     def test_set_availability_bulk_reports_wrong_kind(self, client, gql_raw):
         result = gql_raw(
-            'mutation { setBloodAvailabilityBulk(ids: ["bl1", "br1"], '
-            'isAvailable: false) { succeeded failed failures { entityId error } } }'
+            'mutation { setBloodAvailabilityBulk(ids: ["bl1", "br1", "nope"], '
+            'isAvailable: false) { succeeded failed '
+            'failures { entityId error code actualEntityType } } }'
         )
         assert not result.errors, result.errors
         bulk = result.data["setBloodAvailabilityBulk"]
-        assert (bulk["succeeded"], bulk["failed"]) == (1, 1)
-        assert bulk["failures"][0]["entityId"] == "br1"
-        assert "Brain" in bulk["failures"][0]["error"]
+        assert (bulk["succeeded"], bulk["failed"]) == (1, 2)
+        by_id = {f["entityId"]: f for f in bulk["failures"]}
+        assert "Brain" in by_id["br1"]["error"]
+        assert by_id["br1"]["code"] == "NOT_FOUND"
+        assert by_id["br1"]["actualEntityType"] == "Brain"
+        assert by_id["nope"]["code"] == "NOT_FOUND"
+        assert by_id["nope"]["actualEntityType"] is None
         _untouched(client, "Brain", "br1")
 
     def test_supersede_wrong_kind_is_not_found(self, client, gql_raw):

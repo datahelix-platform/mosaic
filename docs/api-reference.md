@@ -1032,6 +1032,7 @@ Get the availability status of an entity.
 {
   "data": {
     "entity_id": "entity-123",
+    "entity_type": "Sample",
     "is_available": true
   },
   "error": null,
@@ -1043,7 +1044,8 @@ Get the availability status of an entity.
 
 **POST /entities/{entity_id}/availability**
 
-Set the availability status of an entity.
+Set the availability status of an entity, either way, as its own type. The
+change and its reason are recorded as an `availability_change` provenance entry.
 
 *Path Parameters:*
 | Parameter | Type | Description |
@@ -1053,15 +1055,19 @@ Set the availability status of an entity.
 *Request Body:*
 ```json
 {
-  "is_available": false
+  "is_available": false,
+  "reason": "depleted"
 }
 ```
+
+`reason` is optional.
 
 *Response:*
 ```json
 {
   "data": {
     "entity_id": "entity-123",
+    "entity_type": "Sample",
     "is_available": false
   },
   "error": null,

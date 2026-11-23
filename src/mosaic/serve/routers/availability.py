@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from mosaic.api.exceptions import EntityNotFoundError
 from mosaic.core.client import MosaicClient
+from mosaic.serve.routers.base import resolve_entity_type_or_404
 
 router = APIRouter(prefix="/entities", tags=["availability"])
 
@@ -25,6 +26,7 @@ class AvailabilityRequest(BaseModel):
     """Request body for availability change."""
 
     is_available: bool
+    reason: Optional[str] = None
 
 
 class BulkAvailabilityRequest(BaseModel):
@@ -53,15 +55,19 @@ async def get_entity_availability(
         HTTPException: If entity not found.
     """
     client = await get_client(request)
+    entity_type = resolve_entity_type_or_404(client, entity_id)
 
     try:
-        entity = client.get(entity_type="entity", entity_id=entity_id)
-        return {
-            "entity_id": entity_id,
-            "is_available": True,
-        }
+        entity = client.get(
+            entity_type=entity_type, entity_id=entity_id, include_unavailable=True
+        )
     except EntityNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    return {
+        "entity_id": entity_id,
+        "entity_type": entity["entity_type"],
+        "is_available": entity["is_available"],
+    }
 
 
 @router.post("/{entity_id}/availability")
@@ -70,7 +76,11 @@ async def set_entity_availability(
     request: Request,
     body: AvailabilityRequest,
 ) -> dict[str, Any]:
-    """Set the availability status of an entity.
+    """Set the availability status of an entity, either way.
+
+    The id's own class is resolved first (as ``DELETE /entities/{id}``
+    does), then ``MosaicClient.set_availability_bulk`` records the change
+    and its reason in provenance.
 
     Args:
         entity_id: The ID of the entity.
@@ -84,19 +94,23 @@ async def set_entity_availability(
         HTTPException: If entity not found.
     """
     client = await get_client(request)
+    entity_type = resolve_entity_type_or_404(client, entity_id)
 
-    try:
-        entity = client.get(entity_type="entity", entity_id=entity_id)
-
-        if not body.is_available:
-            client.delete(entity_type="entity", entity_id=entity_id)
-
-        return {
-            "entity_id": entity_id,
-            "is_available": body.is_available,
-        }
-    except EntityNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    result = client.set_availability_bulk(
+        entity_type=entity_type,
+        entity_ids=[entity_id],
+        is_available=body.is_available,
+        reason=body.reason,
+    )
+    if result["failed"]:
+        failure = result["failures"][0]
+        status = 404 if failure.get("code") == "NOT_FOUND" else 500
+        raise HTTPException(status_code=status, detail=failure.get("error"))
+    return {
+        "entity_id": entity_id,
+        "entity_type": entity_type,
+        "is_available": body.is_available,
+    }
 
 
 @router.post("/{entity_type}/bulk-availability")

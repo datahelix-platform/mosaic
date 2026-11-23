@@ -202,6 +202,20 @@ class AvailabilityResult:
 class BulkAvailabilityFailure:
     entity_id: strawberry.ID
     error: str
+    code: Optional[str] = strawberry.field(
+        default=None,
+        description=(
+            "Machine-readable failure code: `NOT_FOUND` for an unknown id or "
+            "an id of another type (#289); null for other failures."
+        ),
+    )
+    actual_entity_type: Optional[str] = strawberry.field(
+        default=None,
+        description=(
+            "Set when the id exists but is of another type: the type it is. "
+            "The stable way to tell a wrong-type id from an unknown one."
+        ),
+    )
 
 
 @strawberry.type(
@@ -1717,6 +1731,8 @@ def _make_bulk_availability_resolver(entity: EntityGraphQLInfo):
                 BulkAvailabilityFailure(
                     entity_id=item["id"],
                     error=item.get("error", "availability change failed"),
+                    code=item.get("code"),
+                    actual_entity_type=item.get("actual_entity_type"),
                 )
                 for item in result["failures"]
             ],

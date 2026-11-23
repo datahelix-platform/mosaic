@@ -20,7 +20,22 @@
   The message names both kinds, and `extensions` carry `entity_type` and
   `actual_entity_type`. A bulk call reports the id under `failures`. A
   supersede's `replacementId` may still be of any kind. Update and replace
-  keep their exact-type rule (`ENTITY_TYPE_CONFLICT`).
+  keep their exact-type rule (`ENTITY_TYPE_CONFLICT`). GraphQL's
+  `BulkAvailabilityFailure` gains optional `code` and `actualEntityType`
+  fields, and every bulk failure for an unknown or wrong-kind id carries
+  `code: "NOT_FOUND"` (SDK and REST included). `delete` checks the kind
+  before running validators, then validates as the stored row's class.
+  **`delete` with a misspelled or unknown kind is now refused**
+  (`EntityKindMismatchError`); before, the kind argument was ignored and the
+  row was deleted anyway.
+- **REST `GET`/`POST /entities/{id}/availability` and the
+  `/entities/{id}/relationships` routes always answered 404** (found in the
+  #289 review). They looked the id up under a placeholder type `"entity"`,
+  which no row has. They now resolve the id's own class first, as
+  `DELETE /entities/{id}` does. `POST …/availability` now sets availability
+  in either direction through the SDK, with an optional `reason`, and
+  records it in provenance. Both availability routes return `entity_type`,
+  and `GET` reports the real `is_available` instead of always `true`.
 - **`supersede_entity` failed on Postgres** (found while testing #289). The
   Postgres adapter lacked the `_set_per_class_superseded_by` helper that the
   atomic supersede path calls, so every entity supersession raised
