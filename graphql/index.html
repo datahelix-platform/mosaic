@@ -2084,12 +2084,27 @@ transitions:</p>
 <a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="k">mutation</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">  </span><span class="n">setSampleAvailabilityBulk</span><span class="p">(</span><span class="n">ids</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s">"…"</span><span class="p">,</span><span class="w"> </span><span class="s">"…"</span><span class="p">],</span><span class="w"> </span><span class="n">isAvailable</span><span class="p">:</span><span class="w"> </span><span class="nb">false</span><span class="p">,</span><span class="w"> </span><span class="n">reason</span><span class="p">:</span><span class="w"> </span><span class="s">"audit"</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">    </span><span class="n">total</span><span class="w"> </span><span class="n">succeeded</span><span class="w"> </span><span class="n">failed</span>
-<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="w">    </span><span class="n">failures</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">entityId</span><span class="w"> </span><span class="n">error</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="w">    </span><span class="n">failures</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">entityId</span><span class="w"> </span><span class="n">error</span><span class="w"> </span><span class="n">code</span><span class="w"> </span><span class="n">actualEntityType</span><span class="w"> </span><span class="p">}</span>
 <a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="w">  </span><span class="p">}</span>
 <a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="p">}</span>
 </code></pre></div>
 <p>The bulk form mirrors the REST bulk-availability endpoint: per-record error
 isolation — one bad id never rolls back its siblings.</p>
+<p>Each lifecycle mutation acts only on its own type's rows. <code>setSampleAvailability</code>,
+<code>setSampleAvailabilityBulk</code> and <code>supersedeSample</code> accept a <code>Sample</code> id or the
+id of a concrete subclass of <code>Sample</code> (the rows <code>samples</code> lists, ADR-0014). An
+id of any other type is refused with <code>NOT_FOUND</code>, the same code as an unknown
+id, and nothing changes. The message names both types, and the error's
+<code>extensions</code> carry <code>entity_type</code> (the mutation's type) and
+<code>actual_entity_type</code> (the id's). In the bulk form that id is reported in
+<code>failures</code> with <code>code: "NOT_FOUND"</code> and <code>actualEntityType</code> set; an unknown id
+also has <code>code: "NOT_FOUND"</code>, with <code>actualEntityType</code> null. Use
+<code>actual_entity_type</code> / <code>actualEntityType</code> to tell a wrong-type id from an
+unknown one, not the message text. Mosaic has no per-record authorization, so
+naming the id's type reveals nothing a caller couldn't already read. <code>supersede…</code>'s <code>replacementId</code> may be of any type, so a
+misclassified record can be replaced by a corrected one of the right type.
+<code>update…</code> stays exact-type: an id of another type is <code>NOT_FOUND</code>, and a
+subclass's id through its parent's <code>update…</code> is <code>ENTITY_TYPE_CONFLICT</code>.</p>
 <p>Supersession works the same way as in the SDK, with a read-side query for the
 chain:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="k">mutation</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">supersedeSample</span><span class="p">(</span><span class="n">id</span><span class="p">:</span><span class="w"> </span><span class="s">"old"</span><span class="p">,</span><span class="w"> </span><span class="n">replacementId</span><span class="p">:</span><span class="w"> </span><span class="s">"new"</span><span class="p">,</span><span class="w"> </span><span class="n">reason</span><span class="p">:</span><span class="w"> </span><span class="s">"remeasured"</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">entityId</span><span class="w"> </span><span class="n">supersededBy</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">}</span>
@@ -2159,7 +2174,8 @@ useful for generic clients that need the LinkML classification:</p>
 <h2 id="errors">Errors<a class="headerlink" href="#errors" title="Permanent link">&para;</a></h2>
 <p>SDK errors surface as structured GraphQL errors with a machine-readable
 <code>extensions.code</code>: <code>VALIDATION_FAILED</code> (with the tier-tagged failure envelope
-when available), <code>NOT_FOUND</code>, <code>ALREADY_SUPERSEDED</code>,
+when available), <code>NOT_FOUND</code> (also for an id of another type given to a
+type's lifecycle mutation), <code>ALREADY_SUPERSEDED</code>, <code>ENTITY_TYPE_CONFLICT</code>,
 <code>AVAILABILITY_CHANGE_FAILED</code>, or <code>INTERNAL_ERROR</code>.</p>
 <h2 id="hardening">Hardening<a class="headerlink" href="#hardening" title="Permanent link">&para;</a></h2>
 <p>Queries nesting deeper than the configured depth limit (default 10) are
