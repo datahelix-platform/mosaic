@@ -2,10 +2,24 @@
 
 ## [Unreleased]
 
+## v0.16.1 — 2026-11-23 (lifecycle mutations reject another kind's id; REST availability routes fixed, relationship stubs answer 501; supersede on Postgres)
+
+**Patch release.** Nothing in it breaks a correct client. Three behaviour
+changes are worth checking:
+
+- an availability, supersede or delete call given another kind's id, or (for
+  `delete`) a misspelled kind, is now refused with `EntityKindMismatchError`
+  (an `EntityNotFoundError`; GraphQL `NOT_FOUND`) where it used to report
+  success (#289);
+- `set<Parent>Availability` on a concrete subclass's id now changes that
+  row, where it used to change nothing;
+- the REST `/entities/{id}/relationships` stubs answer 501 instead of a fake
+  200 (#291).
+
 ### Fixed
 
 - **A kind's lifecycle mutation given another kind's id acted on the wrong
-  record** (#289). Before the fix, `setBloodAvailability(id: <a Brain id>)`
+  record** (#289, #290). Before the fix, `setBloodAvailability(id: <a Brain id>)`
   reported success and changed nothing, and `supersedeBlood(id: <a Brain id>)`
   superseded the Brain. The SDK now checks the id's stored kind for
   `set_availability_bulk`, `supersede_entity` (new `entity_type=` argument,
@@ -29,20 +43,19 @@
   (`EntityKindMismatchError`); before, the kind argument was ignored and the
   row was deleted anyway.
 - **REST `GET`/`POST /entities/{id}/availability` always answered 404**
-  (found in the #289 review). They looked the id up under a placeholder type
+  (#290, found in the #289 review). They looked the id up under a placeholder type
   `"entity"`, which no row has. They now resolve the id's own class first, as
   `DELETE /entities/{id}` does. `POST …/availability` now sets availability
   in either direction through the SDK, with an optional `reason`, and
   records it in provenance. Both routes return `entity_type`, and `GET`
   reports the real `is_available` instead of always `true`.
-
-- **`supersede_entity` failed on Postgres** (found while testing #289). The
+- **`supersede_entity` failed on Postgres** (#290, found while testing #289). The
   Postgres adapter lacked the `_set_per_class_superseded_by` helper that the
   atomic supersede path calls, so every entity supersession raised
   `AttributeError`. The helper is now added, and the #289 cases run on both
   adapters.
 - **TUI command palette: picking an entity type or a command does nothing**
-  (#285). The app's handlers were still named `on_hippo_command_palette_*`
+  (#285, #288). The app's handlers were still named `on_hippo_command_palette_*`
   after ADR-0004 renamed the palette to `MosaicCommandPalette`, so Textual
   never dispatched to them. They are now bound with `@on(...)` so a class
   rename can't unbind them again, and Textual pilot tests cover both paths.
@@ -50,7 +63,7 @@
 ### Changed
 
 - **REST `/entities/{id}/relationships` routes answer 501 Not Implemented**
-  (#290 review, #291). `GET`, `POST` and `DELETE …/relationships/{rel_id}`
+  (#290, #291). `GET`, `POST` and `DELETE …/relationships/{rel_id}`
   were stubs: `GET` returned `[]`, `POST` returned 200 with a made-up id
   and stored nothing, and `DELETE` reported `deleted` without checking
   anything. `GET` and `POST` were unreachable before, because they 404'd on
@@ -61,6 +74,14 @@
   `MosaicClient.update` and read with `MosaicClient.get` or GraphQL
   reference fields. #291 tracks implementing the routes through the SDK or
   removing them.
+
+### Decisions
+
+- **ADR-0014, note of 2026-11-23** (#289, #290): availability, supersede
+  and delete addressed to a kind accept that kind's concrete closure (its own
+  rows and its concrete subclasses' rows), mirroring by-id reads (D3).
+  Supersede's replacement may be of any kind. Update and replace stay
+  exact-type.
 
 ## v0.16.0 — 2026-11-20 (BREAKING: the `hippo` data-contract identifiers retired (platform ADR-0007), families' raw-id fallback dropped; families as GraphQL interfaces, concrete-parent closure, reverse edges over multivalued and forward-declared `inverse`, traversal `columns`)
 
