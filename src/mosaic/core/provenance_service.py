@@ -8,6 +8,7 @@ from mosaic.core.exceptions import (
     EntityAlreadySupersededError,
     EntityNotFoundError,
 )
+from mosaic.core.kind_check import check_kind
 from mosaic.core.storage import Query
 from mosaic.core.storage.adapters.sqlite_adapter import SQLiteAdapter, SQLiteEntity
 
@@ -237,11 +238,14 @@ class ProvenanceService:
         replacement_id: str,
         reason: Optional[str] = None,
         actor: Optional[str] = None,
+        entity_type: Optional[str] = None,
     ) -> dict[str, Any]:
         """Mark an entity as superseded by a replacement entity.
 
         Atomic operation: marks source unavailable, writes provenance events,
-        creates superseded_by relationship edge.
+        creates superseded_by relationship edge. With ``entity_type`` the
+        source must be of that kind or a concrete subclass (#289);
+        ``replacement_id`` only has to exist.
         """
         if self._storage is None:
             raise EntityNotFoundError(
@@ -258,6 +262,8 @@ class ProvenanceService:
                 entity_type="unknown",
                 entity_id=entity_id,
             )
+        if entity_type is not None:
+            check_kind(self._storage, entity_type, source_entity.entity_type, entity_id)
 
         replacement_entity = self._storage.read(replacement_id)
         if replacement_entity is None:

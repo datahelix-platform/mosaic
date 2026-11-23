@@ -161,6 +161,35 @@ class EntityNotFoundError(MosaicError):
         super().__init__(message, **context)
 
 
+class EntityKindMismatchError(EntityNotFoundError):
+    """A kind-specific write was given the id of an entity of another kind.
+
+    ``set_availability_bulk("Blood", ["br1"])``, ``supersede_entity("br1",
+    ..., entity_type="Blood")`` and ``delete("Blood", "br1")`` on a ``Brain``
+    id (#289). The id exists, but not as the requested kind, so the write is
+    refused before anything changes. A row of a concrete subclass is accepted
+    for its parent's lifecycle writes (the parent's concrete closure,
+    ADR-0014 Decision 1 and its 2026-11-23 note); a parent's, sibling's or
+    unrelated class's row is not.
+
+    A subclass of :class:`EntityNotFoundError`: the id is not found *as that
+    kind*, so callers that handle not-found (REST 404, GraphQL ``NOT_FOUND``)
+    keep working, and ``actual_entity_type`` says what the id is.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        entity_type: Optional[str] = None,
+        entity_id: Optional[str] = None,
+        actual_entity_type: Optional[str] = None,
+        **context: Any,
+    ):
+        self.actual_entity_type = actual_entity_type
+        context["actual_entity_type"] = actual_entity_type
+        super().__init__(message, entity_type=entity_type, entity_id=entity_id, **context)
+
+
 class EntityTypeConflictError(MosaicError):
     """Raised when a write targets an ``id`` already registered under a
     different concrete class.

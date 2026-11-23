@@ -315,3 +315,20 @@ parent:
   4. *Accessor collisions:* **accepted for now.** A colliding family accessor is not generated
      and the build warns; before 1.0 the warning becomes a build error (tracked in
      [#280](https://github.com/datahelix-platform/mosaic/issues/280), under the 1.0 API freeze, #104).
+- **Amended 2026-11-23 (labadorf, [#289](https://github.com/datahelix-platform/mosaic/issues/289)):
+  lifecycle writes through a kind are closure-checked.** Decision 6 says only that writes are
+  unchanged for families, and nothing covers a lifecycle write addressed to a kind that is given
+  another kind's id. Before this, `setBloodAvailability(id: <Brain id>)` reported success and
+  changed nothing, and `supersedeBlood(id: <Brain id>)` superseded the Brain. The rule now
+  follows D3. **Availability (single and bulk), supersede and delete** addressed to class `K`
+  accept an id in `concrete_class_closure(K)`, which is `K`'s own rows plus its concrete
+  subclasses' rows: `setProcessAvailability(id: <BankBrain id>)` acts on the `BankBrain` row,
+  in its own class. A parent's, sibling's or unrelated class's id is refused before anything
+  changes, with `EntityKindMismatchError`. That error is a subclass of `EntityNotFoundError`, so
+  GraphQL reports `NOT_FOUND`, and the message names both classes. The check is in the SDK
+  (`set_availability_bulk`, `supersede_entity(..., entity_type=K)`, `delete`), so every
+  transport gets it. **`supersede`'s `replacement_id` only has to exist, and may be of any
+  kind**, so a misclassified record can be superseded by a corrected record of another kind.
+  **Update and replace keep their exact-type rule** (`EntityTypeConflictError`, GraphQL
+  `ENTITY_TYPE_CONFLICT`): a subclass row cannot be updated through its parent's
+  `update…`, because the payload has only the parent's slots.

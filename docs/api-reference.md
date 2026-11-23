@@ -713,79 +713,22 @@ Get the change history/provenance log for an entity.
 
 ### Relationships
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/entities/{entity_id}/relationships` | List entity relationships |
-| POST | `/entities/{entity_id}/relationships` | Create a relationship |
-| DELETE | `/entities/{entity_id}/relationships/{rel_id}` | Delete a relationship |
+| Method | Path | Status |
+|--------|------|--------|
+| GET | `/entities/{entity_id}/relationships` | 501 Not Implemented |
+| POST | `/entities/{entity_id}/relationships` | 501 Not Implemented |
+| DELETE | `/entities/{entity_id}/relationships/{rel_id}` | 501 Not Implemented |
 
-**GET /entities/{entity_id}/relationships**
+These routes were stubs that stored and read nothing. They answer **501 Not
+Implemented** until they are implemented through the SDK or removed
+([#291](https://github.com/datahelix-platform/mosaic/issues/291)). Use one of
+these instead:
 
-Get all relationships for an entity.
-
-*Path Parameters:*
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `entity_id` | string | Entity ID |
-
-*Response:* Array of relationship objects
-
-*Error Codes:* `404` - Entity not found
-
-**POST /entities/{entity_id}/relationships**
-
-Create a relationship between two entities.
-
-*Path Parameters:*
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `entity_id` | string | Source entity ID |
-
-*Request Body:*
-```json
-{
-  "target_entity_id": "entity-456",
-  "relationship_type": "contains"
-}
-```
-
-*Response:*
-```json
-{
-  "data": {
-    "id": "entity-123->entity-456:contains",
-    "source_entity_id": "entity-123",
-    "target_entity_id": "entity-456",
-    "relationship_type": "contains"
-  },
-  "error": null,
-  "meta": { "schema_version": "1.1", "request_id": "uuid" }
-}
-```
-
-*Error Codes:* `404` - Source or target entity not found
-
-**DELETE /entities/{entity_id}/relationships/{rel_id}**
-
-Delete a relationship by its ID.
-
-*Path Parameters:*
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `entity_id` | string | Source entity ID |
-| `rel_id` | string | Relationship ID (e.g. `entity-123->entity-456:contains`) |
-
-*Response:*
-```json
-{
-  "data": {
-    "status": "deleted",
-    "relationship_id": "entity-123->entity-456:contains"
-  },
-  "error": null,
-  "meta": { "schema_version": "1.1", "request_id": "uuid" }
-}
-```
+- the SDK's `client.relationships` (`relate`, `unrelate`,
+  `find_relationships`, `traverse`; see [RelationshipManager](#relationshipmanager));
+- reference slots: write them with `PUT /entities/{entity_type}/{entity_id}`,
+  GraphQL `update<Type>` or `MosaicClient.update`, and read them with
+  `MosaicClient.get` or GraphQL reference fields.
 
 ---
 
@@ -1032,6 +975,7 @@ Get the availability status of an entity.
 {
   "data": {
     "entity_id": "entity-123",
+    "entity_type": "Sample",
     "is_available": true
   },
   "error": null,
@@ -1043,7 +987,8 @@ Get the availability status of an entity.
 
 **POST /entities/{entity_id}/availability**
 
-Set the availability status of an entity.
+Set the availability status of an entity, either way, as its own type. The
+change and its reason are recorded as an `availability_change` provenance entry.
 
 *Path Parameters:*
 | Parameter | Type | Description |
@@ -1053,15 +998,19 @@ Set the availability status of an entity.
 *Request Body:*
 ```json
 {
-  "is_available": false
+  "is_available": false,
+  "reason": "depleted"
 }
 ```
+
+`reason` is optional.
 
 *Response:*
 ```json
 {
   "data": {
     "entity_id": "entity-123",
+    "entity_type": "Sample",
     "is_available": false
   },
   "error": null,
