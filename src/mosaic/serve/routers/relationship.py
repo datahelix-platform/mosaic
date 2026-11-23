@@ -1,34 +1,34 @@
 """Relationship router for Mosaic API.
 
-Provides endpoints for managing entity relationships.
+The ``/entities/{id}/relationships`` routes were stubs that stored and read
+nothing; they answer 501 Not Implemented until they are implemented through
+the SDK or removed (mosaic#291).
 """
 
 from typing import Any
 
-from fastapi import APIRouter, Body, HTTPException, Request, Path
+from fastapi import APIRouter, HTTPException, Path
 from pydantic import BaseModel
-
-from mosaic.api.exceptions import EntityNotFoundError
-from mosaic.core.client import MosaicClient
-from mosaic.serve.routers.base import resolve_entity_type_or_404
 
 router = APIRouter(prefix="/entities", tags=["relationships"])
 
 
-async def get_client(request: Request) -> MosaicClient:
-    """Get the MosaicClient from request state."""
-    if hasattr(request.app.state, "mosaic_client"):
-        return request.app.state.mosaic_client
-    return MosaicClient()
+_NOT_IMPLEMENTED = (
+    "REST relationship routes are not implemented (mosaic#291). Use the SDK's "
+    "MosaicClient.relationships (relate, unrelate, find_relationships), or "
+    "write reference slots with PUT /entities/{entity_type}/{entity_id}, "
+    "GraphQL update<Type> or MosaicClient.update, and read them with "
+    "MosaicClient.get or GraphQL reference fields."
+)
 
 
-def _require_entity(client: MosaicClient, entity_id: str) -> None:
-    """404 unless ``entity_id`` is an available entity, read as its own class."""
-    entity_type = resolve_entity_type_or_404(client, entity_id)
-    try:
-        client.get(entity_type=entity_type, entity_id=entity_id)
-    except EntityNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+def _not_implemented() -> HTTPException:
+    """501 for the stub relationship routes (#290 review, #291).
+
+    They stored and read nothing: answering 200 would be a silent success,
+    the class of bug #289 fixes.
+    """
+    return HTTPException(status_code=501, detail=_NOT_IMPLEMENTED)
 
 
 class RelationshipRequest(BaseModel):
@@ -38,78 +38,24 @@ class RelationshipRequest(BaseModel):
     relationship_type: str
 
 
-@router.get("/{entity_id}/relationships")
-async def get_entity_relationships(
-    entity_id: str,
-    request: Request,
-) -> list[dict[str, Any]]:
-    """Get all relationships for an entity.
-
-    Args:
-        entity_id: The ID of the entity.
-        request: FastAPI request object.
-
-    Returns:
-        List of relationships.
-
-    Raises:
-        HTTPException: If entity not found.
-    """
-    client = await get_client(request)
-
-    _require_entity(client, entity_id)
-
-    return []
+@router.get("/{entity_id}/relationships", status_code=501)
+async def get_entity_relationships(entity_id: str) -> dict[str, Any]:
+    """Not implemented: 501 (mosaic#291). See ``_NOT_IMPLEMENTED``."""
+    raise _not_implemented()
 
 
-@router.post("/{entity_id}/relationships")
+@router.post("/{entity_id}/relationships", status_code=501)
 async def create_relationship(
-    entity_id: str,
-    request: Request,
-    body: RelationshipRequest,
+    entity_id: str, body: RelationshipRequest
 ) -> dict[str, Any]:
-    """Create a relationship between entities.
-
-    Args:
-        entity_id: The ID of the source entity.
-        request: FastAPI request object.
-        body: Relationship request with target and type.
-
-    Returns:
-        Created relationship.
-
-    Raises:
-        HTTPException: If entity not found.
-    """
-    client = await get_client(request)
-
-    _require_entity(client, entity_id)
-    _require_entity(client, body.target_entity_id)
-
-    rel_id = f"{entity_id}->{body.target_entity_id}:{body.relationship_type}"
-
-    return {
-        "id": rel_id,
-        "source_entity_id": entity_id,
-        "target_entity_id": body.target_entity_id,
-        "relationship_type": body.relationship_type,
-    }
+    """Not implemented: 501 (mosaic#291). See ``_NOT_IMPLEMENTED``."""
+    raise _not_implemented()
 
 
-@router.delete("/{entity_id}/relationships/{rel_id}")
+@router.delete("/{entity_id}/relationships/{rel_id}", status_code=501)
 async def delete_relationship(
     entity_id: str,
     rel_id: str = Path(..., description="Relationship ID"),
-    request: Request = None,
 ) -> dict[str, Any]:
-    """Delete a relationship.
-
-    Args:
-        entity_id: The ID of the source entity.
-        rel_id: The ID of the relationship to delete.
-        request: FastAPI request object.
-
-    Returns:
-        Deletion confirmation.
-    """
-    return {"status": "deleted", "relationship_id": rel_id}
+    """Not implemented: 501 (mosaic#291). See ``_NOT_IMPLEMENTED``."""
+    raise _not_implemented()

@@ -28,14 +28,14 @@
   **`delete` with a misspelled or unknown kind is now refused**
   (`EntityKindMismatchError`); before, the kind argument was ignored and the
   row was deleted anyway.
-- **REST `GET`/`POST /entities/{id}/availability` and the
-  `/entities/{id}/relationships` routes always answered 404** (found in the
-  #289 review). They looked the id up under a placeholder type `"entity"`,
-  which no row has. They now resolve the id's own class first, as
+- **REST `GET`/`POST /entities/{id}/availability` always answered 404**
+  (found in the #289 review). They looked the id up under a placeholder type
+  `"entity"`, which no row has. They now resolve the id's own class first, as
   `DELETE /entities/{id}` does. `POST …/availability` now sets availability
   in either direction through the SDK, with an optional `reason`, and
-  records it in provenance. Both availability routes return `entity_type`,
-  and `GET` reports the real `is_available` instead of always `true`.
+  records it in provenance. Both routes return `entity_type`, and `GET`
+  reports the real `is_available` instead of always `true`.
+
 - **`supersede_entity` failed on Postgres** (found while testing #289). The
   Postgres adapter lacked the `_set_per_class_superseded_by` helper that the
   atomic supersede path calls, so every entity supersession raised
@@ -46,6 +46,21 @@
   after ADR-0004 renamed the palette to `MosaicCommandPalette`, so Textual
   never dispatched to them. They are now bound with `@on(...)` so a class
   rename can't unbind them again, and Textual pilot tests cover both paths.
+
+### Changed
+
+- **REST `/entities/{id}/relationships` routes answer 501 Not Implemented**
+  (#290 review, #291). `GET`, `POST` and `DELETE …/relationships/{rel_id}`
+  were stubs: `GET` returned `[]`, `POST` returned 200 with a made-up id
+  and stored nothing, and `DELETE` reported `deleted` without checking
+  anything. `GET` and `POST` were unreachable before, because they 404'd on
+  the same `"entity"` lookup. They now answer 501, and the message points to
+  the supported paths: the SDK's `MosaicClient.relationships` (`relate`,
+  `unrelate`, `find_relationships`), or reference slots, written with
+  `PUT /entities/{type}/{id}`, GraphQL `update<Type>` or
+  `MosaicClient.update` and read with `MosaicClient.get` or GraphQL
+  reference fields. #291 tracks implementing the routes through the SDK or
+  removing them.
 
 ## v0.16.0 — 2026-11-20 (BREAKING: the `hippo` data-contract identifiers retired (platform ADR-0007), families' raw-id fallback dropped; families as GraphQL interfaces, concrete-parent closure, reverse edges over multivalued and forward-declared `inverse`, traversal `columns`)
 

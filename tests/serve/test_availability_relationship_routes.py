@@ -1,10 +1,9 @@
-"""REST routes addressed by id alone resolve the id's own class (#289 review).
+"""REST routes addressed by id alone (#289 review).
 
-``GET``/``POST /entities/{id}/availability`` and the
-``/entities/{id}/relationships`` routes used to look the id up as the
+``GET``/``POST /entities/{id}/availability`` used to look the id up as the
 placeholder type ``"entity"``, which no row has, so they always answered
 404. They now resolve the stored class first, as ``DELETE /entities/{id}``
-does.
+does. The ``/entities/{id}/relationships`` stubs answer 501 (#291).
 """
 
 import os
@@ -80,27 +79,20 @@ def test_availability_unknown_id_is_404(api, method):
     assert resp.status_code == 404
 
 
-def test_relationship_routes_on_real_entities(api):
-    resp = api.get("/entities/s1/relationships")
-    assert resp.status_code == 200, resp.text
-    assert _body(resp) == []
-    resp = api.post(
-        "/entities/s1/relationships",
-        json={"target_entity_id": "s2", "relationship_type": "related_to"},
-    )
-    assert resp.status_code == 200, resp.text
-    assert _body(resp)["target_entity_id"] == "s2"
-
-
-def test_relationship_routes_unknown_ids_are_404(api):
-    assert api.get("/entities/no-such-id/relationships").status_code == 404
-    resp = api.post(
-        "/entities/s1/relationships",
-        json={"target_entity_id": "no-such-id", "relationship_type": "related_to"},
-    )
-    assert resp.status_code == 404
-    resp = api.post(
-        "/entities/no-such-id/relationships",
-        json={"target_entity_id": "s2", "relationship_type": "related_to"},
-    )
-    assert resp.status_code == 404
+@pytest.mark.parametrize("entity_id", ["s1", "no-such-id"])
+def test_relationship_routes_are_not_implemented(api, entity_id):
+    """The stub routes stored and read nothing; they answer 501, pointing at
+    the supported path, rather than a silent 200 (#290 review, #291)."""
+    responses = [
+        api.get(f"/entities/{entity_id}/relationships"),
+        api.post(
+            f"/entities/{entity_id}/relationships",
+            json={"target_entity_id": "s2", "relationship_type": "related_to"},
+        ),
+        api.delete(f"/entities/{entity_id}/relationships/s1->s2:related_to"),
+    ]
+    for resp in responses:
+        assert resp.status_code == 501, (resp.request.method, resp.text)
+        assert "not implemented" in resp.text
+        assert "MosaicClient.relationships" in resp.text
+        assert "#291" in resp.text
