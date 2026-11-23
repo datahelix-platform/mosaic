@@ -29,6 +29,7 @@ from mosaic.core.converse_query_spec import EXON_URL_ENV, run_converse_turn
 from mosaic.core.converse_query_spec import exon_timeout as _exon_timeout
 from mosaic.core.exceptions import (
     EntityAlreadySupersededError,
+    EntityKindMismatchError,
     EntityNotFoundError,
     EntityTypeConflictError,
     ValidationError as MosaicValidationError,
@@ -741,6 +742,16 @@ def _as_graphql_error(exc: Exception) -> GraphQLError:
                 "entity_id": exc.entity_id,
                 "requested_entity_type": exc.requested_entity_type,
                 "existing_entity_type": exc.existing_entity_type,
+            },
+        )
+    if isinstance(exc, EntityKindMismatchError):
+        # #289: the id exists, as another kind. Same code as an unknown id.
+        return GraphQLError(
+            message,
+            extensions={
+                "code": "NOT_FOUND",
+                "entity_type": exc.entity_type,
+                "actual_entity_type": exc.actual_entity_type,
             },
         )
     if isinstance(exc, EntityNotFoundError):
@@ -1655,9 +1666,17 @@ def _make_availability_resolver(entity: EntityGraphQLInfo):
             reason=reason,
         )
         if result["failed"]:
-            error = result["failures"][0].get("error", "availability change failed")
-            code = "NOT_FOUND" if "not found" in error.lower() else "AVAILABILITY_CHANGE_FAILED"
-            raise GraphQLError(error, extensions={"code": code})
+            failure = result["failures"][0]
+            error = failure.get("error", "availability change failed")
+            code = failure.get("code") or (
+                "NOT_FOUND" if "not found" in error.lower() else "AVAILABILITY_CHANGE_FAILED"
+            )
+            extensions: dict[str, Any] = {"code": code}
+            if failure.get("actual_entity_type"):
+                # #289: the id is another kind's row.
+                extensions["entity_type"] = class_name
+                extensions["actual_entity_type"] = failure["actual_entity_type"]
+            raise GraphQLError(error, extensions=extensions)
         return AvailabilityResult(entity_id=id, is_available=is_available)
 
     resolver.__name__ = f"set_{entity.singular_name}_availability"
@@ -1725,7 +1744,8 @@ def _make_supersede_resolver(entity: EntityGraphQLInfo):
     ) -> SupersedeResult:
         try:
             _client(info).supersede_entity(
-                str(id), str(replacement_id), reason=reason
+                str(id), str(replacement_id), reason=reason,
+                entity_type=class_name,
             )
         except (EntityNotFoundError, EntityAlreadySupersededError) as exc:
             raise _as_graphql_error(exc) from exc

@@ -2404,13 +2404,40 @@ class PostgresAdapter(EntityStore):
 
         Provenance is the caller's responsibility, matching SQLite.
         """
-        del entity_type  # storage is generic; kept for interface parity.
         with self._transaction() as conn:
-            cur = conn.cursor()
-            cur.execute(
-                "UPDATE entities "
-                "SET is_available = FALSE, superseded_by = %s WHERE id = %s",
+            self._set_per_class_superseded_by(
+                conn.cursor(), entity_type, entity_id, replacement_id,
+                is_available=False,
+            )
+
+    def _set_per_class_superseded_by(
+        self,
+        cursor: Any,
+        entity_type: str,
+        entity_id: str,
+        replacement_id: Optional[str],
+        is_available: Optional[bool] = None,
+    ) -> None:
+        """Record a supersession pointer inside a caller-owned transaction.
+
+        Postgres mirror of the SQLite helper that
+        ``ProvenanceService.supersede_entity`` calls so the state change, its
+        provenance and the ``superseded_by`` edge commit together (sec9
+        §9.6). Rows live in the generic ``entities`` table, so
+        ``entity_type`` is kept only for interface parity. Missing before
+        #289, which left entity supersession failing on Postgres.
+        """
+        del entity_type
+        if is_available is None:
+            cursor.execute(
+                "UPDATE entities SET superseded_by = %s WHERE id = %s",
                 (replacement_id, entity_id),
+            )
+        else:
+            cursor.execute(
+                "UPDATE entities SET superseded_by = %s, is_available = %s "
+                "WHERE id = %s",
+                (replacement_id, is_available, entity_id),
             )
 
     def read(self, entity_id: str) -> Optional[PostgresEntity]:

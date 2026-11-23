@@ -4,6 +4,28 @@
 
 ### Fixed
 
+- **A kind's lifecycle mutation given another kind's id acted on the wrong
+  record** (#289). Before the fix, `setBloodAvailability(id: <a Brain id>)`
+  reported success and changed nothing, and `supersedeBlood(id: <a Brain id>)`
+  superseded the Brain. The SDK now checks the id's stored kind for
+  `set_availability_bulk`, `supersede_entity` (new `entity_type=` argument,
+  which GraphQL passes) and `delete`, so GraphQL's
+  `set<Kind>Availability`, `set<Kind>AvailabilityBulk` and `supersede<Kind>`,
+  REST's bulk-availability and delete routes, and SDK callers all refuse it.
+  An id of the kind itself or of one of its concrete subclasses is accepted, as
+  for by-id reads (ADR-0014, note of 2026-11-23): `setProcessAvailability` on
+  a `BankBrain` id now changes that row, where it used to change nothing.
+  Any other id raises the new `EntityKindMismatchError`, a subclass of
+  `EntityNotFoundError`, so GraphQL answers `NOT_FOUND` as for an unknown id.
+  The message names both kinds, and `extensions` carry `entity_type` and
+  `actual_entity_type`. A bulk call reports the id under `failures`. A
+  supersede's `replacementId` may still be of any kind. Update and replace
+  keep their exact-type rule (`ENTITY_TYPE_CONFLICT`).
+- **`supersede_entity` failed on Postgres** (found while testing #289). The
+  Postgres adapter lacked the `_set_per_class_superseded_by` helper that the
+  atomic supersede path calls, so every entity supersession raised
+  `AttributeError`. The helper is now added, and the #289 cases run on both
+  adapters.
 - **TUI command palette: picking an entity type or a command does nothing**
   (#285). The app's handlers were still named `on_hippo_command_palette_*`
   after ADR-0004 renamed the palette to `MosaicCommandPalette`, so Textual

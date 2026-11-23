@@ -21,6 +21,7 @@ from tests.support.closure_fixture import (
     run_graphql,
     seed,
 )
+from tests.support.kind_check_cases import KindCheckGraphQLCases
 
 
 @pytest.fixture
@@ -43,6 +44,10 @@ def gql(client):
 
 class TestSQLiteGraphQLClosureResolution(ClosureGraphQLCases):
     pass
+
+
+class TestSQLiteGraphQLKindCheckedWrites(KindCheckGraphQLCases):
+    """#289: per-type lifecycle mutations reject another kind's id."""
 
 
 class TestUnexposedSubclassConsistency:

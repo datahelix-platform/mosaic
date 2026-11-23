@@ -300,11 +300,23 @@ client.supersede_entity(
 )
 ```
 
+Pass `entity_type` to check the old entity's type first, as GraphQL's
+`supersede<Type>` does: the old entity must be of that type or one of its
+concrete subclasses, and `replacement_id` may be of any type.
+
+```python
+client.supersede_entity("abc-123", "def-456", entity_type="Blood")
+```
+
 Both entities are retained — there are no hard deletes. The old entity remains queryable via `client.get()` (which returns superseded entities) and `client.history()`.
 
 ### Raises
 
 - `EntityNotFoundError` — if either `entity_id` or `replacement_id` does not exist
+- `EntityKindMismatchError` (an `EntityNotFoundError`) — if `entity_type` is
+  given and `entity_id` is of another type. `set_availability_bulk(entity_type, ids)`
+  reports such an id as a failure, and `delete(entity_type, id)` raises the
+  same error.
 - `EntityAlreadySupersededError` — if `entity_id` is already superseded
 
 ---

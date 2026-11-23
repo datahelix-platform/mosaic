@@ -15,6 +15,7 @@ import pytest
 from mosaic.core.client import MosaicClient
 from mosaic.core.storage.adapters.sqlite_adapter import SQLiteAdapter
 from tests.support.closure_fixture import ClosureSDKCases, build_closure_registry, seed
+from tests.support.kind_check_cases import KindCheckSDKCases
 
 
 @pytest.fixture
@@ -29,3 +30,7 @@ def client():
 
 class TestSQLiteClosureResolution(ClosureSDKCases):
     pass
+
+
+class TestSQLiteKindCheckedWrites(KindCheckSDKCases):
+    """#289: kind-specific lifecycle writes check the id's kind."""

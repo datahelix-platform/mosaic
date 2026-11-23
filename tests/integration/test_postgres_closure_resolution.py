@@ -23,6 +23,7 @@ from tests.support.closure_fixture import (
     run_graphql,
     seed,
 )
+from tests.support.kind_check_cases import KindCheckGraphQLCases, KindCheckSDKCases
 
 POSTGRES_URL = os.environ.get("MOSAIC_DATABASE_URL")
 
@@ -75,3 +76,11 @@ class TestPostgresClosureResolution(ClosureSDKCases):
 
 class TestPostgresGraphQLClosureResolution(ClosureGraphQLCases):
     pass
+
+
+class TestPostgresKindCheckedWrites(KindCheckSDKCases):
+    """#289 on Postgres: kind-specific lifecycle writes check the id's kind."""
+
+
+class TestPostgresGraphQLKindCheckedWrites(KindCheckGraphQLCases):
+    """#289 on Postgres: per-type lifecycle mutations reject another kind's id."""

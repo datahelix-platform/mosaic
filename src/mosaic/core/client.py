@@ -777,6 +777,11 @@ class MosaicClient:
                     entity_id=entity_id,
                 )
 
+        # #289: an id of another kind is refused (EntityKindMismatchError);
+        # a concrete subclass's row is deleted as its own class (ADR-0014).
+        entity_type = self._ingestion_service._checked_delete_type(
+            entity_type, entity_id
+        )
         return self._delete_internal(entity_type, entity_id)
 
     def set_availability_bulk(
@@ -790,7 +795,10 @@ class MosaicClient:
         """Change availability status for multiple entities at once.
 
         Returns a summary with per-entity successes and failures.
-        Records provenance events for each changed entity.
+        Records provenance events for each changed entity. Each id must be
+        an ``entity_type`` row or a row of one of its concrete subclasses
+        (ADR-0014); an id of another kind is reported as a failure and left
+        unchanged (#289).
         """
         return self._ingestion_service.set_availability_bulk(
             entity_type, entity_ids, is_available, reason, actor
@@ -1175,10 +1183,19 @@ class MosaicClient:
         replacement_id: str,
         reason: Optional[str] = None,
         actor: Optional[str] = None,
+        entity_type: Optional[str] = None,
     ) -> dict[str, Any]:
-        """Mark an entity as superseded by a replacement entity."""
+        """Mark an entity as superseded by a replacement entity.
+
+        With ``entity_type``, the source id must be a row of that class or
+        of one of its concrete subclasses (ADR-0014); another kind's id
+        raises :class:`~mosaic.core.exceptions.EntityKindMismatchError`
+        before anything changes (#289). ``replacement_id`` may be of any
+        kind, so a misclassified record can be superseded by a corrected
+        one. Without ``entity_type`` the source kind is not checked.
+        """
         return self._provenance_service.supersede_entity(
-            entity_id, replacement_id, reason, actor
+            entity_id, replacement_id, reason, actor, entity_type=entity_type
         )
 
     def get_by_external_id(

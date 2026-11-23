@@ -5,11 +5,13 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from mosaic.core.exceptions import (
+    EntityKindMismatchError,
     EntityNotFoundError,
     EntityTypeConflictError,
     ValidationFailure,
 )
 from mosaic.core.ingestion import extract_fts_content
+from mosaic.core.kind_check import check_kind
 from mosaic.core.schema_manager import SchemaManager
 from mosaic.core.storage.adapters.sqlite_adapter import SQLiteAdapter, SQLiteEntity
 from mosaic.core.validation.validators import WriteOperation
@@ -372,7 +374,20 @@ class IngestionService:
                     entity_id=entity_id,
                 )
 
+        entity_type = self._checked_delete_type(entity_type, entity_id)
         return self._delete_internal(entity_type, entity_id)
+
+    def _checked_delete_type(self, entity_type: str, entity_id: str) -> str:
+        """#289: refuse a delete addressed to another kind's id; return the
+        row's own class (a concrete subclass is accepted, ADR-0014)."""
+        if self._storage is None or not hasattr(self._storage, "read"):
+            return entity_type
+        read_fn = getattr(self._storage, "read_any", self._storage.read)
+        existing = read_fn(entity_id)
+        if existing is None:
+            return entity_type
+        check_kind(self._storage, entity_type, existing.entity_type, entity_id)
+        return existing.entity_type
 
     def set_availability_bulk(
         self,
@@ -406,19 +421,31 @@ class IngestionService:
                     failures.append({"id": eid, "error": f"Entity not found: {eid}"})
                     continue
 
+                # #289: the id must be of this kind or one of its concrete
+                # subclasses; the write then targets the row's own class.
+                check_kind(self._storage, entity_type, existing.entity_type, eid)
+                row_type = existing.entity_type
+
                 self._storage.set_availability(
                     entity_id=eid,
-                    entity_type=entity_type,
+                    entity_type=row_type,
                     is_available=is_available,
                     actor=actor,
                     reason=reason,
                 )
 
                 data = existing.data if existing else {}
-                self._sync_entity_to_fts(eid, entity_type, data, is_available=is_available)
+                self._sync_entity_to_fts(eid, row_type, data, is_available=is_available)
 
                 successes.append({"id": eid, "is_available": is_available})
 
+            except EntityKindMismatchError as e:
+                failures.append({
+                    "id": eid,
+                    "error": str(e),
+                    "code": "NOT_FOUND",
+                    "actual_entity_type": e.actual_entity_type,
+                })
             except Exception as e:
                 failures.append({"id": eid, "error": str(e)})
 

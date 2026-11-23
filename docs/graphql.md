@@ -271,6 +271,18 @@ mutation {
 The bulk form mirrors the REST bulk-availability endpoint: per-record error
 isolation — one bad id never rolls back its siblings.
 
+Each lifecycle mutation acts only on its own type's rows. `setSampleAvailability`,
+`setSampleAvailabilityBulk` and `supersedeSample` accept a `Sample` id or the
+id of a concrete subclass of `Sample` (the rows `samples` lists, ADR-0014). An
+id of any other type is refused with `NOT_FOUND`, the same code as an unknown
+id, and nothing changes. The message names both types, and the error's
+`extensions` carry `entity_type` (the mutation's type) and
+`actual_entity_type` (the id's). In the bulk form that id is reported in
+`failures`. `supersede…`'s `replacementId` may be of any type, so a
+misclassified record can be replaced by a corrected one of the right type.
+`update…` stays exact-type: an id of another type is `NOT_FOUND`, and a
+subclass's id through its parent's `update…` is `ENTITY_TYPE_CONFLICT`.
+
 Supersession works the same way as in the SDK, with a read-side query for the
 chain:
 
@@ -356,7 +368,8 @@ useful for generic clients that need the LinkML classification:
 
 SDK errors surface as structured GraphQL errors with a machine-readable
 `extensions.code`: `VALIDATION_FAILED` (with the tier-tagged failure envelope
-when available), `NOT_FOUND`, `ALREADY_SUPERSEDED`,
+when available), `NOT_FOUND` (also for an id of another type given to a
+type's lifecycle mutation), `ALREADY_SUPERSEDED`, `ENTITY_TYPE_CONFLICT`,
 `AVAILABILITY_CHANGE_FAILED`, or `INTERNAL_ERROR`.
 
 ## Hardening
