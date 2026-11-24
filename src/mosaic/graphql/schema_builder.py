@@ -290,9 +290,16 @@ def get_entity_loader(context: Any, class_name: str) -> DataLoader:
     """Per-request, per-entity-type DataLoader (batched relationship reads).
 
     A single GraphQL request resolving N relationship fields of the same
-    target type issues ONE ``client.query`` (OR-composed id filters; one
+    target type issues ONE ``client.query`` (one ``id in [...]`` filter; one
     storage round-trip + one batched temporal aggregation) instead of N
     ``client.get`` calls.
+
+    The batch is a single ``in`` filter, not one ``id = ?`` filter per key
+    joined by OR: SQLite parses an OR chain one tree level deeper per term,
+    and stock builds cap expression depth at 1000, so ~1000 targets of one
+    type in one request failed with "Expression tree is too large". ``in``
+    is one node however many ids it carries (SQLite ``IN (...)``, Postgres
+    ``= ANY(...)``), the form the query service already uses for id batches.
     """
     loaders = context.setdefault("entity_loaders", {})
     if class_name not in loaders:
@@ -301,8 +308,7 @@ def get_entity_loader(context: Any, class_name: str) -> DataLoader:
         async def load_fn(keys: list[str]) -> list[Optional[dict[str, Any]]]:
             paginated = client.query(
                 entity_type=class_name,
-                filters=[{"field": "id", "value": key} for key in keys],
-                filter_mode="or",
+                filters=[{"field": "id", "op": "in", "value": list(keys)}],
             )
             by_id = {item["id"]: item for item in paginated.items}
             return [by_id.get(key) for key in keys]
