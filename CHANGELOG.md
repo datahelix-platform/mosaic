@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **A GraphQL request that resolved about 1,000 related records of one type
+  failed on SQLite** (#293) with "Expression tree is too large (maximum
+  depth 1000)". The per-request relationship loader sent its batch as one
+  `id = ?` filter per key joined by OR, which SQLite parses one tree level
+  deeper per key, and stock SQLite builds (the published image's among them)
+  cap expression depth at 1000. So 999 keys of one type in one request was
+  enough: `donors { samples }` over every donor of the 500-donor brain-bank
+  demo, or several fields whose targets of one type add up to that. Forward
+  references and reverse lists both go through the loader; a forward
+  reference came back `null` on every row. The loader now sends one
+  `id in [...]` filter, the form the query service already uses for id
+  batches. Postgres, which flattens OR chains, was not affected.
+
 ## v0.16.1 — 2026-11-23 (lifecycle mutations reject another kind's id; REST availability routes fixed, relationship stubs answer 501; supersede on Postgres)
 
 **Patch release.** Nothing in it breaks a correct client. Three behaviour
